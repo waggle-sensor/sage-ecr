@@ -276,7 +276,7 @@ class Apps(MethodView):
 
     
         
-
+app.add_url_rule('/', view_func=Base.as_view('appsBase'))
 app.add_url_rule('/apps', view_func=AppList.as_view('appsListAPI'))
 app.add_url_rule('/apps/<string:app_id>', view_func=Apps.as_view('appsAPI'))
 
