@@ -6,20 +6,9 @@ SAGE Edge Code Repository
 
 # testing
 
+
 ```bash
 docker-compose build
-
-docker-compose up -d 
-
-while [[ ${HEALTH}_ != "ok_" ]] ; do HEALTH=$(curl -s http://localhost:5000/healthy) ; echo $HEALTH ; sleep 1 ; done
-
-docker exec -ti sage-ecr_sage-ecr_1 pytest -v
-```
-
-or (works on laptop, not for Github Actions)
-```bash
-docker-compose build
-
 docker-compose run --rm  sage-ecr  pytest -v
 ```
 
