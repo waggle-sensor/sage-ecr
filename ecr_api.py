@@ -274,7 +274,13 @@ class Apps(MethodView):
 
         return returnObj
 
-    
+class Base(MethodView):
+    def get(self):
+
+        # example:  curl localhost:5000/
+
+        return "SAGE Edge Code Repository"
+            
         
 app.add_url_rule('/', view_func=Base.as_view('appsBase'))
 app.add_url_rule('/apps', view_func=AppList.as_view('appsListAPI'))
