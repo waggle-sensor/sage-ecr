@@ -3,7 +3,7 @@ version: '3.7'
 
 services:
 
-  sage-api:
+  sage-ecr:
     image: sagecontinuum/sage-ecr:latest
     build:
       context: .
