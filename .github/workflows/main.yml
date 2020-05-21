@@ -15,7 +15,15 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+
     - name: Build the Docker image
       run: docker-compose build
+
+    - name: Start docker-compose
+      run: docker-compose up -d
+
+    - name: wait for service
+      run: until curl -s http://localhost:5000/ ; do echo "no connection..." ; sleep 1 ; done
+      
     - name: run tests
-      run: docker-compose run --rm  sage-ecr  pytest -v
+      run: docker exec -ti sage-ecr_sage-ecr_1 pytest -v
