@@ -2,6 +2,7 @@
 
 from flask import Flask
 from flask.views import MethodView
+from flask import jsonify
 
 import MySQLdb
 from flask import request
@@ -108,12 +109,12 @@ class EcrDB():
 
 
 
-
+# /apps
 class AppList(MethodView):
     def get(self):
         ecr_db = EcrDB()
         app_list = ecr_db.listApps()
-        return { "data" : app_list} 
+        return jsonify(app_list) 
 
     def post(self):
         # example
@@ -274,6 +275,7 @@ class AppList(MethodView):
         return returnObj
     
 
+# /apps/{id}
 class Apps(MethodView):
     def get(self, app_id):
 
