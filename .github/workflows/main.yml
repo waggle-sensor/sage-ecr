@@ -27,7 +27,7 @@ jobs:
 
     - name: wait for service
       run: |
-        sleep 5 
+        set +e 
         while [[ ${HEALTH}_ != "ok_" ]] ; do HEALTH=$(curl -s http://localhost:5000/healthy) ; echo $HEALTH ; sleep 1 ; done
 
     - name: run tests
