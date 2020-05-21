@@ -4,7 +4,13 @@ SAGE Edge Code Repository
 
 
 
+# testing
 
+```bash
+docker-compose build
+
+docker-compose run --rm  sage-ecr  pytest -v
+```
 
 
 # debugging
