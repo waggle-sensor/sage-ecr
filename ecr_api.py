@@ -146,9 +146,9 @@ class AppList(MethodView):
         if len(appName) < 4:
            return  {"error": f'Name has to be at least 4 characters long'}  
 
-        # \w = [a-zA-Z0-9_]
+        
         vc = '[.a-zA-Z0-9_-]'
-        p = re.compile(f'\w{vc}+', re.ASCII)
+        p = re.compile(f'[a-zA-Z0-9_]{vc}+', re.ASCII)
         if not p.match(appName):
             return  {"error": f'Name can only consist of [0-9a-zA-Z-_.] characters and only start with [0-9a-zA-Z] characters.'}  
 
@@ -280,7 +280,7 @@ class Base(MethodView):
         # example:  curl localhost:5000/
 
         return "SAGE Edge Code Repository"
-            
+
         
 app.add_url_rule('/', view_func=Base.as_view('appsBase'))
 app.add_url_rule('/apps', view_func=AppList.as_view('appsListAPI'))
