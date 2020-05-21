@@ -24,6 +24,6 @@ jobs:
 
     - name: wait for service
       run: until curl -s http://localhost:5000/ ; do echo "no connection..." ; sleep 1 ; done
-      
+
     - name: run tests
-      run: docker exec -ti sage-ecr_sage-ecr_1 pytest -v
+      run: docker exec -t sage-ecr_sage-ecr_1 pytest -v
