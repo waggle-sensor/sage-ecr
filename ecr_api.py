@@ -51,13 +51,17 @@ dbFields_str  = ",".join(dbFields)
 
 class EcrDB():
     def __init__ ( self ) :
+        count = 0
         while True:
             try:
                 self.db=MySQLdb.connect(host=mysql_host,user=mysql_user,
                   passwd=mysql_password,db=mysql_db)
             except Exception as e:
+                if count > 10:
+                    raise
                 print(f'Could not connnect to database, error={e}, retry in 2 seconds', file=sys.stderr)
                 time.sleep(2)
+                count += 1
                 continue
             break
 
