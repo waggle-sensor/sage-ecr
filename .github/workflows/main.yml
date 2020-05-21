@@ -16,21 +16,8 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Try cleanup
-      run: docker-compose down -v
-
     - name: Build the Docker image
       run: docker-compose build
 
-    - name: Start docker-compose
-      run: docker-compose up -d
-
-    - name: wait for service
-      run: |
-        set +e 
-        sleep 5
-        docker-compose logs
-        while [[ ${HEALTH}_ != "ok_" ]] ; do HEALTH=$(curl -s http://localhost:5000/healthy) ; echo $HEALTH ; sleep 1 ; done
-
     - name: run tests
-      run: docker exec -t sage-ecr_sage-ecr_1 pytest -v
+      run: docker-compose run --rm  sage-ecr  pytest -v
