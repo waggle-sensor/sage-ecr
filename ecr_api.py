@@ -8,7 +8,7 @@ from flask import request
 import re
 import uuid
 import json
-
+import time
 
 import os
 import sys
@@ -51,8 +51,16 @@ dbFields_str  = ",".join(dbFields)
 
 class EcrDB():
     def __init__ ( self ) :
-        self.db =MySQLdb.connect(host=mysql_host,user=mysql_user,
+        while True:
+            try:
+                self.db=MySQLdb.connect(host=mysql_host,user=mysql_user,
                   passwd=mysql_password,db=mysql_db)
+            except Exception as e:
+                print(f'Could not connnect to database, error={e}, retry in 2 seconds', file=sys.stderr)
+                time.sleep(2)
+                continue
+            break
+
         self.cur=self.db.cursor()
 
     def getApp(self, app_id):
