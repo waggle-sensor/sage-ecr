@@ -57,7 +57,7 @@ class EcrDB():
                 self.db=MySQLdb.connect(host=mysql_host,user=mysql_user,
                   passwd=mysql_password,db=mysql_db)
             except Exception as e:
-                if count >30:
+                if count > 60:
                     raise
                 print(f'Could not connnect to database, error={e}, retry in 2 seconds', file=sys.stderr)
                 time.sleep(2)
@@ -293,8 +293,22 @@ class Base(MethodView):
 
         return "SAGE Edge Code Repository"
 
+class Healthy(MethodView):
+    def get(self):
+
+        # example:  curl localhost:5000/
+        try:
+            ecr_db = EcrDB()
+        except:
+            return "error"
+
+        if ecr_db == None:
+            return "error"
+
+        return "ok"
         
 app.add_url_rule('/', view_func=Base.as_view('appsBase'))
+app.add_url_rule('/healthy', view_func=Healthy.as_view('healthy'))
 app.add_url_rule('/apps', view_func=AppList.as_view('appsListAPI'))
 app.add_url_rule('/apps/<string:app_id>', view_func=Apps.as_view('appsAPI'))
 

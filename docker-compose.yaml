@@ -22,7 +22,6 @@ services:
   db:
     image: mysql:8
     env_file: mysql.env
-   
     volumes:
       - ${PWD}/schema.sql:/docker-entrypoint-initdb.d/init.sql
       - sage-ecr-db:/var/lib/mysql
