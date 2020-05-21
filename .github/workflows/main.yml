@@ -23,7 +23,11 @@ jobs:
       run: docker-compose up -d
 
     - name: wait for service
-      run: while [[ $(curl -s http://localhost:5000/healthy) != "ok" ]] ; do echo "no connection..." ; sleep 1 ; done
+      run: |
+        sleep 5
+        docker-compose -v
+        docker exec -t sage-ecr_sage-ecr_1 printenv
+        while [[ $(curl -s http://localhost:5000/healthy) != "ok" ]] ; do echo "no connection..." ; sleep 1 ; done
 
     - name: run tests
       run: docker exec -t sage-ecr_sage-ecr_1 pytest -v
