@@ -28,6 +28,8 @@ jobs:
     - name: wait for service
       run: |
         set +e 
+        sleep 5
+        docker-compose logs
         while [[ ${HEALTH}_ != "ok_" ]] ; do HEALTH=$(curl -s http://localhost:5000/healthy) ; echo $HEALTH ; sleep 1 ; done
 
     - name: run tests
