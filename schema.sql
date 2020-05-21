@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS SageECR.CI (
     GPU , sensor,  etc..
 */
 CREATE TABLE IF NOT EXISTS SageECR.Requirements (
-    id                  BINARY(16) NOT NULL PRIMARY KEY,
+    id                  BINARY(16) NOT NULL,
     requirement         VARCHAR(64),
-   PRIMARY KEY(`id`, `requirement`)
+    PRIMARY KEY(`id`, `requirement`)
 );
