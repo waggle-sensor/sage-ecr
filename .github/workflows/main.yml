@@ -16,8 +16,8 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Debug info
-      run: docker volume ls
+    - name: Try cleanup
+      run: docker-compose down -v
 
     - name: Build the Docker image
       run: docker-compose build
