@@ -11,7 +11,7 @@ docker-compose build
 
 docker-compose up -d 
 
-until curl -s http://localhost:5000/ ; do echo "no connection..." ; sleep 1 ; done
+while [[ ${HEALTH}_ != "ok_" ]] ; do HEALTH=$(curl -s http://localhost:5000/healthy) ; echo $HEALTH ; sleep 1 ; done
 
 docker exec -ti sage-ecr_sage-ecr_1 pytest -v
 ```

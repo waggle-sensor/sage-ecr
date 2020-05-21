@@ -50,14 +50,14 @@ dbFields_str  = ",".join(dbFields)
 
 
 class EcrDB():
-    def __init__ ( self ) :
+    def __init__ ( self , retries=60) :
         count = 0
         while True:
             try:
                 self.db=MySQLdb.connect(host=mysql_host,user=mysql_user,
                   passwd=mysql_password,db=mysql_db)
             except Exception as e:
-                if count > 60:
+                if count > retries:
                     raise
                 print(f'Could not connnect to database, error={e}, retry in 2 seconds', file=sys.stderr)
                 time.sleep(2)
@@ -298,12 +298,9 @@ class Healthy(MethodView):
 
         # example:  curl localhost:5000/
         try:
-            ecr_db = EcrDB()
-        except:
-            return "error"
-
-        if ecr_db == None:
-            return "error"
+            ecr_db = EcrDB(retries=1)
+        except Exception as e:
+            return f'error ({e})'
 
         return "ok"
         
