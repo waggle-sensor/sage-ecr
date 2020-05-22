@@ -1,7 +1,7 @@
 # sage-ecr
 SAGE Edge Code Repository
 
-![docker-compose test](https://github.com/sagecontinuum/sage-storage-api/workflows/docker-compose%20test/badge.svg)
+![CI](https://github.com/sagecontinuum/sage-ecr/workflows/CI/badge.svg)
 
 # usage
 
