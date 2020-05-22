@@ -1,5 +1,6 @@
 Flask
 mysqlclient
 pytest
+coverage
 middleware
 requests
