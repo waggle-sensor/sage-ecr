@@ -15,7 +15,11 @@ services:
     volumes:
       - ${PWD}:/usr/src/app  # for development only
     env_file: mysql.env
-    
+    environment:
+      DISABLE_AUTH: 1
+      tokenInfoEndpoint: ${SageTokenInfoEndpoint} 
+      tokenInfoUser: ${SageTokenInfoUser}  
+      tokenInfoPassword: ${SageTokenInfoPassword} 
     
 
 
