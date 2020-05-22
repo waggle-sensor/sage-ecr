@@ -20,4 +20,7 @@ jobs:
       run: docker-compose build
 
     - name: run tests
-      run: docker-compose run --rm  sage-ecr  pytest -v
+      run: docker-compose run --rm  sage-ecr  coverage run -m pytest -v
+
+    - name: test code coverage
+      run: docker-compose run --rm  sage-ecr  coverage report -m
