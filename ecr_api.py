@@ -184,7 +184,7 @@ class EcrDB():
         row = self.cur.fetchone()
         i = 0
         if row == None:
-            raise Exception(f'App {app_id} not found')
+            raise ErrorResponse(f'App {app_id} not found', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
         for value in row:
             print(f'value: {value}', file=sys.stderr)
             returnObj[returnFields[i]] = value
@@ -431,7 +431,7 @@ app = Flask(__name__)
 app.wsgi_app = ecr_middleware(app.wsgi_app)
 
 @app.errorhandler(ErrorResponse)
-def handle_invalid_usage(error): # pragma: no cover
+def handle_invalid_usage(error):
     response = jsonify(error.to_dict())
     response.status_code = error.status_code
     return response

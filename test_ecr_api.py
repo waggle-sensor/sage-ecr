@@ -114,4 +114,12 @@ def test_health(client):
 
     assert rv.data == b"ok"
 
+def test_error(client):
+    
+    rv = client.get('/apps/test')
+    result = rv.get_json()
+
+    assert "error" in result
+
+    assert "not found" in result["error"]
 
