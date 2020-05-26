@@ -11,9 +11,16 @@ import uuid
 import json
 import time
 
+from werkzeug.wrappers import Request, Response, ResponseStream
+from middleware import middleware
+import requests
+from http import HTTPStatus
+
 import os
 import sys
-app = Flask(__name__)
+
+
+
 
 # https://mysqlclient.readthedocs.io/user_guide.html#mysqldb-mysql
 mysql_host = os.getenv('MYSQL_HOST')
@@ -48,6 +55,105 @@ input_valid_types = ["boolean", "int", "long", "float", "double", "string", "Fil
 # database fields
 dbFields = valid_fields + ["owner"]
 dbFields_str  = ",".join(dbFields)
+
+
+tokenInfoEndpoint = os.getenv('tokenInfoEndpoint')
+tokenInfoUser = os.getenv('tokenInfoUser')
+tokenInfoPassword = os.getenv('tokenInfoPassword')
+auth_disabled = os.getenv('DISABLE_AUTH', default="0") == "1"
+
+
+# from https://flask.palletsprojects.com/en/1.1.x/patterns/apierrors/
+class ErrorResponse(Exception):
+    status_code = HTTPStatus.BAD_REQUEST 
+
+    def __init__(self, message, status_code=None, payload=None):
+        Exception.__init__(self)
+        self.message = message
+        if status_code is not None:
+            self.status_code = status_code
+        self.payload = payload
+
+    def to_dict(self):
+        rv = dict(self.payload or ())
+        rv['error'] = self.message
+        return rv
+
+
+
+# do token introspection
+# from https://medium.com/swlh/creating-middlewares-with-python-flask-166bd03f2fd4
+class ecr_middleware():
+    '''
+    Simple WSGI middleware
+    '''
+
+    def __init__(self, app):
+        self.app = app
+        self.userName = ''
+        self.password = ''
+        #self.authenticated = False
+
+    def __call__(self, environ, start_response):
+        # reminder: -H "Authorization: sage ${SAGE_USER_TOKEN}"
+        request = Request(environ)
+        authHeader = request.headers.get("Authorization", default = "")
+
+        if auth_disabled:
+           # self.authenticated
+            environ['authenticated'] = True
+            environ['user'] = "testuser"
+            return self.app(environ, start_response)
+
+
+        environ['authenticated'] = False
+        #print(f"Authorization: {authHeader}", file=sys.stderr)
+
+        if authHeader == "":
+            return self.app(environ, start_response)
+
+        authHeaderArray = authHeader.split(" ", 2)
+        if len(authHeaderArray) != 2:
+            res = Response(f'Authorization failed (could not parse Authorization header)', mimetype= 'text/plain', status=401)
+            return res(environ, start_response)
+
+        if authHeaderArray[0].lower() != "sage":
+            res = Response(f'Authorization failed (Authorization bearer not supported)', mimetype= 'text/plain', status=401)
+            return res(environ, start_response)
+
+        token = authHeaderArray[1]
+        if token == "":
+            res = Response(f'Authorization failed (token empty)', mimetype= 'text/plain', status=401)
+            return res(environ, start_response)
+
+
+        
+        
+        
+        # example: curl -X POST -H 'Accept: application/json; indent=4' -H "Authorization: Basic c2FnZS1hcGktc2VydmVyOnRlc3Q=" -d 'token=<SAGE-USER-TOKEN>'  <sage-ui-hostname>:80/token_info/
+        # https://github.com/sagecontinuum/sage-ui/#token-introspection-api
+
+
+        headers = {"Accept":"application/json; indent=4", "Authorization": f"Basic {tokenInfoPassword}" , "Content-Type":"application/x-www-form-urlencoded"}
+        data=f"token={token}"
+        r = requests.post(tokenInfoEndpoint, data = data, headers=headers, timeout=5)
+
+        
+
+        result_obj = r.json()
+        if not "active" in result_obj:
+            res = Response(f'Authorization failed (broken response) {result_obj}', mimetype= 'text/plain', status=500)
+            return res(environ, start_response)
+
+        is_active = result_obj["active"]
+        if is_active:
+            environ['authenticated'] = True
+            environ['user'] = result_obj["username"]
+            return self.app(environ, start_response)
+
+        res = Response(f'Authorization failed (token not active)', mimetype= 'text/plain', status=401)
+        return res(environ, start_response)
+        
 
 
 class EcrDB():
@@ -112,6 +218,12 @@ class EcrDB():
 # /apps
 class AppList(MethodView):
     def get(self):
+        authenticated = request.environ['authenticated']
+        if not authenticated:
+            raise ErrorResponse('Not authenticated', status_code=HTTPStatus.UNAUTHORIZED)
+
+        # TODO allow unauthenticated users to get public apps
+
         ecr_db = EcrDB()
         app_list = ecr_db.listApps()
         return jsonify(app_list) 
@@ -124,47 +236,46 @@ class AppList(MethodView):
 
         # TODO authentication
         # TODO set owner
-        authenticated = False
+        authenticated = request.environ['authenticated']
+        if not authenticated:
+            raise ErrorResponse('Not authenticated', status_code=HTTPStatus.UNAUTHORIZED)
+
+        
+        requestUser = request.environ['user']
+
         postData = request.get_json(force=True)
 
         for key in postData:
             if not key in valid_fields_set:
-                return  {"error": f'Field {key} not supported'}
+                #return  {"error": f'Field {key} not supported'}
+                raise ErrorResponse(f'Field {key} not supported', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
         # if required
         for key in required_fields:
             if not key in postData:
-                return  {"error": f'Required field {key} is missing'}
+                #return  {"error": f'Required field {key} is missing'}
+                raise ErrorResponse(f'Required field {key} is missing', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
             value  = postData[key]
             if len(value) == 0:
-                return  {"error": f'Required field {key} is missing'}
-
+                #return  {"error": f'Required field {key} is missing'}
+                raise ErrorResponse(f'Required field {key} is missing', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
         
 
         ##### name
         appName = postData["name"]
         appNameArray = appName.split("/", 2)
-        appUser = "user"
-        if len(appNameArray) == 2:
-            appUser = appNameArray[0]
-            appName = appNameArray[1]
-
-        if not authenticated:
-            appUser = "unknown"
-        # TODO check if appUser is correct
-        # either owner or group name user has permisson to
-
-
-        if len(appName) < 4:
-           return  {"error": f'Name has to be at least 4 characters long'}  
-
+        if len(appNameArray) > 1:
+            raise ErrorResponse(f'Name should not contain a slash', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+      
+  
+        
         
         vc = '[.a-zA-Z0-9_-]'
         p = re.compile(f'[a-zA-Z0-9_]{vc}+', re.ASCII)
         if not p.match(appName):
-            return  {"error": f'Name can only consist of [0-9a-zA-Z-_.] characters and only start with [0-9a-zA-Z] characters.'}  
-
+            #return  {"error": f'Name can only consist of [0-9a-zA-Z-_.] characters and only start with [0-9a-zA-Z] characters.'}  
+            raise ErrorResponse(f'Name can only consist of [0-9a-zA-Z-_.] characters and only start with [0-9a-zA-Z] characters.', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
         ##### architecture
         
@@ -174,8 +285,9 @@ class AppList(MethodView):
             for arch in appArchitecture:
                 if not arch in architecture_valid:
                     valid_arch_str = ",".join(architecture_valid)
-                    return  {"error": f'Architecture {arch} not supported, valid values: {valid_arch_str}'}
-
+                    #return  {"error": f'Architecture {arch} not supported, valid values: {valid_arch_str}'}
+                    raise ErrorResponse(f'Architecture {arch} not supported, valid values: {valid_arch_str}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+                
             architecture_str = ",".join(appArchitecture)
 
 
@@ -198,7 +310,7 @@ class AppList(MethodView):
                 break
         
         if not source_matched:
-            return  {"error": f'Could not parse source field'}
+            raise ErrorResponse('Could not parse source field', status_code=HTTPStatus.INTERNAL_SERVER_ERROR) 
 
         ##### inputs
         
@@ -209,13 +321,14 @@ class AppList(MethodView):
             for app_input in appInputs:
                 for field in app_input:
                     if not  field in  input_fields_valid:
-                        return  {"error": f'Input field {field} not supported'} 
+                        raise ErrorResponse(f'Input field {field} not supported', status_code=HTTPStatus.INTERNAL_SERVER_ERROR) 
+
                 for expected in input_fields_valid:
                     if not  expected in  app_input:
-                        return  {"error": f'Expected field {expected} missing'} 
+                        raise ErrorResponse(f'Expected field {expected} missing', status_code=HTTPStatus.INTERNAL_SERVER_ERROR) 
                     input_type = app_input["type"]
                     if not input_type in input_valid_types:
-                        return  {"error": f'Input type {input_type} not supported'} 
+                        raise ErrorResponse(f'Input type {input_type} not supported', status_code=HTTPStatus.INTERNAL_SERVER_ERROR) 
 
             appInputs_str = json.dumps(appInputs) 
 
@@ -230,7 +343,7 @@ class AppList(MethodView):
         for key in valid_fields_set:
             dbObject[key] = ""
 
-        dbObject["name"] = f'{appUser}/{appName}'
+        dbObject["name"] = appName
         dbObject["architecture"] = architecture_str
         dbObject["inputs"] = appInputs_str
         dbObject["metadata"] = appMetadata_str
@@ -238,7 +351,7 @@ class AppList(MethodView):
         for key in ["description", "version", "source"]:
             dbObject[key] = postData[key]
 
-        dbObject["owner"] = "unknown"
+        dbObject["owner"] = requestUser
         
         # create INSERT statment dynamically
         values =[]
@@ -280,7 +393,12 @@ class Apps(MethodView):
     def get(self, app_id):
 
         # example:  curl localhost:5000/app/{}
+        authenticated = request.environ['authenticated']
+        if not authenticated:
+            raise ErrorResponse('Not authenticated', status_code=HTTPStatus.UNAUTHORIZED)
 
+        # TODO make sure user has permissions to view
+        
         ecr_db = EcrDB()
 
 
@@ -288,6 +406,7 @@ class Apps(MethodView):
 
         return returnObj
 
+# /
 class Base(MethodView):
     def get(self):
 
@@ -295,6 +414,7 @@ class Base(MethodView):
 
         return "SAGE Edge Code Repository"
 
+# /healthy
 class Healthy(MethodView):
     def get(self):
 
@@ -305,7 +425,17 @@ class Healthy(MethodView):
             return f'error ({e})'
 
         return "ok"
-        
+
+
+app = Flask(__name__)
+app.wsgi_app = ecr_middleware(app.wsgi_app)
+
+@app.errorhandler(ErrorResponse)
+def handle_invalid_usage(error):
+    response = jsonify(error.to_dict())
+    response.status_code = error.status_code
+    return response
+
 app.add_url_rule('/', view_func=Base.as_view('appsBase'))
 app.add_url_rule('/healthy', view_func=Healthy.as_view('healthy'))
 app.add_url_rule('/apps', view_func=AppList.as_view('appsListAPI'))

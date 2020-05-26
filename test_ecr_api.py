@@ -43,18 +43,21 @@ def test_app_upload_and_download(client):
     
     
     assert result != None
-    assert result["name"] ==  "unknown/testapp"
+    assert result["name"] ==  "testapp"
     
 
     assert "id" in result
     app_id = result["id"]
 
+    # test GET /apps/{app_id}
+    ######################################################
     rv = client.get(f'/apps/{app_id}')
     
     result = rv.get_json()
 
     assert result != None
-    assert result["name"] ==  "unknown/testapp"
+    assert result["name"] ==  "testapp"
+    assert result["owner"] ==  "testuser"
     assert "id" in result
     app_get_id = result["id"]
     assert app_id == app_get_id
@@ -68,4 +71,3 @@ def test_app_upload_and_download(client):
 
     assert "my-science-data" in result["metadata"]
     assert result["metadata"]["my-science-data"] == 12345
-    
