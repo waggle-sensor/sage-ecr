@@ -20,6 +20,15 @@ CREATE TABLE IF NOT EXISTS SageECR.Apps (
     owner               VARCHAR(64) NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS SageECR.AppPermissions (
+    id                  BINARY(16) NOT NULL,
+    granteeType         ENUM('USER', 'GROUP'),
+    grantee             VARCHAR(64), 
+    permission          ENUM('READ', 'WRITE', 'READ_ACP', 'WRITE_ACP', 'FULL_CONTROL'),
+    PRIMARY KEY (id, granteeType, grantee, permission)
+);
+# permissions similar to https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html
+
 /* Continous Integration related */
 CREATE TABLE IF NOT EXISTS SageECR.CI (
     id                  BINARY(16) NOT NULL PRIMARY KEY,

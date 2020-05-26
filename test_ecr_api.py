@@ -121,5 +121,6 @@ def test_error(client):
 
     assert "error" in result
 
-    assert "not found" in result["error"]
+    # this fails because app "test" does not exist and there is no permission
+    assert "Not authorized" in result["error"]
 

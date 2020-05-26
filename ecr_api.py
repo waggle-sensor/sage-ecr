@@ -173,6 +173,28 @@ class EcrDB():
             break
 
         self.cur=self.db.cursor()
+        return
+
+    def hasPermission(self, app_id, granteeType, grantee, permission):
+
+
+        stmt = f'SELECT BIN_TO_UUID(id) FROM AppPermissions WHERE BIN_TO_UUID(id) = %s AND granteeType = %s AND grantee = %s AND (permission="FULL_CONTROL" OR permission = %s)'
+        print(f'stmt: {stmt} app_id={app_id} granteeType={granteeType} grantee={grantee} permission={permission}', file=sys.stderr)
+        self.cur.execute(stmt, (app_id, granteeType, grantee,  permission ))
+
+        row = self.cur.fetchone()
+        if row == None:
+            #print(f'row empty', file=sys.stderr)
+            return False
+
+        if len(row) > 0:
+            return True
+
+        #print(f'row len 0', file=sys.stderr)
+        return False
+
+
+
 
     def getApp(self, app_id):
         stmt = f'SELECT  BIN_TO_UUID(id), {dbFields_str} FROM Apps WHERE BIN_TO_UUID(id) = %s'
@@ -212,6 +234,8 @@ class EcrDB():
             app_list.append({"id": row[0], "name": row[1], "version":row[2]})
         
         return app_list
+
+
 
 
 
@@ -291,7 +315,7 @@ class AppList(MethodView):
             architecture_str = ",".join(appArchitecture)
 
 
-        architecture_valid
+    
 
         ##### source
         # source
@@ -372,6 +396,9 @@ class AppList(MethodView):
         
         ecr_db.cur.execute(stmt, (newID_str, *values))
       
+        stmt = f'INSERT INTO AppPermissions ( id, granteeType , grantee, permission) VALUES (UUID_TO_BIN(%s) , %s,  %s, %s)'
+        ecr_db.cur.execute(stmt, (newID_str, "USER", requestUser , "FULL_CONTROL"))
+
         ecr_db.db.commit()
         #print(f'row: {row}', file=sys.stderr)
 
@@ -398,9 +425,15 @@ class Apps(MethodView):
             raise ErrorResponse('Not authenticated', status_code=HTTPStatus.UNAUTHORIZED)
 
         # TODO make sure user has permissions to view
-        
+
+        requestUser = request.environ['user']
+
         ecr_db = EcrDB()
 
+
+        print(requestUser, file=sys.stderr)
+        if not ecr_db.hasPermission(app_id, "USER", requestUser , "READ"):
+            raise ErrorResponse(f'Not authorized. ({requestUser})', status_code=HTTPStatus.UNAUTHORIZED)
 
         returnObj=ecr_db.getApp(app_id)
 
