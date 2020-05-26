@@ -7,6 +7,10 @@ import pytest
 import sys
 from ecr_api import app , dbFields
 
+
+test_app_def = '{"name" : "testapp", "description": "blabla", "architecture" : ["linux/amd64" , "linux/arm/v7"] , "version" : "1.0", "source" :"https://github.com/user/repo.git#v1.0", "inputs": [{"id":"speed" , "type":"int" }] , "metadata": {"my-science-data" : 12345} }'
+
+
 # from https://flask.palletsprojects.com/en/1.1.x/testing/
 @pytest.fixture
 def client():
@@ -32,7 +36,7 @@ def test_connect(client):
 def test_app_upload_and_download(client):
     """Start with a blank database."""
 
-    test_app_def = '{"name" : "testapp", "description": "blabla", "architecture" : ["linux/amd64" , "linux/arm/v7"] , "version" : "1.0", "source" :"https://github.com/user/repo.git#v1.0", "inputs": [{"id":"speed" , "type":"int" }] , "metadata": {"my-science-data" : 12345} }'
+    
 
 
     rv = client.post('/apps', data = test_app_def)
@@ -71,3 +75,43 @@ def test_app_upload_and_download(client):
 
     assert "my-science-data" in result["metadata"]
     assert result["metadata"]["my-science-data"] == 12345
+
+
+
+def test_listApps(client):
+    rv = client.post('/apps', data = test_app_def)
+    assert rv.data != ""
+    print(f'rv.data: {rv.data}' , file=sys.stderr)
+    
+    result = rv.get_json()
+
+    assert "id" in result
+    app_id = result["id"]
+
+
+    rv = client.get('/apps', data = test_app_def)
+
+    result = rv.get_json()
+
+    found_app = False 
+    for app in result:
+        assert "id" in app
+        if app["id"] == app_id:
+            found_app = True
+            break
+
+    assert found_app
+
+
+    assert len(result) > 0
+
+def test_health(client):
+    
+    rv = client.get('/')
+    assert rv.data == b"SAGE Edge Code Repository"
+    
+    rv = client.get('/healthy')
+
+    assert rv.data == b"ok"
+
+
