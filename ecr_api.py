@@ -418,7 +418,7 @@ class Base(MethodView):
 class Healthy(MethodView):
     def get(self):
 
-        # example:  curl localhost:5000/
+        # example:  curl localhost:5000/healthy
         try:
             ecr_db = EcrDB(retries=1)
         except Exception as e:
