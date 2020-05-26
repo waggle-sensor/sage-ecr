@@ -64,10 +64,10 @@ auth_disabled = os.getenv('DISABLE_AUTH', default="0") == "1"
 
 
 # from https://flask.palletsprojects.com/en/1.1.x/patterns/apierrors/
-class ErrorResponse(Exception):
+class ErrorResponse(Exception): # pragma: no cover
     status_code = HTTPStatus.BAD_REQUEST 
 
-    def __init__(self, message, status_code=None, payload=None):
+    def __init__(self, message, status_code=None, payload=None): 
         Exception.__init__(self)
         self.message = message
         if status_code is not None:
@@ -94,7 +94,7 @@ class ecr_middleware():
         self.password = ''
         #self.authenticated = False
 
-    def __call__(self, environ, start_response):
+    def __call__(self, environ, start_response): # pragma: no cover
         # reminder: -H "Authorization: sage ${SAGE_USER_TOKEN}"
         request = Request(environ)
         authHeader = request.headers.get("Authorization", default = "")
@@ -163,7 +163,7 @@ class EcrDB():
             try:
                 self.db=MySQLdb.connect(host=mysql_host,user=mysql_user,
                   passwd=mysql_password,db=mysql_db)
-            except Exception as e:
+            except Exception as e: # pragma: no cover
                 if count > retries:
                     raise
                 print(f'Could not connnect to database, error={e}, retry in 2 seconds', file=sys.stderr)
@@ -431,7 +431,7 @@ app = Flask(__name__)
 app.wsgi_app = ecr_middleware(app.wsgi_app)
 
 @app.errorhandler(ErrorResponse)
-def handle_invalid_usage(error):
+def handle_invalid_usage(error): # pragma: no cover
     response = jsonify(error.to_dict())
     response.status_code = error.status_code
     return response
