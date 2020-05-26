@@ -29,7 +29,7 @@ returns:
   "metadata": {
     "my-science-data": 12345
   }, 
-  "name": "unknown/testapp1", 
+  "name": "testapp1", 
   "owner": "unknown", 
   "source": "https://github.com/user/repo.git#v1.0", 
   "version": "1.0"
@@ -57,17 +57,17 @@ returns
 [
   {
     "id": "7133719e-7049-4bcb-a699-ed8fab8be346", 
-    "name": "unknown/testapp1", 
+    "name": "testapp1", 
     "version": "1.0"
   }, 
   {
     "id": "8717a431-49ce-49da-a710-0590281dc6e9", 
-    "name": "unknown/testapp2", 
+    "name": "testapp2", 
     "version": "1.0"
   }, 
   {
     "id": "e9f98c56-fbde-41d9-a6ec-e2c0dfa32352", 
-    "name": "unknown/testapp3", 
+    "name": "testapp3", 
     "version": "1.0"
   }
 ]
@@ -78,7 +78,7 @@ returns
 
 ```bash
 docker-compose build
-docker-compose run --rm  sage-ecr  pytest -v
+docker-compose run --rm  sage-ecr /bin/ash -c 'coverage run -m pytest -v &&  coverage report -m'
 ```
 
 
