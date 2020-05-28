@@ -190,24 +190,23 @@ class EcrDB():
     # returns true if user has any of the permissions 
     def hasPermission(self, app_id, granteeType, grantee, permissions):
 
+        
+        permissionOR = "permission = %s" + " OR permission = %s" * (len(permissions) -1)
+       
+        stmt = f'SELECT BIN_TO_UUID(id) FROM AppPermissions WHERE BIN_TO_UUID(id) = %s AND granteeType = %s AND grantee = %s AND ({permissionOR})'
+        print(f'stmt: {stmt} app_id={app_id} granteeType={granteeType} grantee={grantee} permissions={json.dumps(permissions)}', file=sys.stderr)
+        
+        self.cur.execute(stmt, (app_id, granteeType, grantee,  *permissions ))
+        row = self.cur.fetchone()
+        if row == None:
+            return False
 
-        for permission in permissions:
-            stmt = f'SELECT BIN_TO_UUID(id) FROM AppPermissions WHERE BIN_TO_UUID(id) = %s AND granteeType = %s AND grantee = %s AND (permission="FULL_CONTROL" OR permission = %s)'
-            print(f'stmt: {stmt} app_id={app_id} granteeType={granteeType} grantee={grantee} permission={permission}', file=sys.stderr)
-            self.cur.execute(stmt, (app_id, granteeType, grantee,  permission ))
-
-            row = self.cur.fetchone()
-            if row == None:
-                #print(f'row empty', file=sys.stderr)
-                continue
-
-            if len(row) > 0:
-                return True
-
-            #print(f'row len 0', file=sys.stderr)
-            continue
+        if len(row) > 0:
+            return True
 
         return False
+
+       
 
 
     def deleteApp(self, app_id):
@@ -604,7 +603,7 @@ class Apps(MethodView):
 
 
         print(requestUser, file=sys.stderr)
-        if not ecr_db.hasPermission(app_id, "USER", requestUser , ["READ"]):
+        if not ecr_db.hasPermission(app_id, "USER", requestUser , ["FULL_CONTROL", "READ"]):
             raise ErrorResponse(f'Not authorized.', status_code=HTTPStatus.UNAUTHORIZED)
 
         returnObj=ecr_db.getApp(app_id)
