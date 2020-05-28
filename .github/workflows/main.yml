@@ -19,8 +19,6 @@ jobs:
     - name: Build the Docker image
       run: docker-compose build
 
-    - name: run tests
-      run: docker-compose run --rm  sage-ecr  coverage run -m pytest -v
+    - name: run tests and coverage
+      run: docker-compose run --rm  sage-ecr /bin/ash -c 'coverage run -m pytest -v &&  coverage report -m'
 
-    - name: test code coverage
-      run: docker-compose run --rm  sage-ecr  coverage report -m
