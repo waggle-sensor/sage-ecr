@@ -187,6 +187,7 @@ class EcrDB():
         self.cur=self.db.cursor()
         return
 
+    # returns true if user has any of the permissions 
     def hasPermission(self, app_id, granteeType, grantee, permissions):
 
 
