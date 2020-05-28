@@ -205,6 +205,14 @@ def test_permissions(client):
 
     assert result[0]["permission"]== "FULL_CONTROL"
 
+
+    # check app without auth
+    rv = client.get(f'/apps/{app_id}')
+
+    result = rv.get_json()
+
+    error_msg = result.get("error", "")
+    assert "Not authenticated" in  error_msg
     
 
 
