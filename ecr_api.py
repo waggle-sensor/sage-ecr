@@ -193,7 +193,11 @@ class EcrDB():
         
         permissionOR = "permission = %s" + " OR permission = %s" * (len(permissions) -1)
        
-        stmt = f'SELECT BIN_TO_UUID(id) FROM AppPermissions WHERE BIN_TO_UUID(id) = %s AND granteeType = %s AND grantee = %s AND ({permissionOR})'
+        permissionsPublicRead = 'FALSE'
+        if 'READ' in permissions:
+            permissionsPublicRead='(granteeType="GROUP" AND grantee="Allusers")'
+
+        stmt = f'SELECT BIN_TO_UUID(id) FROM AppPermissions WHERE BIN_TO_UUID(id) = %s AND (( granteeType = %s AND grantee = %s AND ({permissionOR}) ) OR {permissionsPublicRead}  )'
         print(f'stmt: {stmt} app_id={app_id} granteeType={granteeType} grantee={grantee} permissions={json.dumps(permissions)}', file=sys.stderr)
         
         self.cur.execute(stmt, (app_id, granteeType, grantee,  *permissions ))
@@ -592,19 +596,25 @@ class Apps(MethodView):
         
         # example:  curl localhost:5000/app/{id}
         authenticated = request.environ['authenticated']
-        if not authenticated:
-            raise ErrorResponse('Not authenticated', status_code=HTTPStatus.UNAUTHORIZED)
-
-        # TODO make sure user has permissions to view
-        requestUser = request.environ.get('user', "")
-        
 
         ecr_db = EcrDB()
 
 
-        print(requestUser, file=sys.stderr)
-        if not ecr_db.hasPermission(app_id, "USER", requestUser , ["FULL_CONTROL", "READ"]):
-            raise ErrorResponse(f'Not authorized.', status_code=HTTPStatus.UNAUTHORIZED)
+        if authenticated:
+            requestUser = request.environ.get('user', "")
+            granteeType =  "USER"
+            grantee = requestUser
+            permissions = ["FULL_CONTROL", "READ"]
+
+        else:
+            granteeType =  "GROUP"
+            grantee = "AllUsers"
+            permissions = ["READ"]
+            
+            
+        if not ecr_db.hasPermission(app_id, granteeType , grantee , permissions):
+                raise ErrorResponse(f'Not authorized.', status_code=HTTPStatus.UNAUTHORIZED)
+    
 
         returnObj=ecr_db.getApp(app_id)
 

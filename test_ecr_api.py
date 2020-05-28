@@ -156,6 +156,21 @@ def test_permissions(client):
 
     assert len(result) ==2
 
+    # get public app as authenticated user
+    rv = client.get(f'/apps/{app_id}', headers=headers)
+
+    result = rv.get_json()
+
+    assert "id" in result
+
+
+    # get public app anonymously
+    rv = client.get(f'/apps/{app_id}')
+
+    result = rv.get_json()
+
+    assert "id" in result
+
     # remove public permission
     rv = client.delete(f'/apps/{app_id}/permissions', data=data, headers=headers)
 
@@ -212,7 +227,7 @@ def test_permissions(client):
     result = rv.get_json()
 
     error_msg = result.get("error", "")
-    assert "Not authenticated" in  error_msg
+    assert "Not authorized" in  error_msg
     
 
 
@@ -237,5 +252,5 @@ def test_error(client):
     assert "error" in result
 
     # this fails because app "test" does not exist and there is no permission
-    assert "Not authenticated" in result["error"]
+    assert "Not authorized" in result["error"]
 
