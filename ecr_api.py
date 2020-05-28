@@ -64,7 +64,7 @@ auth_disabled = os.getenv('DISABLE_AUTH', default="0") == "1"
 
 
 # from https://flask.palletsprojects.com/en/1.1.x/patterns/apierrors/
-class ErrorResponse(Exception): # pragma: no cover
+class ErrorResponse(Exception):
     status_code = HTTPStatus.BAD_REQUEST 
 
     def __init__(self, message, status_code=None, payload=None): 
@@ -99,11 +99,7 @@ class ecr_middleware():
         request = Request(environ)
         authHeader = request.headers.get("Authorization", default = "")
 
-        if auth_disabled:
-           # self.authenticated
-            environ['authenticated'] = True
-            environ['user'] = "testuser"
-            return self.app(environ, start_response)
+        
 
 
         environ['authenticated'] = False
@@ -132,6 +128,22 @@ class ecr_middleware():
         
         # example: curl -X POST -H 'Accept: application/json; indent=4' -H "Authorization: Basic c2FnZS1hcGktc2VydmVyOnRlc3Q=" -d 'token=<SAGE-USER-TOKEN>'  <sage-ui-hostname>:80/token_info/
         # https://github.com/sagecontinuum/sage-ui/#token-introspection-api
+
+        if auth_disabled:
+            # "user:"
+            tokenArray = token.split(":")
+            if tokenArray[0] != "user" or len(tokenArray) < 2 or  len(tokenArray) > 3:
+                res = Response(f'Authorization is disabled but token requires format user:<name>', mimetype= 'text/plain', status=401)
+                return res(environ, start_response)
+
+            if len(tokenArray) == 3:
+                if tokenArray[2] == "admin":
+                    environ['admin'] = True
+
+           # self.authenticated
+            environ['authenticated'] = True
+            environ['user'] = tokenArray[1]
+            return self.app(environ, start_response)
 
 
         headers = {"Accept":"application/json; indent=4", "Authorization": f"Basic {tokenInfoPassword}" , "Content-Type":"application/x-www-form-urlencoded"}
@@ -175,24 +187,41 @@ class EcrDB():
         self.cur=self.db.cursor()
         return
 
-    def hasPermission(self, app_id, granteeType, grantee, permission):
+    def hasPermission(self, app_id, granteeType, grantee, permissions):
 
 
-        stmt = f'SELECT BIN_TO_UUID(id) FROM AppPermissions WHERE BIN_TO_UUID(id) = %s AND granteeType = %s AND grantee = %s AND (permission="FULL_CONTROL" OR permission = %s)'
-        print(f'stmt: {stmt} app_id={app_id} granteeType={granteeType} grantee={grantee} permission={permission}', file=sys.stderr)
-        self.cur.execute(stmt, (app_id, granteeType, grantee,  permission ))
+        for permission in permissions:
+            stmt = f'SELECT BIN_TO_UUID(id) FROM AppPermissions WHERE BIN_TO_UUID(id) = %s AND granteeType = %s AND grantee = %s AND (permission="FULL_CONTROL" OR permission = %s)'
+            print(f'stmt: {stmt} app_id={app_id} granteeType={granteeType} grantee={grantee} permission={permission}', file=sys.stderr)
+            self.cur.execute(stmt, (app_id, granteeType, grantee,  permission ))
 
-        row = self.cur.fetchone()
-        if row == None:
-            #print(f'row empty', file=sys.stderr)
-            return False
+            row = self.cur.fetchone()
+            if row == None:
+                #print(f'row empty', file=sys.stderr)
+                continue
 
-        if len(row) > 0:
-            return True
+            if len(row) > 0:
+                return True
 
-        #print(f'row len 0', file=sys.stderr)
+            #print(f'row len 0', file=sys.stderr)
+            continue
+
         return False
 
+
+    def deleteApp(self, app_id):
+        stmt_apps = f'DELETE FROM Apps WHERE BIN_TO_UUID(id) = %s'
+        print(f'stmt: {stmt_apps} app_id={app_id}', file=sys.stderr)
+        self.cur.execute(stmt_apps, (app_id, ))
+
+
+        stmt_permissions = f'DELETE FROM AppPermissions WHERE BIN_TO_UUID(id) = %s'
+        print(f'stmt: {stmt_permissions} app_id={app_id}', file=sys.stderr)
+        self.cur.execute(stmt_permissions, (app_id, ))
+
+        self.db.commit()
+
+        return
 
 
 
@@ -219,11 +248,62 @@ class EcrDB():
 
         return returnObj
     
-    def listApps(self):
-        stmt = f'SELECT  BIN_TO_UUID(id), name, version FROM Apps'
-        print(f'stmt: {stmt}', file=sys.stderr)
-        self.cur.execute(stmt)
+    def getAppField(self, app_id, field):
+        stmt = f'SELECT  BIN_TO_UUID(id), {field} FROM Apps WHERE BIN_TO_UUID(id) = %s'
+        print(f'stmt: {stmt} app_id={app_id}', file=sys.stderr)
+        self.cur.execute(stmt, (app_id, ))
 
+        returnFields = ["id", field]
+        returnObj={}
+        row = self.cur.fetchone()
+        i = 0
+        if row == None:
+            raise ErrorResponse(f'App {app_id} not found', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+        for value in row:
+            print(f'value: {value}', file=sys.stderr)
+            returnObj[returnFields[i]] = value
+            i+=1
+
+        #decode embedded json
+        if field in ["inputs", "metadata"]:
+            if field in returnObj:
+                returnObj[field] = json.loads(returnObj[field])
+
+        return returnObj[field]
+
+
+    def listApps(self, user="", app_id=""):
+
+        query_data = []
+
+        appID_condition = 'TRUE'
+        if app_id != "":
+            appID_condition = f'id = %s'
+            query_data.append(app_id)
+ 
+        user_condition = 'FALSE'
+        if user != "" :
+            user_condition = '(granteeType="USER" AND grantee=%s)'
+            query_data.append(user)
+
+
+
+        stmt = f'SELECT  BIN_TO_UUID(id), name, version, owner FROM Apps INNER JOIN AppPermissions  USING (id) WHERE {appID_condition} AND ( ({user_condition}) OR (granteeType="GROUP" AND grantee="AllUsers")) AND (permission="READ" OR permission="FULL_CONTROL")'
+        print(f'stmt: {stmt}', file=sys.stderr)
+        self.cur.execute(stmt , query_data)
+
+        #if user == "":
+        #    # only public apps
+        #    stmt = f'SELECT  BIN_TO_UUID(id), name, version, owner FROM Apps INNER JOIN AppPermissions  USING (id) WHERE  granteeType="GROUP" AND grantee="AllUsers" AND (permission="READ" OR permission="FULL_CONTROL")'
+        #    print(f'stmt: {stmt}', file=sys.stderr)
+        #    self.cur.execute(stmt)
+        #else :
+    #
+        #    stmt = f'SELECT  BIN_TO_UUID(id), name, version, owner FROM Apps INNER JOIN AppPermissions  USING (id) WHERE ( (granteeType="USER" AND grantee=%s) OR (granteeType="GROUP" AND grantee="AllUsers")) AND (permission="READ" OR permission="FULL_CONTROL")'
+        #    print(f'stmt: {stmt}', file=sys.stderr)
+        #    self.cur.execute(stmt , (user,))
+
+        
         rows = self.cur.fetchall()
 
         app_list = []
@@ -231,25 +311,88 @@ class EcrDB():
         for row in rows:
             print(f'row: {row}', file=sys.stderr)
 
-            app_list.append({"id": row[0], "name": row[1], "version":row[2]})
+            app_list.append({"id": row[0], "name": row[1], "version":row[2], "owner":row[3]})
         
         return app_list
 
+    def getPermissions(self, app_id):
+        stmt = f'SELECT  BIN_TO_UUID(id), granteeType , grantee, permission FROM AppPermissions WHERE BIN_TO_UUID(id) = %s'
+        print(f'stmt: {stmt} app_id={app_id}', file=sys.stderr)
+        self.cur.execute(stmt, (app_id, ))
 
+        rows = self.cur.fetchall()
 
+        perm_list = []
 
+        for row in rows:
+            #print(f'row: {row}', file=sys.stderr)
+
+            perm_list.append({"id": row[0], "granteeType": row[1], "grantee":row[2], "permission":row[3]})
+
+        return perm_list
+
+    # TODO ignore Duplicate entry 
+    def addPermission(self, app_id, granteeType , grantee , permission):
+
+        if granteeType=="GROUP" and grantee=="AllUsers" and permission != "READ":
+            raise ErrorResponse(f'AllUsers can only get READ permission.', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        stmt = f'INSERT INTO AppPermissions ( id, granteeType , grantee, permission) VALUES (UUID_TO_BIN(%s) , %s,  %s, %s)'
+        self.cur.execute(stmt, (app_id, granteeType, grantee , permission))
+
+        self.db.commit()
+
+        return 1
+
+    # deletes all permissions unless limited by any of optional parameters
+    def deletePermissions(self, app_id, granteeType=None , grantee=None , permission=None):
+
+        
+        
+        owner = self.getAppField(app_id, "owner")
+
+        
+        if not owner:
+            raise ErrorResponse('Owner not found', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        
+
+        stmt_delete_permissions = f'DELETE FROM AppPermissions WHERE BIN_TO_UUID(id) = %s'
+        params = [app_id]
+        if granteeType:
+            stmt_delete_permissions += ' AND granteeType=%s'
+            params.append(granteeType)
+
+        if grantee:
+            stmt_delete_permissions += ' AND grantee=%s'
+            params.append(grantee)
+
+        if permission:
+            stmt_delete_permissions += ' AND permission=%s'
+            params.append(permission)   
+
+        # make sure owner does not take his own permissions away
+        stmt_delete_permissions +=  ' AND NOT (granteeType="USER" AND grantee=%s AND permission="FULL_CONTROL")' 
+        params.append(owner)
+
+        print(f'delete stmt: {stmt_delete_permissions} params='+json.dumps(params), file=sys.stderr)
+        self.cur.execute(stmt_delete_permissions, params)
+        self.db.commit()
+
+        
+        return int(self.cur.rowcount)
+        
 
 # /apps
 class AppList(MethodView):
     def get(self):
-        authenticated = request.environ['authenticated']
-        if not authenticated:
-            raise ErrorResponse('Not authenticated', status_code=HTTPStatus.UNAUTHORIZED)
 
-        # TODO allow unauthenticated users to get public apps
+       
+        requestUser = request.environ.get('user', "")
+
 
         ecr_db = EcrDB()
-        app_list = ecr_db.listApps()
+        app_list = ecr_db.listApps(user=requestUser)
         return jsonify(app_list) 
 
     def post(self):
@@ -265,7 +408,8 @@ class AppList(MethodView):
             raise ErrorResponse('Not authenticated', status_code=HTTPStatus.UNAUTHORIZED)
 
         
-        requestUser = request.environ['user']
+        requestUser = request.environ.get('user', "")
+
 
         postData = request.get_json(force=True)
 
@@ -309,7 +453,6 @@ class AppList(MethodView):
             for arch in appArchitecture:
                 if not arch in architecture_valid:
                     valid_arch_str = ",".join(architecture_valid)
-                    #return  {"error": f'Architecture {arch} not supported, valid values: {valid_arch_str}'}
                     raise ErrorResponse(f'Architecture {arch} not supported, valid values: {valid_arch_str}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
                 
             architecture_str = ",".join(appArchitecture)
@@ -417,27 +560,134 @@ class AppList(MethodView):
 
 # /apps/{id}
 class Apps(MethodView):
-    def get(self, app_id):
-
-        # example:  curl localhost:5000/app/{}
+    def delete(self, app_id):
         authenticated = request.environ['authenticated']
         if not authenticated:
             raise ErrorResponse('Not authenticated', status_code=HTTPStatus.UNAUTHORIZED)
 
         # TODO make sure user has permissions to view
 
-        requestUser = request.environ['user']
+        requestUser = request.environ.get('user', "")
+
 
         ecr_db = EcrDB()
 
 
         print(requestUser, file=sys.stderr)
-        if not ecr_db.hasPermission(app_id, "USER", requestUser , "READ"):
-            raise ErrorResponse(f'Not authorized. ({requestUser})', status_code=HTTPStatus.UNAUTHORIZED)
+        if not ecr_db.hasPermission(app_id, "USER", requestUser , ["FULL_CONTROL"]):
+            raise ErrorResponse(f'Not authorized.', status_code=HTTPStatus.UNAUTHORIZED)
+        
+        try:
+            ecr_db.deleteApp(app_id)
+        except Exception as e:
+            raise ErrorResponse(f'Error deleting app: {e}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        return {"deleted": 1}
+
+    def get(self, app_id):
+
+        
+        
+
+        
+        # example:  curl localhost:5000/app/{id}
+        authenticated = request.environ['authenticated']
+        if not authenticated:
+            raise ErrorResponse('Not authenticated', status_code=HTTPStatus.UNAUTHORIZED)
+
+        # TODO make sure user has permissions to view
+        requestUser = request.environ.get('user', "")
+        
+
+        ecr_db = EcrDB()
+
+
+        print(requestUser, file=sys.stderr)
+        if not ecr_db.hasPermission(app_id, "USER", requestUser , ["READ"]):
+            raise ErrorResponse(f'Not authorized.', status_code=HTTPStatus.UNAUTHORIZED)
 
         returnObj=ecr_db.getApp(app_id)
 
         return returnObj
+
+# /apps/{app_id}/permissions
+class Permissions(MethodView):
+    def get(self, app_id):
+        authenticated = request.environ['authenticated']
+        if not authenticated:
+            raise ErrorResponse('Not authenticated', status_code=HTTPStatus.UNAUTHORIZED)
+
+        # TODO make sure user has permissions to view
+
+        requestUser = request.environ.get('user', "")
+        isAdmin = request.environ.get('admin', False)
+
+        ecr_db = EcrDB()
+
+        
+        if not (isAdmin or ecr_db.hasPermission(app_id, "USER", requestUser , ["ACL_READ", "FULL_CONTROL"])):
+            raise ErrorResponse(f'Not authorized.', status_code=HTTPStatus.UNAUTHORIZED)
+
+        result = ecr_db.getPermissions(app_id)
+        
+        return jsonify(result)
+
+    def put(self, app_id):
+        # example to make app public:
+        # curl -X PUT localhost:5000/permissions/{id} -H "Authorization: sage user:testuser" -d '{"granteeType": "GROUP", "grantee": "AllUsers", "permission": "READ"}'
+        authenticated = request.environ['authenticated']
+        if not authenticated:
+            raise ErrorResponse('Not authenticated', status_code=HTTPStatus.UNAUTHORIZED)
+
+        # TODO make sure user has permissions to view
+
+        requestUser = request.environ.get('user', "")
+        isAdmin = request.environ.get('admin', False)
+
+        ecr_db = EcrDB()
+        if not (isAdmin or ecr_db.hasPermission(app_id, "USER", requestUser , ["ACL_WRITE", "FULL_CONTROL"])):
+            raise ErrorResponse(f'Not authorized.', status_code=HTTPStatus.UNAUTHORIZED)
+
+        postData = request.get_json(force=True)
+        for key in ["granteeType", "grantee", "permission"]:
+            if not key in postData:
+                raise ErrorResponse(f'Field {key} missing', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+        
+        
+
+        result = ecr_db.addPermission(app_id, postData["granteeType"], postData["grantee"], postData["permission"])
+        
+        obj= {"added": result }
+
+        return jsonify(obj)
+
+    def delete(self, app_id):
+        authenticated = request.environ['authenticated']
+        if not authenticated:
+            raise ErrorResponse('Not authenticated', status_code=HTTPStatus.UNAUTHORIZED)
+
+        # TODO make sure user has permissions to view
+
+        requestUser = request.environ.get('user', "")
+
+
+        ecr_db = EcrDB()
+        if not ecr_db.hasPermission(app_id, "USER", requestUser , ["ACL_WRITE", "FULL_CONTROL"]):
+            raise ErrorResponse(f'Not authorized.', status_code=HTTPStatus.UNAUTHORIZED)
+
+        postData = request.get_json(force=True)
+            
+        granteeType = postData.get("granteeType", None)
+        grantee = postData.get("grantee", None)
+        permission = postData.get("permission", None)
+
+        result = ecr_db.deletePermissions(app_id, granteeType, grantee, permission)
+        
+        obj= {"deleted": result }
+
+        return jsonify(obj)
+
+
 
 # /
 class Base(MethodView):
@@ -473,7 +723,8 @@ app.add_url_rule('/', view_func=Base.as_view('appsBase'))
 app.add_url_rule('/healthy', view_func=Healthy.as_view('healthy'))
 app.add_url_rule('/apps', view_func=AppList.as_view('appsListAPI'))
 app.add_url_rule('/apps/<string:app_id>', view_func=Apps.as_view('appsAPI'))
-
+#app.add_url_rule('/permissions/<string:app_id>', view_func=Permissions.as_view('permissionsAPI'))
+app.add_url_rule('/apps/<string:app_id>/permissions', view_func=Permissions.as_view('permissionsAPI'))
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
