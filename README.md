@@ -40,7 +40,7 @@ returns:
 ## GET /apps/{id}
 
 ```bash
-curl localhost:5000/apps/${APP_ID}
+curl localhost:5000/apps/${APP_ID} -H "Authorization: sage user:testuser"
 ```
 
 returns same as above
