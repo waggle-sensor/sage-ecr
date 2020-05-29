@@ -190,14 +190,14 @@ class EcrDB():
     # returns true if user has any of the permissions 
     def hasPermission(self, app_id, granteeType, grantee, permissions):
 
-        
-        permissionOR = "permission = %s" + " OR permission = %s" * (len(permissions) -1)
+        permissionIN = "permission IN (%s"+ " , %s" * (len(permissions) -1) + ")"
+        #permissionOR = "permission = %s" + " OR permission = %s" * (len(permissions) -1)
        
         permissionsPublicRead = 'FALSE'
         if 'READ' in permissions:
             permissionsPublicRead='(granteeType="GROUP" AND grantee="Allusers")'
 
-        stmt = f'SELECT BIN_TO_UUID(id) FROM AppPermissions WHERE BIN_TO_UUID(id) = %s AND (( granteeType = %s AND grantee = %s AND ({permissionOR}) ) OR {permissionsPublicRead}  )'
+        stmt = f'SELECT BIN_TO_UUID(id) FROM AppPermissions WHERE BIN_TO_UUID(id) = %s AND (( granteeType = %s AND grantee = %s AND ({permissionIN}) ) OR {permissionsPublicRead}  )'
         print(f'stmt: {stmt} app_id={app_id} granteeType={granteeType} grantee={grantee} permissions={json.dumps(permissions)}', file=sys.stderr)
         
         self.cur.execute(stmt, (app_id, granteeType, grantee,  *permissions ))
