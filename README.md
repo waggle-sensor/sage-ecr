@@ -46,6 +46,19 @@ curl localhost:5000/apps/${APP_ID} -H "Authorization: sage user:testuser"
 returns same as above
 
 
+## DELETE /apps/{id}
+
+```bash
+curl -X DELETE localhost:5000/apps/${APP_ID} -H "Authorization: sage user:testuser"
+```
+
+returns
+```json5
+{
+  "deleted": 1
+}
+```
+
 ## GET /apps
 
 ```bash
