@@ -38,9 +38,12 @@ mysql_password =  os.getenv('MYSQL_PASSWORD')
 
 
 # app definition
-valid_fields =["name", "description", "version", "source", "depends_on", "architecture" , "baseCommand", "arguments", "inputs", "metadata"]
+valid_fields =["name", "description", "version", "source", "depends_on", "architecture" , "baseCommand", "arguments", "inputs", "resources", "metadata"]
 valid_fields_set = set(valid_fields)
 required_fields = set(["name", "description", "version", "source"])
+
+mysql_fields = ["name", "description", "version", "source", "depends_on", "architecture" , "baseCommand", "arguments", "inputs", "metadata"]
+mysql_fields_det = set(valid_fields)
 
 # architecture https://github.com/docker-library/official-images#architectures-other-than-amd64
 architecture_valid = ["linux/amd64", "linux/arm64", "linux/arm/v6", "linux/arm/v7", "linux/arm/v8"]
@@ -53,7 +56,7 @@ input_valid_types = ["boolean", "int", "long", "float", "double", "string", "Fil
 
 
 # database fields
-dbFields = valid_fields + ["owner"]
+dbFields = mysql_fields + ["owner"]
 dbFields_str  = ",".join(dbFields)
 
 
@@ -249,6 +252,18 @@ class EcrDB():
         for field in ["inputs", "metadata"]:
             if field in returnObj:
                 returnObj[field] = json.loads(returnObj[field])
+
+        stmt = f'SELECT  BIN_TO_UUID(id), resource FROM Resources WHERE BIN_TO_UUID(id) = %s'
+        print(f'stmt: {stmt} app_id={app_id}', file=sys.stderr)
+        self.cur.execute(stmt, (app_id, ))
+        resources = []
+        rows = self.cur.fetchall()
+        for row in rows:
+            row_obj = json.loads(row[1])
+            resources.append(row_obj)
+
+        if len(resources) > 0:
+            returnObj["resources"] = resources
 
         return returnObj
     
@@ -503,6 +518,17 @@ class AppList(MethodView):
 
             appInputs_str = json.dumps(appInputs) 
 
+        ##### resources
+
+        #resources_str = None
+        resourcesArray=[]
+        if "resources" in postData:
+            resourcesArray = postData["resources"]
+            if not isinstance(resourcesArray, list):
+                raise ErrorResponse(f'Field resources has to be an array', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+            #resources_str = json.dumps(resourcesArray)
+
         ##### metadata
         appMetadata_str = ""
         if "metadata" in postData:
@@ -535,12 +561,22 @@ class AppList(MethodView):
 
         newID = uuid.uuid4()
         newID_str = str(newID)
-        stmt = f'INSERT INTO Apps ( id, {dbFields_str}) VALUES (UUID_TO_BIN(%s) ,{variables_str})'
-        print(f'stmt: {stmt}', file=sys.stderr)
+        
         
         ecr_db = EcrDB()
         
+       
+        for res in resourcesArray:
+            res_str = json.dumps(res)
+            stmt = f'INSERT INTO Resources ( id, resource) VALUES (UUID_TO_BIN(%s) , %s)'
+            ecr_db.cur.execute(stmt, (newID_str, res_str,))
         
+
+        stmt = f'INSERT INTO Apps ( id, {dbFields_str}) VALUES (UUID_TO_BIN(%s) ,{variables_str})'
+        print(f'stmt: {stmt}', file=sys.stderr)
+
+
+
         ecr_db.cur.execute(stmt, (newID_str, *values))
       
         stmt = f'INSERT INTO AppPermissions ( id, granteeType , grantee, permission) VALUES (UUID_TO_BIN(%s) , %s,  %s, %s)'
