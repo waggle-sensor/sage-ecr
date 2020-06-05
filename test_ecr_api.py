@@ -8,7 +8,7 @@ import sys
 from ecr_api import app , dbFields
 import json
 
-test_app_def = '{"name" : "testapp", "description": "blabla", "architecture" : ["linux/amd64" , "linux/arm/v7"] , "version" : "1.0", "source" :"https://github.com/user/repo.git#v1.0", "inputs": [{"id":"speed" , "type":"int" }] , "metadata": {"my-science-data" : 12345} }'
+test_app_def = '{"name" : "testapp", "description": "blabla", "architecture" : ["linux/amd64" , "linux/arm/v7"] , "version" : "1.0", "source" :"https://github.com/user/repo.git#v1.0", "resources": [{"type":"RGB_image_producer", "view": "top", "min_resolution":"600x800"}], "inputs": [{"id":"speed" , "type":"int" }] , "metadata": {"my-science-data" : 12345} }'
 
 
 # from https://flask.palletsprojects.com/en/1.1.x/testing/
@@ -124,8 +124,10 @@ def test_permissions(client):
     #print(f'rv.data: {rv.data}' , file=sys.stderr)
     
     result = rv.get_json()
+   
+    assert isinstance(result,dict) , "is not a dict"
 
-    assert "id" in result
+    assert "id" in result #, f'response was: {rv.data}'
     app_id = result["id"]
 
     # verify app

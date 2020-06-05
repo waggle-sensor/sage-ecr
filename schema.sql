@@ -11,9 +11,9 @@ CREATE TABLE IF NOT EXISTS SageECR.Apps (
     depends_on          VARCHAR(128),
     architecture        VARCHAR(64),
     baseCommand         VARCHAR(64),
-    arguments           VARCHAR(128),
-    inputs              VARCHAR(64),
-    metadata            VARCHAR(64),
+    arguments           VARCHAR(256),
+    inputs              VARCHAR(256),
+    metadata            TEXT,
     schema_version      VARCHAR(64),
     time_created        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     time_last_updated   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -42,8 +42,8 @@ CREATE TABLE IF NOT EXISTS SageECR.CI (
 /* hardware requirements
     GPU , sensor,  etc..
 */
-CREATE TABLE IF NOT EXISTS SageECR.Requirements (
-    id                  BINARY(16) NOT NULL,
-    requirement         VARCHAR(64),
-    PRIMARY KEY(`id`, `requirement`)
+CREATE TABLE IF NOT EXISTS SageECR.Resources (
+   id                  BINARY(16) NOT NULL,
+    resource            VARCHAR(256),
+    PRIMARY KEY(`id`, `resource`)
 );
