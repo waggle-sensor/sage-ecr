@@ -2,11 +2,13 @@
 
 
 /* App Specification */
+/* TODO: save commit hash to prevent changes */
 CREATE TABLE IF NOT EXISTS SageECR.Apps (
     id                  BINARY(16) NOT NULL PRIMARY KEY,
     name                VARCHAR(64),
     description         VARCHAR(128),
     version             VARCHAR(64),
+    namespace           VARCHAR(64),
     source              VARCHAR(128),
     depends_on          VARCHAR(128),
     architecture        VARCHAR(64),
@@ -30,13 +32,31 @@ CREATE TABLE IF NOT EXISTS SageECR.AppPermissions (
 # permissions similar to https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html
 
 /* Continous Integration related */
-CREATE TABLE IF NOT EXISTS SageECR.CI (
+CREATE TABLE IF NOT EXISTS SageECR.Builds (
+    id                  BINARY(16) NOT NULL,
+    last_queue_id       INT,
+    number              INT DEFAULT -1,
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS SageECR.Certifications (
     id                  BINARY(16) NOT NULL PRIMARY KEY,
-    build               VARCHAR(64),
     profile             VARCHAR(64),
     certifiedBy         VARCHAR(64),
     certifiedDate       TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS SageECR.Profiles (
+    id                  BINARY(16) NOT NULL PRIMARY KEY,
+    number              INT DEFAULT '-1',
+    profile             VARCHAR(64),
+    certifiedBy         VARCHAR(64),
+    certifiedDate       TIMESTAMP
+);
+
+
+
+
 
 
 /* hardware requirements

@@ -5,10 +5,11 @@ import tempfile
 
 import pytest
 import sys
-from ecr_api import app , dbFields
+from ecr_api import app
+from config import dbFields
 import json
 
-test_app_def = '{"name" : "testapp", "description": "blabla", "architecture" : ["linux/amd64" , "linux/arm/v7"] , "version" : "1.0", "source" :"https://github.com/user/repo.git#v1.0", "resources": [{"type":"RGB_image_producer", "view": "top", "min_resolution":"600x800"}], "inputs": [{"id":"speed" , "type":"int" }] , "metadata": {"my-science-data" : 12345} }'
+test_app_def = '{"name" : "testapp", "description": "blabla", "architecture" : ["linux/amd64" , "linux/arm/v7"] , "version" : "1.0", "namespace":"sage", "source" :"https://github.com/user/repo.git#v1.0", "resources": [{"type":"RGB_image_producer", "view": "top", "min_resolution":"600x800"}], "inputs": [{"id":"speed" , "type":"int" }] , "metadata": {"my-science-data" : 12345} }'
 
 
 # from https://flask.palletsprojects.com/en/1.1.x/testing/
@@ -171,6 +172,7 @@ def test_permissions(client):
 
     result = rv.get_json()
 
+    assert "error"  not in result
     assert "id" in result
 
     # remove public permission

@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
 
+
+# ### mysqlclient ###
+# pip install mysqlclient
+# https://github.com/PyMySQL/mysqlclient-python
+# https://mysqlclient.readthedocs.io/
+
+import os
+import sys
+
+
 from flask import Flask
 from flask.views import MethodView
 from flask import jsonify
@@ -14,73 +24,30 @@ import time
 from werkzeug.wrappers import Request, Response, ResponseStream
 from middleware import middleware
 import requests
-from http import HTTPStatus
 
-import os
+from error_response import ErrorResponse
+
+import jenkins_server
+
+import xmltodict
 import sys
+from decorators import * 
+
+import config
 
 
 
-
-# https://mysqlclient.readthedocs.io/user_guide.html#mysqldb-mysql
-mysql_host = os.getenv('MYSQL_HOST')
-mysql_db =os.getenv('MYSQL_DATABASE')
-mysql_user =  os.getenv('MYSQL_USER')
-mysql_password =  os.getenv('MYSQL_PASSWORD')
-#app.config['MYSQL_DATABASE_HOST'] = os.getenv('MYSQL_HOST')
-#app.config['MYSQL_DATABASE_DB'] = os.getenv('MYSQL_DATABASE')
-#app.config['MYSQL_DATABASE_USER'] = os.getenv('MYSQL_USER')
-#app.config['MYSQL_DATABASE_PASSWORD'] = os.getenv('MYSQL_PASSWORD')
+# refs/tags/<tagName> or  refs/heads/<branchName>
+#t.substitute({'git_url' : 'https://github.com/sagecontinuum/sage-cli.git'})
 
 
 
 
 
 
-# app definition
-valid_fields =["name", "description", "version", "source", "depends_on", "architecture" , "baseCommand", "arguments", "inputs", "resources", "metadata"]
-valid_fields_set = set(valid_fields)
-required_fields = set(["name", "description", "version", "source"])
-
-mysql_fields = ["name", "description", "version", "source", "depends_on", "architecture" , "baseCommand", "arguments", "inputs", "metadata"]
-mysql_fields_det = set(valid_fields)
-
-# architecture https://github.com/docker-library/official-images#architectures-other-than-amd64
-architecture_valid = ["linux/amd64", "linux/arm64", "linux/arm/v6", "linux/arm/v7", "linux/arm/v8"]
 
 
-# app input
-input_fields_valid = ["id", "type"]
-# "Directory" not suypported yet # ref: https://www.commonwl.org/v1.1/CommandLineTool.html#CWLType
-input_valid_types = ["boolean", "int", "long", "float", "double", "string", "File"] 
 
-
-# database fields
-dbFields = mysql_fields + ["owner"]
-dbFields_str  = ",".join(dbFields)
-
-
-tokenInfoEndpoint = os.getenv('tokenInfoEndpoint')
-tokenInfoUser = os.getenv('tokenInfoUser')
-tokenInfoPassword = os.getenv('tokenInfoPassword')
-auth_disabled = os.getenv('DISABLE_AUTH', default="0") == "1"
-
-
-# from https://flask.palletsprojects.com/en/1.1.x/patterns/apierrors/
-class ErrorResponse(Exception):
-    status_code = HTTPStatus.BAD_REQUEST 
-
-    def __init__(self, message, status_code=None, payload=None): 
-        Exception.__init__(self)
-        self.message = message
-        if status_code is not None:
-            self.status_code = status_code
-        self.payload = payload
-
-    def to_dict(self):
-        rv = dict(self.payload or ())
-        rv['error'] = self.message
-        return rv
 
 
 
@@ -132,7 +99,7 @@ class ecr_middleware():
         # example: curl -X POST -H 'Accept: application/json; indent=4' -H "Authorization: Basic c2FnZS1hcGktc2VydmVyOnRlc3Q=" -d 'token=<SAGE-USER-TOKEN>'  <sage-ui-hostname>:80/token_info/
         # https://github.com/sagecontinuum/sage-ui/#token-introspection-api
 
-        if auth_disabled:
+        if config.auth_disabled:
             # "user:"
             tokenArray = token.split(":")
             if tokenArray[0] != "user" or len(tokenArray) < 2 or  len(tokenArray) > 3:
@@ -149,9 +116,9 @@ class ecr_middleware():
             return self.app(environ, start_response)
 
 
-        headers = {"Accept":"application/json; indent=4", "Authorization": f"Basic {tokenInfoPassword}" , "Content-Type":"application/x-www-form-urlencoded"}
+        headers = {"Accept":"application/json; indent=4", "Authorization": f"Basic {config.tokenInfoPassword}" , "Content-Type":"application/x-www-form-urlencoded"}
         data=f"token={token}"
-        r = requests.post(tokenInfoEndpoint, data = data, headers=headers, timeout=5)
+        r = requests.post(config.tokenInfoEndpoint, data = data, headers=headers, timeout=5)
 
         
 
@@ -171,236 +138,6 @@ class ecr_middleware():
         
 
 
-class EcrDB():
-    def __init__ ( self , retries=60) :
-        count = 0
-        while True:
-            try:
-                self.db=MySQLdb.connect(host=mysql_host,user=mysql_user,
-                  passwd=mysql_password,db=mysql_db)
-            except Exception as e: # pragma: no cover
-                if count > retries:
-                    raise
-                print(f'Could not connnect to database, error={e}, retry in 2 seconds', file=sys.stderr)
-                time.sleep(2)
-                count += 1
-                continue
-            break
-
-        self.cur=self.db.cursor()
-        return
-
-    # returns true if user has any of the permissions 
-    def hasPermission(self, app_id, granteeType, grantee, permissions):
-
-        permissionIN = "permission IN (%s"+ " , %s" * (len(permissions) -1) + ")"
-        #permissionOR = "permission = %s" + " OR permission = %s" * (len(permissions) -1)
-       
-        permissionsPublicRead = 'FALSE'
-        if 'READ' in permissions:
-            permissionsPublicRead='(granteeType="GROUP" AND grantee="Allusers")'
-
-        stmt = f'SELECT BIN_TO_UUID(id) FROM AppPermissions WHERE BIN_TO_UUID(id) = %s AND (( granteeType = %s AND grantee = %s AND ({permissionIN}) ) OR {permissionsPublicRead}  )'
-        print(f'stmt: {stmt} app_id={app_id} granteeType={granteeType} grantee={grantee} permissions={json.dumps(permissions)}', file=sys.stderr)
-        
-        self.cur.execute(stmt, (app_id, granteeType, grantee,  *permissions ))
-        row = self.cur.fetchone()
-        if row == None:
-            return False
-
-        if len(row) > 0:
-            return True
-
-        return False
-
-       
-
-
-    def deleteApp(self, app_id):
-        stmt_apps = f'DELETE FROM Apps WHERE BIN_TO_UUID(id) = %s'
-        print(f'stmt: {stmt_apps} app_id={app_id}', file=sys.stderr)
-        self.cur.execute(stmt_apps, (app_id, ))
-
-
-        stmt_permissions = f'DELETE FROM AppPermissions WHERE BIN_TO_UUID(id) = %s'
-        print(f'stmt: {stmt_permissions} app_id={app_id}', file=sys.stderr)
-        self.cur.execute(stmt_permissions, (app_id, ))
-
-        self.db.commit()
-
-        return
-
-
-
-    def getApp(self, app_id):
-        stmt = f'SELECT  BIN_TO_UUID(id), {dbFields_str} FROM Apps WHERE BIN_TO_UUID(id) = %s'
-        print(f'stmt: {stmt} app_id={app_id}', file=sys.stderr)
-        self.cur.execute(stmt, (app_id, ))
-
-        returnFields = ["id"] + dbFields
-        returnObj={}
-        row = self.cur.fetchone()
-        i = 0
-        if row == None:
-            raise ErrorResponse(f'App {app_id} not found', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-        for value in row:
-            print(f'value: {value}', file=sys.stderr)
-            returnObj[returnFields[i]] = value
-            i+=1
-
-        #decode embedded json
-        for field in ["inputs", "metadata"]:
-            if field in returnObj:
-                returnObj[field] = json.loads(returnObj[field])
-
-        stmt = f'SELECT  BIN_TO_UUID(id), resource FROM Resources WHERE BIN_TO_UUID(id) = %s'
-        print(f'stmt: {stmt} app_id={app_id}', file=sys.stderr)
-        self.cur.execute(stmt, (app_id, ))
-        resources = []
-        rows = self.cur.fetchall()
-        for row in rows:
-            row_obj = json.loads(row[1])
-            resources.append(row_obj)
-
-        if len(resources) > 0:
-            returnObj["resources"] = resources
-
-        return returnObj
-    
-    def getAppField(self, app_id, field):
-        stmt = f'SELECT  BIN_TO_UUID(id), {field} FROM Apps WHERE BIN_TO_UUID(id) = %s'
-        print(f'stmt: {stmt} app_id={app_id}', file=sys.stderr)
-        self.cur.execute(stmt, (app_id, ))
-
-        returnFields = ["id", field]
-        returnObj={}
-        row = self.cur.fetchone()
-        i = 0
-        if row == None:
-            raise ErrorResponse(f'App {app_id} not found', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-        for value in row:
-            print(f'value: {value}', file=sys.stderr)
-            returnObj[returnFields[i]] = value
-            i+=1
-
-        #decode embedded json
-        if field in ["inputs", "metadata"]:
-            if field in returnObj:
-                returnObj[field] = json.loads(returnObj[field])
-
-        return returnObj[field]
-
-
-    def listApps(self, user="", app_id=""):
-
-        query_data = []
-
-        appID_condition = 'TRUE'
-        if app_id != "":
-            appID_condition = f'id = %s'
-            query_data.append(app_id)
- 
-        user_condition = 'FALSE'
-        if user != "" :
-            user_condition = '(granteeType="USER" AND grantee=%s)'
-            query_data.append(user)
-
-
-
-        stmt = f'SELECT  BIN_TO_UUID(id), name, version, owner FROM Apps INNER JOIN AppPermissions  USING (id) WHERE {appID_condition} AND ( ({user_condition}) OR (granteeType="GROUP" AND grantee="AllUsers")) AND (permission="READ" OR permission="FULL_CONTROL")'
-        print(f'stmt: {stmt}', file=sys.stderr)
-        self.cur.execute(stmt , query_data)
-
-        #if user == "":
-        #    # only public apps
-        #    stmt = f'SELECT  BIN_TO_UUID(id), name, version, owner FROM Apps INNER JOIN AppPermissions  USING (id) WHERE  granteeType="GROUP" AND grantee="AllUsers" AND (permission="READ" OR permission="FULL_CONTROL")'
-        #    print(f'stmt: {stmt}', file=sys.stderr)
-        #    self.cur.execute(stmt)
-        #else :
-    #
-        #    stmt = f'SELECT  BIN_TO_UUID(id), name, version, owner FROM Apps INNER JOIN AppPermissions  USING (id) WHERE ( (granteeType="USER" AND grantee=%s) OR (granteeType="GROUP" AND grantee="AllUsers")) AND (permission="READ" OR permission="FULL_CONTROL")'
-        #    print(f'stmt: {stmt}', file=sys.stderr)
-        #    self.cur.execute(stmt , (user,))
-
-        
-        rows = self.cur.fetchall()
-
-        app_list = []
-
-        for row in rows:
-            print(f'row: {row}', file=sys.stderr)
-
-            app_list.append({"id": row[0], "name": row[1], "version":row[2], "owner":row[3]})
-        
-        return app_list
-
-    def getPermissions(self, app_id):
-        stmt = f'SELECT  BIN_TO_UUID(id), granteeType , grantee, permission FROM AppPermissions WHERE BIN_TO_UUID(id) = %s'
-        print(f'stmt: {stmt} app_id={app_id}', file=sys.stderr)
-        self.cur.execute(stmt, (app_id, ))
-
-        rows = self.cur.fetchall()
-
-        perm_list = []
-
-        for row in rows:
-            #print(f'row: {row}', file=sys.stderr)
-
-            perm_list.append({"id": row[0], "granteeType": row[1], "grantee":row[2], "permission":row[3]})
-
-        return perm_list
-
-    # TODO ignore Duplicate entry 
-    def addPermission(self, app_id, granteeType , grantee , permission):
-
-        if granteeType=="GROUP" and grantee=="AllUsers" and permission != "READ":
-            raise ErrorResponse(f'AllUsers can only get READ permission.', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-        stmt = f'INSERT INTO AppPermissions ( id, granteeType , grantee, permission) VALUES (UUID_TO_BIN(%s) , %s,  %s, %s)'
-        self.cur.execute(stmt, (app_id, granteeType, grantee , permission))
-
-        self.db.commit()
-
-        return 1
-
-    # deletes all permissions unless limited by any of optional parameters
-    def deletePermissions(self, app_id, granteeType=None , grantee=None , permission=None):
-
-        
-        
-        owner = self.getAppField(app_id, "owner")
-
-        
-        if not owner:
-            raise ErrorResponse('Owner not found', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-        
-
-        stmt_delete_permissions = f'DELETE FROM AppPermissions WHERE BIN_TO_UUID(id) = %s'
-        params = [app_id]
-        if granteeType:
-            stmt_delete_permissions += ' AND granteeType=%s'
-            params.append(granteeType)
-
-        if grantee:
-            stmt_delete_permissions += ' AND grantee=%s'
-            params.append(grantee)
-
-        if permission:
-            stmt_delete_permissions += ' AND permission=%s'
-            params.append(permission)   
-
-        # make sure owner does not take his own permissions away
-        stmt_delete_permissions +=  ' AND NOT (granteeType="USER" AND grantee=%s AND permission="FULL_CONTROL")' 
-        params.append(owner)
-
-        print(f'delete stmt: {stmt_delete_permissions} params='+json.dumps(params), file=sys.stderr)
-        self.cur.execute(stmt_delete_permissions, params)
-        self.db.commit()
-
-        
-        return int(self.cur.rowcount)
-        
 
 # /apps
 class AppList(MethodView):
@@ -410,10 +147,11 @@ class AppList(MethodView):
         requestUser = request.environ.get('user', "")
 
 
-        ecr_db = EcrDB()
+        ecr_db = ecrdb.EcrDB()
         app_list = ecr_db.listApps(user=requestUser)
         return jsonify(app_list) 
 
+    @login_required
     def post(self):
         # example
        
@@ -422,10 +160,7 @@ class AppList(MethodView):
 
         # TODO authentication
         # TODO set owner
-        authenticated = request.environ['authenticated']
-        if not authenticated:
-            raise ErrorResponse('Not authenticated', status_code=HTTPStatus.UNAUTHORIZED)
-
+        
         
         requestUser = request.environ.get('user', "")
 
@@ -433,12 +168,12 @@ class AppList(MethodView):
         postData = request.get_json(force=True)
 
         for key in postData:
-            if not key in valid_fields_set:
+            if not key in config.valid_fields_set:
                 #return  {"error": f'Field {key} not supported'}
                 raise ErrorResponse(f'Field {key} not supported', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
         # if required
-        for key in required_fields:
+        for key in config.required_fields:
             if not key in postData:
                 #return  {"error": f'Required field {key} is missing'}
                 raise ErrorResponse(f'Required field {key} is missing', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
@@ -470,8 +205,8 @@ class AppList(MethodView):
         if "architecture" in postData:
             appArchitecture  = postData["architecture"]
             for arch in appArchitecture:
-                if not arch in architecture_valid:
-                    valid_arch_str = ",".join(architecture_valid)
+                if not arch in config.architecture_valid:
+                    valid_arch_str = ",".join(config.architecture_valid)
                     raise ErrorResponse(f'Architecture {arch} not supported, valid values: {valid_arch_str}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
                 
             architecture_str = ",".join(appArchitecture)
@@ -506,14 +241,14 @@ class AppList(MethodView):
             appInputs = postData["inputs"]
             for app_input in appInputs:
                 for field in app_input:
-                    if not  field in  input_fields_valid:
+                    if not  field in  config.input_fields_valid:
                         raise ErrorResponse(f'Input field {field} not supported', status_code=HTTPStatus.INTERNAL_SERVER_ERROR) 
 
-                for expected in input_fields_valid:
+                for expected in config.input_fields_valid:
                     if not  expected in  app_input:
                         raise ErrorResponse(f'Expected field {expected} missing', status_code=HTTPStatus.INTERNAL_SERVER_ERROR) 
                     input_type = app_input["type"]
-                    if not input_type in input_valid_types:
+                    if not input_type in config.input_valid_types:
                         raise ErrorResponse(f'Input type {input_type} not supported', status_code=HTTPStatus.INTERNAL_SERVER_ERROR) 
 
             appInputs_str = json.dumps(appInputs) 
@@ -537,7 +272,7 @@ class AppList(MethodView):
 
         ##### create dbObject
         dbObject = {}
-        for key in valid_fields_set:
+        for key in config.valid_fields_set:
             dbObject[key] = ""
 
         dbObject["name"] = appName
@@ -545,7 +280,7 @@ class AppList(MethodView):
         dbObject["inputs"] = appInputs_str
         dbObject["metadata"] = appMetadata_str
         #copy fields
-        for key in ["description", "version", "source"]:
+        for key in ["description", "version", "source", "namespace"]:
             dbObject[key] = postData[key]
 
         dbObject["owner"] = requestUser
@@ -553,7 +288,7 @@ class AppList(MethodView):
         # create INSERT statment dynamically
         values =[]
         variables = []
-        for key in dbFields:
+        for key in config.dbFields:
             values.append(dbObject[key])
             variables.append("%s")
 
@@ -563,7 +298,7 @@ class AppList(MethodView):
         newID_str = str(newID)
         
         
-        ecr_db = EcrDB()
+        ecr_db = ecrdb.EcrDB()
         
        
         for res in resourcesArray:
@@ -572,7 +307,7 @@ class AppList(MethodView):
             ecr_db.cur.execute(stmt, (newID_str, res_str,))
         
 
-        stmt = f'INSERT INTO Apps ( id, {dbFields_str}) VALUES (UUID_TO_BIN(%s) ,{variables_str})'
+        stmt = f'INSERT INTO Apps ( id, {config.dbFields_str}) VALUES (UUID_TO_BIN(%s) ,{variables_str})'
         print(f'stmt: {stmt}', file=sys.stderr)
 
 
@@ -600,23 +335,14 @@ class AppList(MethodView):
 
 # /apps/{id}
 class Apps(MethodView):
+    @login_required
+    @has_permission( "FULL_CONTROL" )
     def delete(self, app_id):
-        authenticated = request.environ['authenticated']
-        if not authenticated:
-            raise ErrorResponse('Not authenticated', status_code=HTTPStatus.UNAUTHORIZED)
-
-        # TODO make sure user has permissions to view
-
-        requestUser = request.environ.get('user', "")
-
-
-        ecr_db = EcrDB()
-
-
-        print(requestUser, file=sys.stderr)
-        if not ecr_db.hasPermission(app_id, "USER", requestUser , ["FULL_CONTROL"]):
-            raise ErrorResponse(f'Not authorized.', status_code=HTTPStatus.UNAUTHORIZED)
         
+
+        ecr_db = ecrdb.EcrDB()
+
+
         try:
             ecr_db.deleteApp(app_id)
         except Exception as e:
@@ -624,75 +350,216 @@ class Apps(MethodView):
 
         return {"deleted": 1}
 
+    @has_permission( "READ", "FULL_CONTROL" )
     def get(self, app_id):
 
-        
-        
-
-        
-        # example:  curl localhost:5000/app/{id}
-        authenticated = request.environ['authenticated']
-
-        ecr_db = EcrDB()
-
-
-        if authenticated:
-            requestUser = request.environ.get('user', "")
-            granteeType =  "USER"
-            grantee = requestUser
-            permissions = ["FULL_CONTROL", "READ"]
-
-        else:
-            granteeType =  "GROUP"
-            grantee = "AllUsers"
-            permissions = ["READ"]
-            
-            
-        if not ecr_db.hasPermission(app_id, granteeType , grantee , permissions):
-                raise ErrorResponse(f'Not authorized.', status_code=HTTPStatus.UNAUTHORIZED)
-    
+      
+        ecr_db = ecrdb.EcrDB()
 
         returnObj=ecr_db.getApp(app_id)
 
         return returnObj
 
-# /apps/{app_id}/permissions
-class Permissions(MethodView):
+
+
+
+# /apps/{app_id}/builds/
+class Builds(MethodView):
+    @login_required
+    @has_permission( "READ", "FULL_CONTROL" )
     def get(self, app_id):
-        authenticated = request.environ['authenticated']
-        if not authenticated:
-            raise ErrorResponse('Not authenticated', status_code=HTTPStatus.UNAUTHORIZED)
 
-        # TODO make sure user has permissions to view
-
-        requestUser = request.environ.get('user', "")
-        isAdmin = request.environ.get('admin', False)
-
-        ecr_db = EcrDB()
+        try:
+            js = jenkins_server.JenkinsServer(host=config.jenkins_server, username=config.jenkins_user, password=config.jenkins_token)
+        except Exception as e:
+            raise ErrorResponse(f'JenkinsServer() returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
         
-        if not (isAdmin or ecr_db.hasPermission(app_id, "USER", requestUser , ["ACL_READ", "FULL_CONTROL"])):
-            raise ErrorResponse(f'Not authorized.', status_code=HTTPStatus.UNAUTHORIZED)
 
+        # strategy to find last build
+        # 1. check db field "number"
+        # 2. use global queue id to map to app-specific build number
+        # 3. take whatever is reported as last build (IS MISLEADING, returns previous build)
+
+        ecr_db = ecrdb.EcrDB()
+
+        ecr_db = ecrdb.EcrDB()
+        app_spec = ecr_db.getApp(app_id)
+
+        app_human_id = createJenkinsName(app_spec)
+
+
+        # strategy 1: try to find build number in database
+
+        try:
+            last_queue_id, number = ecr_db.getLastBuildID(app_id)
+        except Exception as e:
+            raise ErrorResponse(f'Could not get build ID: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        if number != -1:
+
+            buildInfo = js.server.get_build_info(app_human_id, number)
+            return buildInfo
+            
+
+        # strategy 2: try to use  last_queue_id to find "number"
+
+        queue_item = None
+        try:
+            queue_item = js.server.get_queue_item(last_queue_id)   
+        except Exception as e:
+
+            if not "does not exist" in str(e):
+                raise ErrorResponse(f'get_queue_item() returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+        
+
+        if queue_item:
+
+            if not "executable" in queue_item:
+                return {"error": queue_item["why"], "data": queue_item}
+
+
+            executable= queue_item["executable"]
+            if not "number" in executable:
+                return {"error": queue_item["why"], "data": queue_item}
+
+            number = executable["number"]
+
+            ecr_db.setLastBuildID(app_id, last_queue_id, number)
+        
+            verify_last_queue_id, verify_number = ecr_db.getLastBuildID(app_id)
+
+            if verify_last_queue_id != last_queue_id:
+                return {"error": "last_queue_id does not match"}
+
+            if verify_number != number:
+                return {"error": "number does not match"}
+
+            buildInfo = js.server.get_build_info(app_human_id, number)
+            return buildInfo
+
+
+        
+        return {"error": f"queue_item for id {last_queue_id} not found"}
+        #show = request.values.get("show", default="")
+
+        # job_info = js.get_job_info(app_id)
+        # #if show=="job_info":
+        # #    return job_info
+
+        # lastBuild = job_info["lastBuild"]
+        # number= lastBuild["number"]
+        
+        # ecr_db.setLastBuildID(app_id, last_queue_id, number)
+
+
+        # buildInfo = js.server.get_build_info(app_human_id, number)
+        # return buildInfo
+
+
+        
+
+
+        
+    
+    @login_required
+    @has_permission( "FULL_CONTROL" )
+    def post(self, app_id):
+
+        host = config.jenkins_server
+        username = config.jenkins_user
+        password = config.jenkins_token
+
+        try:
+            
+            js = jenkins_server.JenkinsServer(host, username, password)
+        except Exception as e:
+            raise ErrorResponse(f'JenkinsServer() returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        ecr_db = ecrdb.EcrDB()
+        app_spec = ecr_db.getApp(app_id)
+
+        app_human_id = createJenkinsName(app_spec)
+        
+
+
+        overwrite=False
+        if js.hasJenkinsJob(app_human_id):
+            overwrite =  True
+        
+       
+
+        
+        try:
+            js.createJob(app_human_id, app_spec, overwrite=overwrite)
+        except Exception as e:
+            raise ErrorResponse(f'createJob() returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR) 
+
+
+
+        queue_item_number = js.build_job(app_human_id)
+
+
+        queue_item = None
+
+        number = -1
+        while number == -1:
+            try:
+                queue_item = js.server.get_queue_item(queue_item_number)   
+            except Exception as e:
+
+                if not "does not exist" in str(e):
+                    raise ErrorResponse(f'get_queue_item() returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+            
+            if queue_item != None:
+                if "executable" in queue_item:
+                    executable=queue_item["executable"]
+                    if "number" in executable:
+                        number = executable["number"]
+                        break
+
+            time.sleep(2)
+
+    
+        try:
+            stmt = 'INSERT INTO Builds ( id, last_queue_id, number)  VALUES (UUID_TO_BIN(%s) , %s,  %s)  ON DUPLICATE KEY UPDATE last_queue_id=%s, number=%s  '
+
+
+            ecr_db.cur.execute(stmt, (app_id, queue_item_number, number, queue_item_number, number))
+
+            ecr_db.db.commit()
+        except Exception as e:
+            raise ErrorResponse(f'error inserting build info: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        #time.sleep(6)
+
+        #queued_item = js.server.get_queue_item(queue_item_number)
+
+        #returnObj = {"queue_item_number":queue_item_number, "queued_item": queued_item}
+        #return returnObj
+        return {"build_number": number }
+
+
+
+
+# /apps/{app_id}/permissions
+class Permissions(MethodView):
+    @login_required
+    @has_permission( "ACL_READ", "FULL_CONTROL" )
+    def get(self, app_id):
+        
+
+        ecr_db = ecrdb.EcrDB()
         result = ecr_db.getPermissions(app_id)
         
         return jsonify(result)
 
+    @login_required
+    @has_permission( "ACL_WRITE", "FULL_CONTROL" )
     def put(self, app_id):
         # example to make app public:
         # curl -X PUT localhost:5000/permissions/{id} -H "Authorization: sage user:testuser" -d '{"granteeType": "GROUP", "grantee": "AllUsers", "permission": "READ"}'
-        authenticated = request.environ['authenticated']
-        if not authenticated:
-            raise ErrorResponse('Not authenticated', status_code=HTTPStatus.UNAUTHORIZED)
-
-        # TODO make sure user has permissions to view
-
-        requestUser = request.environ.get('user', "")
-        isAdmin = request.environ.get('admin', False)
-
-        ecr_db = EcrDB()
-        if not (isAdmin or ecr_db.hasPermission(app_id, "USER", requestUser , ["ACL_WRITE", "FULL_CONTROL"])):
-            raise ErrorResponse(f'Not authorized.', status_code=HTTPStatus.UNAUTHORIZED)
+       
 
         postData = request.get_json(force=True)
         for key in ["granteeType", "grantee", "permission"]:
@@ -700,27 +567,21 @@ class Permissions(MethodView):
                 raise ErrorResponse(f'Field {key} missing', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
         
         
-
+        ecr_db = ecrdb.EcrDB()
         result = ecr_db.addPermission(app_id, postData["granteeType"], postData["grantee"], postData["permission"])
         
         obj= {"added": result }
 
         return jsonify(obj)
 
+    @login_required
+    @has_permission( "ACL_WRITE", "FULL_CONTROL" )
     def delete(self, app_id):
-        authenticated = request.environ['authenticated']
-        if not authenticated:
-            raise ErrorResponse('Not authenticated', status_code=HTTPStatus.UNAUTHORIZED)
-
-        # TODO make sure user has permissions to view
-
-        requestUser = request.environ.get('user', "")
+        
 
 
-        ecr_db = EcrDB()
-        if not ecr_db.hasPermission(app_id, "USER", requestUser , ["ACL_WRITE", "FULL_CONTROL"]):
-            raise ErrorResponse(f'Not authorized.', status_code=HTTPStatus.UNAUTHORIZED)
-
+        ecr_db = ecrdb.EcrDB()
+        
         postData = request.get_json(force=True)
             
         granteeType = postData.get("granteeType", None)
@@ -749,11 +610,28 @@ class Healthy(MethodView):
 
         # example:  curl localhost:5000/healthy
         try:
-            ecr_db = EcrDB(retries=1)
+            ecr_db = ecrdb.EcrDB(retries=1)
         except Exception as e:
             return f'error ({e})'
 
         return "ok"
+
+
+
+
+def createJenkinsName(app_spec):
+    import urllib.parse
+
+    namespace = ""
+    if "namespace" in app_spec and len(app_spec["namespace"]) > 0:
+        namespace = app_spec["namespace"]
+    else:
+        namespace = app_spec["owner"]
+       
+
+    return f'{namespace}_{app_spec["name"]}_{app_spec["version"]}'
+
+
 
 
 app = Flask(__name__)
@@ -771,6 +649,10 @@ app.add_url_rule('/apps', view_func=AppList.as_view('appsListAPI'))
 app.add_url_rule('/apps/<string:app_id>', view_func=Apps.as_view('appsAPI'))
 #app.add_url_rule('/permissions/<string:app_id>', view_func=Permissions.as_view('permissionsAPI'))
 app.add_url_rule('/apps/<string:app_id>/permissions', view_func=Permissions.as_view('permissionsAPI'))
+
+app.add_url_rule('/apps/<string:app_id>/builds', view_func=Builds.as_view('buildsAPI'))
+
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
