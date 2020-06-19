@@ -12,6 +12,13 @@ docker-compose down --remove-orphans
 
 
 docker rm -fv jenkins
+
+
+cd jenkins/
+docker build -t sagecontinuum/jenkins .
+cd ..
+
+
 set -x
 docker run -d --name jenkins --env JAVA_OPTS=-Dhudson.footerURL=http://localhost:8082 -p 8082:8080  -p 50000:50000 -v `pwd`/temp:/docker:rw -v /var/run/docker.sock:/var/run/docker.sock sagecontinuum/jenkins 
 set +x
