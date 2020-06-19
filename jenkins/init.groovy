@@ -3,6 +3,8 @@ import hudson.model.*
 import jenkins.model.*
 import jenkins.security.*
 import jenkins.security.apitoken.*
+import jenkins.install.*;
+import hudson.util.*;
 
 // create token
 
@@ -35,3 +37,6 @@ cmd.execute().with{
 }
 
 
+// from https://riptutorial.com/jenkins/example/24925/disable-setup-wizard
+def instance = Jenkins.getInstance()
+instance.setInstallState(InstallState.INITIAL_SETUP_COMPLETED)

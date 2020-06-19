@@ -8,8 +8,100 @@ import sys
 from ecr_api import app
 from config import dbFields
 import json
+import time
 
-test_app_def = '{"name" : "testapp", "description": "blabla", "architecture" : ["linux/amd64" , "linux/arm/v7"] , "version" : "1.0", "namespace":"sage", "source" :"https://github.com/user/repo.git#v1.0", "resources": [{"type":"RGB_image_producer", "view": "top", "min_resolution":"600x800"}], "inputs": [{"id":"speed" , "type":"int" }] , "metadata": {"my-science-data" : 12345} }'
+#test_app_def = '{"name" : "testapp", "description": "blabla", "architecture" : ["linux/amd64" , "linux/arm/v7"] , "version" : "1.0", "namespace":"sage", "source" :"https://github.com/user/repo.git#v1.0", "resources": [{"type":"RGB_image_producer", "view": "top", "min_resolution":"600x800"}], "inputs": [{"id":"speed" , "type":"int" }] , "metadata": {"my-science-data" : 12345} }'
+
+# carped
+#test_app_def_obj =  {"name" : "carped", "description": "very important app", "architecture" : ["linux/amd64" ] , "version" : "1.0", "namespace":"sage", "source" :"https://github.com/waggle-sensor/edge-plugins.git#master#plugin-carped", "inputs": [{"id":"speed" , "type":"int" }] , "metadata": {"my-science-data" : 12345} }
+
+carped_app =  {
+    "name" : "carped",
+    "description": "very important app",
+    "version" : "1.0", 
+    "namespace":"sage", 
+    "sources" : 
+        [ 
+            {
+                "name" : "default",  # optional, default: "default"
+                "architectures" : [ "linux/amd64" ] , # required
+                "url": "https://github.com/waggle-sensor/edge-plugins.git" ,  # required
+                "branch": "master",  # optional, default: master
+                "directory" : "plugin-carped" , # optional, default: root of git repository
+                "dockerfile" : "Dockerfile_sage"  # optional, default: Dockerfile , relative to context directory
+            },
+            {
+                "name" : "armv7",  # optional, default: "default"
+                "architectures" : [ "linux/arm/v7" ] , # required
+                "url": "https://github.com/waggle-sensor/edge-plugins.git" ,  # required
+                "branch": "master",  # optional, default: master
+                "directory" : "plugin-carped" , # optional, default: root of git repository
+                "dockerfile" : "Dockerfile_sage"  # optional, default: Dockerfile , relative to context directory
+            }
+        ],
+    "resources": 
+        [
+            {
+                "type":"RGB_image_producer",
+                "view": "top",
+                "min_resolution":"600x800"
+            }
+        ],
+    "inputs": 
+        [
+            {"id":"speed" , "type":"int" }
+        ] ,
+    "metadata": {
+        "my-science-data" : 12345
+        }
+    }
+
+
+simple_app =  {
+    "name" : "simple",
+    "description": "very important app",
+    "version" : "1.0", 
+    "namespace":"sage", 
+    "sources" : 
+        [ 
+            {
+                "name" : "default",  # optional, default: "default"
+                "architectures" : [ "linux/amd64" ] , # required
+                "url": "https://github.com/waggle-sensor/edge-plugins.git" ,  # required
+                "branch": "master",  # optional, default: master
+                "directory" : "plugin-simple" , # optional, default: root of git repository
+                "dockerfile" : "Dockerfile_sage"  # optional, default: Dockerfile , relative to context directory
+            },
+            {
+                "name" : "armv7",  # optional, default: "default"
+                "architectures" : [ "linux/arm/v7" ] , # required
+                "url": "https://github.com/waggle-sensor/edge-plugins.git" ,  # required
+                "branch": "master",  # optional, default: master
+                "directory" : "plugin-simple" , # optional, default: root of git repository
+                "dockerfile" : "Dockerfile_sage"  # optional, default: Dockerfile , relative to context directory
+            }
+        ],
+    "resources": 
+        [
+            {
+                "type":"RGB_image_producer",
+                "view": "top",
+                "min_resolution":"600x800"
+            }
+        ],
+    "inputs": 
+        [
+            {"id":"speed" , "type":"int" }
+        ] ,
+    "metadata": {
+        "my-science-data" : 12345
+        }
+    }
+
+test_app_def_obj = simple_app
+
+test_app_def = json.dumps(test_app_def_obj)
+
 
 
 # from https://flask.palletsprojects.com/en/1.1.x/testing/
@@ -34,6 +126,92 @@ def test_connect(client):
     assert b'SAGE Edge Code Repository' in rv.data
 
 
+def test_upload_and_build(client):
+
+    headers = {"Authorization" : "sage user:testuser"}
+
+    rv = client.post('/apps', data = test_app_def, headers=headers)
+    assert rv.data != ""
+    print(f'rv.data: {rv.data}' , file=sys.stderr)
+    
+    result = rv.get_json()
+    
+    
+    assert result != None
+    assert result["name"] ==  test_app_def_obj["name"]
+    
+
+    assert "id" in result
+    app_id = result["id"]
+
+    # build "default"
+    if True:
+        rv = client.post(f'/apps/{app_id}/builds', headers=headers)
+        
+        assert rv.data != ""
+        print(f'rv.data: {rv.data}' , file=sys.stderr)
+        
+        result = rv.get_json()
+
+        assert "build_number" in result
+
+        # TODO add timeout
+        while True:
+            rv = client.get(f'/apps/{app_id}/builds', headers=headers)
+        
+            assert rv.data != ""
+            print(f'rv.data: {rv.data}' , file=sys.stderr)
+        
+            result = rv.get_json()
+
+            assert "result" in result
+
+            result_status = result["result"]
+
+            if result_status == None:
+                time.sleep(2)
+                continue
+            
+            print(f'result_status: {result_status}' , file=sys.stderr)
+            assert result_status == "SUCCESS"
+            break
+
+
+    # build "armv7"
+    
+    rv = client.post(f'/apps/{app_id}/builds?source=armv7', headers=headers)
+    
+    assert rv.data != ""
+    print(f'rv.data: {rv.data}' , file=sys.stderr)
+    
+    result = rv.get_json()
+
+    assert "build_number" in result
+
+    # TODO add timeout
+    while True:
+        rv = client.get(f'/apps/{app_id}/builds?source=armv7', headers=headers)
+    
+        assert rv.data != ""
+        print(f'rv.data: {rv.data}' , file=sys.stderr)
+    
+        result = rv.get_json()
+
+        assert "result" in result
+
+        result_status = result["result"]
+
+        if result_status == None:
+            time.sleep(2)
+            continue
+        
+        print(f'result_status: {result_status}' , file=sys.stderr)
+        assert result_status == "SUCCESS"
+        break
+
+
+
+
 def test_app_upload_and_download(client):
     """Start with a blank database."""
 
@@ -48,7 +226,8 @@ def test_app_upload_and_download(client):
     
     
     assert result != None
-    assert result["name"] ==  "testapp"
+    assert "name" in result
+    assert result["name"] ==  test_app_def_obj["name"]
     
 
     assert "id" in result
@@ -61,7 +240,12 @@ def test_app_upload_and_download(client):
     result = rv.get_json()
 
     assert result != None
-    assert result["name"] ==  "testapp"
+    assert "error"  not in result
+
+    assert "name" in result
+    assert result["name"] ==  test_app_def_obj["name"]
+
+    assert "owner" in result
     assert result["owner"] ==  "testuser"
     assert "id" in result
     app_get_id = result["id"]
@@ -74,6 +258,7 @@ def test_app_upload_and_download(client):
     assert len(result["inputs"]) == 1
     assert len(result["inputs"][0]) == 2
 
+    assert "metadata" in result
     assert "my-science-data" in result["metadata"]
     assert result["metadata"]["my-science-data"] == 12345
 

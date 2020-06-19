@@ -69,9 +69,6 @@ class ecr_middleware():
         request = Request(environ)
         authHeader = request.headers.get("Authorization", default = "")
 
-        
-
-
         environ['authenticated'] = False
         #print(f"Authorization: {authHeader}", file=sys.stderr)
 
@@ -92,10 +89,6 @@ class ecr_middleware():
             res = Response(f'Authorization failed (token empty)', mimetype= 'text/plain', status=401)
             return res(environ, start_response)
 
-
-        
-        
-        
         # example: curl -X POST -H 'Accept: application/json; indent=4' -H "Authorization: Basic c2FnZS1hcGktc2VydmVyOnRlc3Q=" -d 'token=<SAGE-USER-TOKEN>'  <sage-ui-hostname>:80/token_info/
         # https://github.com/sagecontinuum/sage-ui/#token-introspection-api
 
@@ -114,8 +107,7 @@ class ecr_middleware():
             environ['authenticated'] = True
             environ['user'] = tokenArray[1]
             return self.app(environ, start_response)
-
-
+        
         headers = {"Accept":"application/json; indent=4", "Authorization": f"Basic {config.tokenInfoPassword}" , "Content-Type":"application/x-www-form-urlencoded"}
         data=f"token={token}"
         r = requests.post(config.tokenInfoEndpoint, data = data, headers=headers, timeout=5)
@@ -155,7 +147,7 @@ class AppList(MethodView):
     def post(self):
         # example
        
-        # curl -X POST localhost:5000/apps -d '{"name" : "testapp", "description": "blabla", "architecture" : ["linux/amd64" , "linux/arm/v7"] , "version" : "1.0", "source" :"https://github.com/user/repo.git#v1.0", "inputs": [{"id":"speed" , "type":"int" }] , "metadata": {"my-science-data" : 12345} }'
+        # curl -X POST localhost:5000/apps -d '{"name" : "testapp", "description": "blabla", "version" : "1.0", "source" :"https://github.com/user/repo.git#v1.0", "inputs": [{"id":"speed" , "type":"int" }] , "metadata": {"my-science-data" : 12345} }'
 
 
         # TODO authentication
@@ -185,7 +177,8 @@ class AppList(MethodView):
         
 
         ##### name
-        appName = postData["name"]
+        appName = postData.get("name", "")
+
         appNameArray = appName.split("/", 2)
         if len(appNameArray) > 1:
             raise ErrorResponse(f'Name should not contain a slash', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
@@ -199,17 +192,7 @@ class AppList(MethodView):
             #return  {"error": f'Name can only consist of [0-9a-zA-Z-_.] characters and only start with [0-9a-zA-Z] characters.'}  
             raise ErrorResponse(f'Name can only consist of [0-9a-zA-Z-_.] characters and only start with [0-9a-zA-Z] characters.', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
-        ##### architecture
         
-        architecture_str = ""
-        if "architecture" in postData:
-            appArchitecture  = postData["architecture"]
-            for arch in appArchitecture:
-                if not arch in config.architecture_valid:
-                    valid_arch_str = ",".join(config.architecture_valid)
-                    raise ErrorResponse(f'Architecture {arch} not supported, valid values: {valid_arch_str}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-                
-            architecture_str = ",".join(appArchitecture)
 
 
     
@@ -220,25 +203,31 @@ class AppList(MethodView):
         # https://github.com/<user>/<repo>.git#<tag>
         # http://sagecontinuum.org/bucket/<bucket_id>
 
-        appSource = postData["source"]
-        source_public_git_pattern = re.compile(f'https://github.com/{vc}+/{vc}+.git#{vc}+')
-        source_private_git_pattern = re.compile(f'git@github.com/{vc}+/{vc}+.git#{vc}+') 
-        source_sage_store_pattern = re.compile(f'http://sagecontinuum.org/bucket/[0-9a-z.]+') 
-        source_matched = False
-        for p in [source_public_git_pattern, source_private_git_pattern , source_sage_store_pattern]:
-            if p.match(appSource):
-                source_matched = True
-                break
         
-        if not source_matched:
-            raise ErrorResponse('Could not parse source field', status_code=HTTPStatus.INTERNAL_SERVER_ERROR) 
+
+        sourcesArray = postData.get("sources",[])
+        if len(sourcesArray) == 0:
+            raise ErrorResponse("Field source is missing")
+
+
+
+        #source_public_git_pattern = re.compile(f'https://github.com/{vc}+/{vc}+.git#{vc}+')
+        #source_private_git_pattern = re.compile(f'git@github.com/{vc}+/{vc}+.git#{vc}+') 
+        #source_sage_store_pattern = re.compile(f'http://sagecontinuum.org/bucket/[0-9a-z.]+') 
+        #source_matched = False
+        #for p in [source_public_git_pattern, source_private_git_pattern , source_sage_store_pattern]:
+        #    if p.match(appSource):
+        #        source_matched = True
+        #        break
+        
+        #if not source_matched:
+        #    raise ErrorResponse('Could not parse source field', status_code=HTTPStatus.INTERNAL_SERVER_ERROR) 
 
         ##### inputs
         
         # inputs validation
-        appInputs = None
-        if "inputs" in postData:
-            appInputs = postData["inputs"]
+        appInputs = postData.get("inputs", [])
+        if len(appInputs) > 0:
             for app_input in appInputs:
                 for field in app_input:
                     if not  field in  config.input_fields_valid:
@@ -256,31 +245,38 @@ class AppList(MethodView):
         ##### resources
 
         #resources_str = None
-        resourcesArray=[]
-        if "resources" in postData:
-            resourcesArray = postData["resources"]
-            if not isinstance(resourcesArray, list):
-                raise ErrorResponse(f'Field resources has to be an array', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+        resourcesArray = postData.get("resources", [])
+        if not isinstance(resourcesArray, list):
+            raise ErrorResponse(f'Field resources has to be an array', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
             #resources_str = json.dumps(resourcesArray)
 
         ##### metadata
-        appMetadata_str = ""
-        if "metadata" in postData:
-            appMetadata = postData["metadata"]
-            appMetadata_str = json.dumps(appMetadata) 
+        appMetadata = postData.get("metadata", None)
+        
+
+        
 
         ##### create dbObject
         dbObject = {}
+        
         for key in config.valid_fields_set:
             dbObject[key] = ""
+        
+        if appMetadata:
+            #raise ErrorResponse(f'metadata is missing', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+            if not isinstance(appMetadata, dict):
+                raise ErrorResponse(f'Field metadata has to be an object, got {str(appMetadata)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+            dbObject["metadata"] = json.dumps(appMetadata) 
+            
+ 
 
         dbObject["name"] = appName
-        dbObject["architecture"] = architecture_str
+        
         dbObject["inputs"] = appInputs_str
-        dbObject["metadata"] = appMetadata_str
+        
         #copy fields
-        for key in ["description", "version", "source", "namespace"]:
+        for key in ["description", "version", "namespace"]:
             dbObject[key] = postData[key]
 
         dbObject["owner"] = requestUser
@@ -300,6 +296,53 @@ class AppList(MethodView):
         
         ecr_db = ecrdb.EcrDB()
         
+
+        for build_source in sourcesArray:
+
+
+            source_name = build_source.get("name", "default")
+            
+            
+            architectures_array = build_source.get("architectures", [])
+    
+            if len(architectures_array) == 0:
+                raise ErrorResponse("architectures missing in source")
+
+            ##### architecture
+        
+        
+            for arch in architectures_array:
+                if not arch in config.architecture_valid:
+                    valid_arch_str = ",".join(config.architecture_valid)
+                    raise ErrorResponse(f'Architecture {arch} not supported, valid values: {valid_arch_str}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+                
+            
+
+            architectures = json.dumps(architectures_array)    
+
+            url = build_source.get("url", "")
+            if url == "":
+                raise ErrorResponse("url missing in source")
+
+
+            branch = build_source.get("branch", "master")
+            if branch == "":
+                raise ErrorResponse("branch missing in source")
+
+
+            directory = build_source.get("directory", ".")
+            if directory == "":
+                directory = "."
+
+            dockerfile = build_source.get("dockerfile", "Dockerfile")
+            if dockerfile == "":
+                dockerfile = "Dockerfile"
+
+
+            #appSources = postData["sources"]
+            stmt = f'INSERT INTO Sources ( id, name, architectures , url, branch, directory, dockerfile ) VALUES (UUID_TO_BIN(%s) , %s , %s, %s, %s, %s, %s)'
+            ecr_db.cur.execute(stmt, (newID_str, source_name, architectures , url, branch, directory, dockerfile,))
+
        
         for res in resourcesArray:
             res_str = json.dumps(res)
@@ -353,7 +396,7 @@ class Apps(MethodView):
     @has_permission( "READ", "FULL_CONTROL" )
     def get(self, app_id):
 
-      
+
         ecr_db = ecrdb.EcrDB()
 
         returnObj=ecr_db.getApp(app_id)
@@ -374,73 +417,83 @@ class Builds(MethodView):
         except Exception as e:
             raise ErrorResponse(f'JenkinsServer() returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
-        
+        source_name= request.values.get("source", "default")
+        #source_name = "default"
 
         # strategy to find last build
         # 1. check db field "number"
         # 2. use global queue id to map to app-specific build number
         # 3. take whatever is reported as last build (IS MISLEADING, returns previous build)
 
-        ecr_db = ecrdb.EcrDB()
+        
 
         ecr_db = ecrdb.EcrDB()
         app_spec = ecr_db.getApp(app_id)
 
-        app_human_id = createJenkinsName(app_spec)
+        app_human_id = createJenkinsName(app_spec, source_name)
 
 
         # strategy 1: try to find build number in database
 
+        number = -1
+        architectures = ""
         try:
-            last_queue_id, number = ecr_db.getLastBuildID(app_id)
+            number, architectures = ecr_db.getBuildInfo(app_id, source_name)
         except Exception as e:
-            raise ErrorResponse(f'Could not get build ID: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+            raise ErrorResponse(f'Could not get build number: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
         if number != -1:
-
-            buildInfo = js.server.get_build_info(app_human_id, number)
+            # get Jenkins build info
+            try:
+                buildInfo = js.server.get_build_info(app_human_id, number)
+            except Exception as e:
+                raise Exception(f'js.server.get_build_info returned: {str(e)}')
             return buildInfo
             
 
+        return {"error": f"number is negative"}
+
         # strategy 2: try to use  last_queue_id to find "number"
 
-        queue_item = None
-        try:
-            queue_item = js.server.get_queue_item(last_queue_id)   
-        except Exception as e:
+        # queue_item = None
+        # try:
+        #     queue_item = js.server.get_queue_item(last_queue_id)   
+        # except Exception as e:
 
-            if not "does not exist" in str(e):
-                raise ErrorResponse(f'get_queue_item() returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+        #     if not "does not exist" in str(e):
+        #         raise ErrorResponse(f'get_queue_item() returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
         
 
-        if queue_item:
+        # if queue_item:
 
-            if not "executable" in queue_item:
-                return {"error": queue_item["why"], "data": queue_item}
+        #     executable= queue_item.get("executable", None)
+
+        #     if not executable:
+        #         return {"error": queue_item["why"], "data": queue_item}
 
 
-            executable= queue_item["executable"]
-            if not "number" in executable:
-                return {"error": queue_item["why"], "data": queue_item}
+        #     executable= queue_item["executable"]
+        #     if not "number" in executable:
+        #         return {"error": queue_item["why"], "data": queue_item}
 
-            number = executable["number"]
+        #     number = executable["number"]
 
-            ecr_db.setLastBuildID(app_id, last_queue_id, number)
+        #     ecr_db.setLastBuildID(app_id, last_queue_id, number)
         
-            verify_last_queue_id, verify_number = ecr_db.getLastBuildID(app_id)
+        #     verify_last_queue_id, verify_number = ecr_db.getLastBuildID(app_id)
 
-            if verify_last_queue_id != last_queue_id:
-                return {"error": "last_queue_id does not match"}
+        #     if verify_last_queue_id != last_queue_id:
+        #         return {"error": "last_queue_id does not match"}
 
-            if verify_number != number:
-                return {"error": "number does not match"}
+        #     if verify_number != number:
+        #         return {"error": "number does not match"}
 
-            buildInfo = js.server.get_build_info(app_human_id, number)
-            return buildInfo
+        #     buildInfo = js.server.get_build_info(app_human_id, number)
+        #     return buildInfo
 
 
         
-        return {"error": f"queue_item for id {last_queue_id} not found"}
+        # return {"error": f"queue_item for id {last_queue_id} not found"}
         #show = request.values.get("show", default="")
 
         # job_info = js.get_job_info(app_id)
@@ -479,7 +532,23 @@ class Builds(MethodView):
         ecr_db = ecrdb.EcrDB()
         app_spec = ecr_db.getApp(app_id)
 
-        app_human_id = createJenkinsName(app_spec)
+
+        source_name= request.values.get("source", "default")
+
+        #source_name = "default"
+
+        sources = app_spec.get("sources", [])
+        source = None
+        for src in sources:
+            src_name = src.get("name", "none")
+            if src_name == source_name:
+                source = src
+                break
+
+        if not source:
+            raise ErrorResponse(f'No source found in app spec', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        app_human_id = createJenkinsName(app_spec, source_name)
         
 
 
@@ -488,10 +557,10 @@ class Builds(MethodView):
             overwrite =  True
         
        
-
+        
         
         try:
-            js.createJob(app_human_id, app_spec, overwrite=overwrite)
+            js.createJob(app_human_id, app_spec, source_name, overwrite=overwrite)
         except Exception as e:
             raise ErrorResponse(f'createJob() returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR) 
 
@@ -502,35 +571,43 @@ class Builds(MethodView):
 
         queue_item = None
 
+        # this loop will waitb for Jenkins to return build number
+        # note that the previous queue_item_number is a temporary global queue number which will be useless after some time.
         number = -1
         while number == -1:
+            time.sleep(2)
+
             try:
                 queue_item = js.server.get_queue_item(queue_item_number)   
-            except Exception as e:
+            except Exception as e: # pragma: no cover
 
                 if not "does not exist" in str(e):
                     raise ErrorResponse(f'get_queue_item() returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
             
-            if queue_item != None:
-                if "executable" in queue_item:
-                    executable=queue_item["executable"]
-                    if "number" in executable:
-                        number = executable["number"]
-                        break
+            if not queue_item:
+                continue
+           
+            executable=queue_item.get("executable", None)
+            if not executable:
+                continue
 
-            time.sleep(2)
+            number = executable.get("number", None)
+            if not number: # pragma: no cover
+                continue
 
-    
+            break
+
+            
+
+        architectures = source.get("architectures", None)
+        if not architectures:
+            raise ErrorResponse(f'architectures not specified in source', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
         try:
-            stmt = 'INSERT INTO Builds ( id, last_queue_id, number)  VALUES (UUID_TO_BIN(%s) , %s,  %s)  ON DUPLICATE KEY UPDATE last_queue_id=%s, number=%s  '
-
-
-            ecr_db.cur.execute(stmt, (app_id, queue_item_number, number, queue_item_number, number))
-
-            ecr_db.db.commit()
+            ecr_db.SaveBuildInfo(app_id, source_name, number, architectures)
+        
         except Exception as e:
-            raise ErrorResponse(f'error inserting build info: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
+            raise ErrorResponse(f'error inserting build info for {app_id}, {source_name}, {number} , SaveBuildInfo: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
         #time.sleep(6)
 
         #queued_item = js.server.get_queue_item(queue_item_number)
@@ -611,7 +688,7 @@ class Healthy(MethodView):
         # example:  curl localhost:5000/healthy
         try:
             ecr_db = ecrdb.EcrDB(retries=1)
-        except Exception as e:
+        except Exception as e: # pragma: no cover
             return f'error ({e})'
 
         return "ok"
@@ -619,7 +696,7 @@ class Healthy(MethodView):
 
 
 
-def createJenkinsName(app_spec):
+def createJenkinsName(app_spec, source_name):
     import urllib.parse
 
     namespace = ""
@@ -629,7 +706,7 @@ def createJenkinsName(app_spec):
         namespace = app_spec["owner"]
        
 
-    return f'{namespace}_{app_spec["name"]}_{app_spec["version"]}'
+    return f'{namespace}_{app_spec["name"]}_{app_spec["version"]}_{source_name}'
 
 
 

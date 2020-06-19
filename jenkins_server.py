@@ -66,35 +66,59 @@ class JenkinsServer():
 
 
 
-    def createJob(self, id, app_spec, overwrite=False):
+    def createJob(self, id, app_spec, source_name, overwrite=False):
 
        
 
         # format https://github.com/user/repo.git#v1.0
-        if not "source" in app_spec:
-            raise Exception("field source missing")
 
-
-        source=app_spec["source"]
-        sourceArray = source.split("#", 3)
-
-        git_url = sourceArray[0]
-        git_branch = sourceArray[1]
-        git_directory = ""
-        if len(sourceArray) > 2:
-            git_directory = sourceArray[2]
-            if git_directory.startswith("/"):
-                git_directory=git_directory[1:]
-        #git_direcory =
         
-        namespace = app_spec["owner"]
-        if "namespace" in app_spec and len(app_spec["namespace"]) > 0:
-            namespace = app_spec["namespace"]
+
+
+        sources=app_spec.get("sources", [])
+        if len(sources) == 0 :
+            raise Exception("field sources empty")
+
+        source = None
+        for src in sources:
+            if src.get("name", "") == source_name:
+                source = src
+                break
+
+        if not source :
+            raise Exception(f'Source with name {source_name} not found')
+
+        #sourceArray = source.split("#", 3)
+
+        git_url = source.get("url", "")
+        git_branch = source.get("branch", "master")
+        git_directory = source.get("directory", ".")
+        if git_directory.startswith("/"):
+            git_directory=git_directory[1:]
+
+        platforms = source.get("architectures", [])
+        if len(platforms) == 0:
+            raise Exception("No architectures specified")
+        platforms_str = ",".join(platforms)
+
+
+        actual_namespace = ""
+        namespace = app_spec.get("namespace", "")
+        if len(namespace) > 0:
+            actual_namespace = namespace
+        else:
+            actual_namespace = app_spec.get("owner", "")
         
+
+        
+        
+        
+        
+
         name = app_spec["name"]
         template = Template(jenkinsfileTemplate)
         try:
-            jenkinsfile = template.substitute(url=git_url, branch=git_branch, directory=git_directory, namespace=namespace,  name=name)
+            jenkinsfile = template.substitute(url=git_url, branch=git_branch, directory=git_directory, namespace=actual_namespace,  name=name, platforms=platforms_str)
         except Exception as e:
             raise Exception(f'  url={git_url}, branch={git_branch}, directory={git_directory}  e={str(e)}')
 
@@ -125,18 +149,18 @@ class JenkinsServer():
 
                 my_job = self.server.get_job_config(id)
                 return my_job
-            except jenkins.NotFoundException as e:
+            except jenkins.NotFoundException as e: # pragma: no cover
                 pass
-            except Exception as e:
+            except Exception as e: # pragma: no cover
                 raise
-                #raise ErrorResponse(f'(server.get_job_config 2) got exception: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-            
-            time.sleep(2)
-            timeout -= 2
+           
+            if True: # pragma: no cover
+                time.sleep(2)
+                timeout -= 2
 
-            if timeout <= 0:
-                raise Exception(f'timout afer job creation')
-            continue
+                if timeout <= 0:
+                    raise Exception(f'timout afer job creation')
+                continue
 
 
         return 1

@@ -31,7 +31,7 @@ while [ 1 ] ; do
 done
 
 set -x
-docker-compose up
+docker-compose up $@
 set +x
 
 

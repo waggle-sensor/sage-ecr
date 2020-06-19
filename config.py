@@ -15,11 +15,11 @@ mysql_password =  os.getenv('MYSQL_PASSWORD')
 
 
 # app definition
-valid_fields =["name", "description", "version", "namespace", "source", "depends_on", "architecture" , "baseCommand", "arguments", "inputs", "resources", "metadata"]
+valid_fields =["name", "description", "version", "namespace", "sources", "depends_on", "baseCommand", "arguments", "inputs", "resources", "metadata"]
 valid_fields_set = set(valid_fields)
-required_fields = set(["name", "description", "version", "source"])
+required_fields = set(["name", "description", "version", "sources"])
 
-mysql_fields = ["name", "description", "version", "namespace",  "source", "depends_on", "architecture" , "baseCommand", "arguments", "inputs", "metadata"]
+mysql_fields = ["name", "description", "version", "namespace", "depends_on", "baseCommand", "arguments", "inputs", "metadata"]
 mysql_fields_det = set(valid_fields)
 
 # architecture https://github.com/docker-library/official-images#architectures-other-than-amd64
@@ -57,8 +57,9 @@ jenkinsfileTemplate = '''pipeline {
                 git branch: '${branch}',
                     url: '${url}'
                 dir("$${env.WORKSPACE}/${directory}"){
-                    sh "ls"
-                    sh "docker build -t ${namespace}/${name} . "
+                    sh "docker version"
+                    sh "docker buildx version"
+                    sh "docker buildx build --pull --platform ${platforms} -t ${namespace}/${name} ."
                 }
                 sleep 10
                 echo 'Building..'

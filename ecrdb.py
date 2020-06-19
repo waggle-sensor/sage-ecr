@@ -89,9 +89,13 @@ class EcrDB():
 
         #decode embedded json
         for field in ["inputs", "metadata"]:
-            if field in returnObj:
-                returnObj[field] = json.loads(returnObj[field])
-
+            value = returnObj.get(field, None)
+            if value:
+                try:
+                    returnObj[field] = json.loads(value)
+                except Exception as e:
+                    raise Exception(f'Error in reading json in field {field}, got "{value}" and error {str(e)}')
+        
         stmt = f'SELECT  BIN_TO_UUID(id), resource FROM Resources WHERE BIN_TO_UUID(id) = %s'
         print(f'stmt: {stmt} app_id={app_id}', file=sys.stderr)
         self.cur.execute(stmt, (app_id, ))
@@ -103,6 +107,28 @@ class EcrDB():
 
         if len(resources) > 0:
             returnObj["resources"] = resources
+
+
+        stmt = f'SELECT  BIN_TO_UUID(id), name, architectures , url, branch, directory, dockerfile FROM Sources WHERE BIN_TO_UUID(id) = %s'
+        print(f'stmt: {stmt} app_id={app_id}', file=sys.stderr)
+        self.cur.execute(stmt, (app_id, ))
+        sources_array = []
+        rows = self.cur.fetchall()
+        for row in rows:
+
+            source_obj = {}
+            source_obj["name"] = row[1]
+            source_obj["architectures"] = json.loads(row[2])
+            source_obj["url"] = row[3]
+            source_obj["branch"] = row[4]
+            source_obj["directory"] = row[5]
+            source_obj["dockerfile"] = row[6]
+
+
+            sources_array.append(source_obj)
+
+
+        returnObj["sources"] = sources_array
 
         return returnObj
     
@@ -241,33 +267,51 @@ class EcrDB():
         return int(self.cur.rowcount)
 
 
-    def getLastBuildID(self, app_id):
+    def getBuildInfo(self, app_id, name):
     
        
 
-        stmt = f'SELECT  BIN_TO_UUID(id), last_queue_id, number FROM Builds WHERE BIN_TO_UUID(id) = %s'
+        stmt = f'SELECT  BIN_TO_UUID(id), build_number , architectures FROM Builds WHERE BIN_TO_UUID(id) = %s AND build_name=%s ORDER BY time_created DESC LIMIT 1'
         print(f'stmt: {stmt} app_id={app_id}', file=sys.stderr)
-        self.cur.execute(stmt, (app_id, ))
+        self.cur.execute(stmt, (app_id, name))
 
         row = self.cur.fetchone()
         if row == None:
             raise Exception("No build id found in database")
 
-        last_queue_id = row[1]
-        number = row[2]
+       
+        number = row[1]
+        architectures = json.loads(row[2])
 
-        return (last_queue_id, number)
 
-    def setLastBuildID(self, app_id, queue_item_number, number):
+        return (number, architectures)
+
+    def SaveBuildInfo(self, app_id, source_name, build_number, architectures):
+
+        architectures_str = json.dumps(architectures)
+
+
+        stmt = 'INSERT INTO Builds ( id, build_name, build_number, architectures)  VALUES (UUID_TO_BIN(%s) , %s,  %s, %s) '
+
+
+        self.cur.execute(stmt, (app_id, source_name, build_number, architectures_str))
+
+        self.db.commit()
+
+        return
+        
+
+
+    # def setLastBuildID(self, app_id, source_name, queue_item_number, number):
         
         
-        try:
+    #     try:
                 
-            stmt = 'UPDATE Builds SET last_queue_id=%s, number=%s WHERE BIN_TO_UUID(id) = %s'
+    #         stmt = 'UPDATE Builds SET last_queue_id=%s, number=%s WHERE BIN_TO_UUID(id) = %s'
 
-            self.cur.execute(stmt, (queue_item_number, number, app_id))
+    #         self.cur.execute(stmt, (queue_item_number, number, app_id))
 
-            self.db.commit()
-        except Exception as e:
-            raise ErrorResponse(f'error updating build info: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+    #         self.db.commit()
+    #     except Exception as e:
+    #         raise ErrorResponse(f'error updating build info: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
         
