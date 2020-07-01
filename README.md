@@ -3,6 +3,16 @@ SAGE Edge Code Repository
 
 ![CI](https://github.com/sagecontinuum/sage-ecr/workflows/CI/badge.svg)
 
+
+Start test environment:
+
+```
+./run.sh -d
+```
+
+Option -d will deamonize the docker-compose environment.
+
+
 # usage
 
 After uploading an app, defining enviornment variable `APP_ID` makes it easier to use the example API calls below.
