@@ -156,15 +156,10 @@ curl localhost:5000/apps/${APP_ID}/builds -H "Authorization: sage user:testuser"
 # testing
 
 
-```bash
-docker-compose build
-docker-compose run --rm  sage-ecr /bin/ash -c 'coverage run -m pytest -v &&  coverage report -m'
-```
-
-or, for an existing docker-compose enviornment:
+for an existing docker-compose enviornment:
 
 ```bash
-docker exec -ti sage-ecr_sage-ecr_1 /bin/ash -c 'coverage run -m pytest -v &&  coverage report -m'
+docker exec -ti sage-ecr_sage-ecr_1 /bin/ash -c 'coverage run -m pytest -v --runslow  &&  coverage report -m'
 ```
 
 

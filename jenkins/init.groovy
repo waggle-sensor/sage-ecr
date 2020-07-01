@@ -18,6 +18,8 @@ def result = apiTokenProperty.tokenStore.generateNewToken(tokenName)
 
 user.save()
 
+println "Got token: $result.plainValue"
+
 File file = new File("/var/jenkins_home/secrets/ecrdb_token.txt")
 file.write result.plainValue
 //return result.plainValue

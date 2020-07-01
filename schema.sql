@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS SageECR.Builds (
     architectures       VARCHAR(256),
     time_created        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     time_last_updated   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (id, build_number)
+    PRIMARY KEY (id, build_name, build_number)
 );
 
 CREATE TABLE IF NOT EXISTS SageECR.Certifications (

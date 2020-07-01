@@ -24,6 +24,7 @@ services:
       - ${PWD}:/usr/src/app  # for development only
     restart: always
     env_file: mysql.env
+   
     environment:
       DISABLE_AUTH: 1
       tokenInfoEndpoint: ${SageTokenInfoEndpoint} 

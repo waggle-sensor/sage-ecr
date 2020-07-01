@@ -34,7 +34,16 @@ COPY init.groovy /var/jenkins_home/
 # this is needed to for docker
 USER root
 
-RUN apk update && apk add jq
+RUN apk update && apk add jq curl
+
+#ENV JAVA_OPTS="-Djenkins.install.runSetupWizard=false"
+
+
+ENV DOCKER_BUILDKIT 1
+
+RUN mkdir -p ~/.docker/cli-plugins/
+RUN curl -L -o ~/.docker/cli-plugins/docker-buildx https://github.com/docker/buildx/releases/download/v0.4.1/buildx-v0.4.1.linux-amd64
+RUN chmod a+x ~/.docker/cli-plugins/docker-buildx
 
 # ugly hack to make sure docker binary is downloaded on start of container
 # this injects get_docker_binary.sh into the entrypoint script

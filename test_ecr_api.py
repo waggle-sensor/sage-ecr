@@ -103,6 +103,7 @@ test_app_def_obj = simple_app
 test_app_def = json.dumps(test_app_def_obj)
 
 
+            
 
 # from https://flask.palletsprojects.com/en/1.1.x/testing/
 @pytest.fixture
@@ -125,7 +126,7 @@ def test_connect(client):
     rv = client.get('/')
     assert b'SAGE Edge Code Repository' in rv.data
 
-
+@pytest.mark.slow
 def test_upload_and_build(client):
 
     headers = {"Authorization" : "sage user:testuser"}
@@ -153,6 +154,7 @@ def test_upload_and_build(client):
         
         result = rv.get_json()
 
+        assert "error" not in result
         assert "build_number" in result
 
         # TODO add timeout
@@ -164,6 +166,7 @@ def test_upload_and_build(client):
         
             result = rv.get_json()
 
+            assert "error" not in result
             assert "result" in result
 
             result_status = result["result"]
@@ -433,6 +436,7 @@ def test_health(client):
 
     assert rv.data == b"ok"
 
+
 def test_error(client):
     
     rv = client.get('/apps/test')
@@ -442,4 +446,7 @@ def test_error(client):
 
     # this fails because app "test" does not exist and there is no permission
     assert "Not authorized" in result["error"]
+
+
+
 

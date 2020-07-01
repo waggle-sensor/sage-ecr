@@ -16,9 +16,15 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Build the Docker image
-      run: docker-compose build
+    - name: start environment
+      run: |
+        export USE_HOST_DOCKER=1
+        
+        ./run.sh -d
+
+    - name: wait for environment
+      run: while [ $(curl -s localhost:5000/healthy)_ != "ok_"  ] ; do echo waiting... ; docker-compose logs --tail=20 ; echo "jenkins log:" ; docker logs jenkins --tail=20 ; sleep 2 ; done
 
     - name: run tests and coverage
-      run: docker-compose run --rm  sage-ecr /bin/ash -c 'coverage run -m pytest -v &&  coverage report -m'
+      run: docker exec sage-ecr_sage-ecr_1 /bin/ash -c 'coverage run -m pytest -v &&  coverage report -m  --fail-under 70'
 
