@@ -1,5 +1,13 @@
 version: '3.7'
 
+# to start this enviornment with a jenkins instance, use run.sh instead of this docker-compose file directly
+
+# if you already have a jenkins server, provide enviornment variables, for example:
+# export JENKINS_SERVER=http://host.docker.internal:8082
+# export JENKINS_USER=ecrdb
+# export JENKINS_TOKEN=$(docker exec -ti jenkins cat /var/jenkins_home/secrets/ecrdb_token.txt)
+
+
 
 services:
 
@@ -14,12 +22,18 @@ services:
       - "5000:5000"
     volumes:
       - ${PWD}:/usr/src/app  # for development only
+    restart: always
     env_file: mysql.env
+   
     environment:
       DISABLE_AUTH: 1
       tokenInfoEndpoint: ${SageTokenInfoEndpoint} 
       tokenInfoUser: ${SageTokenInfoUser}  
-      tokenInfoPassword: ${SageTokenInfoPassword} 
+      tokenInfoPassword: ${SageTokenInfoPassword}
+      JENKINS_SERVER: ${JENKINS_SERVER}
+      JENKINS_USER: ${JENKINS_USER}
+      JENKINS_TOKEN: ${JENKINS_TOKEN}
+      
     
 
 
@@ -29,6 +43,7 @@ services:
     volumes:
       - ${PWD}/schema.sql:/docker-entrypoint-initdb.d/init.sql
       - sage-ecr-db:/var/lib/mysql
+
 
 volumes:
   sage-ecr-db:

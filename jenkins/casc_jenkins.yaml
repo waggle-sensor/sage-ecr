@@ -1,0 +1,15 @@
+jenkins:
+  systemMessage: "Jenkins configured automatically by Jenkins Configuration as Code plugin\n\n"
+
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "ecrdb"
+          password: "test"
+        - id: "admin"
+          password: "testtest"
+  authorizationStrategy: loggedInUsersCanDoAnything
+
+
+  

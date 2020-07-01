@@ -4,3 +4,5 @@ pytest
 coverage
 middleware
 requests
+python-jenkins
+xmltodict

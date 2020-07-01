@@ -1,0 +1,8 @@
+version: '3.7'
+
+services:
+
+  sage-ecr:
+
+    extra_hosts:
+      - "host.docker.internal:${DOCKER_INTERNAL}"

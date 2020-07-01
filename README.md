@@ -3,8 +3,22 @@ SAGE Edge Code Repository
 
 ![CI](https://github.com/sagecontinuum/sage-ecr/workflows/CI/badge.svg)
 
+
+Start test environment:
+
+```
+./run.sh -d
+```
+
+Option -d will deamonize the docker-compose environment.
+
+
 # usage
 
+After uploading an app, defining enviornment variable `APP_ID` makes it easier to use the example API calls below.
+```bash
+export APP_ID='3a7ea5da-517e-4d00-8fcc-1f3e78aca85e'
+```
 
 ## POST /apps
 ```bash
@@ -132,14 +146,30 @@ returns
 
 
 
+## POST /apps/${APP_ID}/builds
+
+Triggers a new build
+```bash
+curl -X POST localhost:5000/apps/${APP_ID}/builds -H "Authorization: sage user:testuser"
+```
+
+## GET /apps/${APP_ID}/builds
+
+Returns state of last build.
+
+```bash
+curl localhost:5000/apps/${APP_ID}/builds -H "Authorization: sage user:testuser"
+```
+
 
 
 # testing
 
 
+for an existing docker-compose enviornment:
+
 ```bash
-docker-compose build
-docker-compose run --rm  sage-ecr /bin/ash -c 'coverage run -m pytest -v &&  coverage report -m'
+docker exec -ti sage-ecr_sage-ecr_1 /bin/ash -c 'coverage run -m pytest -v --runslow  &&  coverage report -m'
 ```
 
 
