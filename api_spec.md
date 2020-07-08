@@ -149,7 +149,7 @@ returns
 ## DELETE /apps/{id}/permissions
 
 ```bash
-curl -X PUT ${ECR_API}/apps/${APP_ID}/permissions -H "Authorization: sage user:testuser" -d '{"granteeType": "GROUP", "grantee": "AllUsers", "permission": "READ"}'
+curl -X DELETE ${ECR_API}/apps/${APP_ID}/permissions -H "Authorization: sage user:testuser" -d '{"granteeType": "GROUP", "grantee": "AllUsers", "permission": "READ"}'
 ```
 
 returns
