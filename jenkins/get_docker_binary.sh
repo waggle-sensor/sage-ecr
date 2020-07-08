@@ -6,7 +6,7 @@ if [ -z "${DATADIR}" ]; then
   DATADIR=/docker/
 fi
 
-if [ ! ${USE_HOST_DOCKER} == "1" ] ; then
+if [ "${USE_HOST_DOCKER}_" != "1_" ] ; then
   export DOCKER_VERSION=$(curl --unix-socket /var/run/docker.sock http://localhost/version | jq -r '.Version')
   export DOCKER_BINARY=${DATADIR}/docker-${DOCKER_VERSION}
 
