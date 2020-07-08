@@ -13,7 +13,12 @@ import sys
 from string import Template
 
 class JenkinsServer():
-    def __init__ ( self , host, username, password, retries=60) :
+    def __init__ ( self , host, username, password, retries=5) :
+
+
+        if not host: 
+            raise Exception("Jenkins host not defined")
+
         #self.host = host
         #self.username = username
         #self.password = password

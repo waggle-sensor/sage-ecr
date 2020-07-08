@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ecr-jenkins
+  namespace: sage
+  labels:
+    app: ecr-jenkins
+spec:
+  selector:
+    k8s-app: ecr-jenkins
+  type: ClusterIP
+  ports:
+  - name: ecr-jenkins
+    port: 8080
+    protocol: TCP
+    targetPort: 8080

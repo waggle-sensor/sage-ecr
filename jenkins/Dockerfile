@@ -1,10 +1,10 @@
 
 
-# docker build -t sagecontinuum/jenkins .
+# docker build -t sagecontinuum/ecr-jenkins .
 
 
-#FROM jenkins/jenkins:lts-alpine
-FROM jenkins/jenkins:alpine
+FROM jenkins/jenkins:lts-alpine
+#FROM jenkins/jenkins:alpine
 
 RUN install-plugins.sh \
     build-timeout \
@@ -24,7 +24,7 @@ RUN install-plugins.sh \
 COPY ./get_docker_binary.sh /
 
 # Jenkins: Configuration as Code
-COPY casc_jenkins.yaml /
+#COPY casc_jenkins.yaml /     # this config should better be mounted into container as is contains passwords
 ENV CASC_JENKINS_CONFIG /casc_jenkins.yaml
 
 # Jenkins: groovy, create token

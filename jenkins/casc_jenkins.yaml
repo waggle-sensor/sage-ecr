@@ -9,7 +9,9 @@ jenkins:
           password: "test"
         - id: "admin"
           password: "testtest"
-  authorizationStrategy: loggedInUsersCanDoAnything
+  authorizationStrategy: 
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: true
 
 
   

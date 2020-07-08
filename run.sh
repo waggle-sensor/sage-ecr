@@ -15,7 +15,7 @@ docker rm -fv jenkins
 
 
 cd jenkins/
-docker build -t sagecontinuum/jenkins .
+docker build -t sagecontinuum/ecr-jenkins .
 cd ..
 
 
@@ -32,7 +32,7 @@ fi
 
 
 set -x
-docker run -d --name jenkins --env USE_HOST_DOCKER=${USE_HOST_DOCKER} --env JAVA_OPTS=-Dhudson.footerURL=http://localhost:8082 -p 8082:8080  -p 50000:50000 -v `pwd`/temp:/docker:rw -v /var/run/docker.sock:/var/run/docker.sock ${DOCKER_MOUNT} sagecontinuum/jenkins 
+docker run -d --name jenkins --env USE_HOST_DOCKER=${USE_HOST_DOCKER} --env JAVA_OPTS=-Dhudson.footerURL=http://localhost:8082 -p 8082:8080  -p 50000:50000 -v `pwd`/jenkins/casc_jenkins.yaml:/casc_jenkins.yaml:ro -v `pwd`/temp:/docker:rw -v /var/run/docker.sock:/var/run/docker.sock ${DOCKER_MOUNT} sagecontinuum/ecr-jenkins 
 set +x
 
 echo "waiting for jenkins..."
@@ -75,7 +75,7 @@ done
 
 echo "staring docker-compose..."
 
-if [[ "$OSTYPE" == "darwin"* ]]; then
+if [[ "$OSTYPE" == "darwin"* ]] ; then
     set -x
     docker-compose up $@
     set +x

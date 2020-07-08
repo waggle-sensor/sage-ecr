@@ -415,7 +415,7 @@ class Builds(MethodView):
         try:
             js = jenkins_server.JenkinsServer(host=config.jenkins_server, username=config.jenkins_user, password=config.jenkins_token)
         except Exception as e:
-            raise ErrorResponse(f'JenkinsServer() returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+            raise ErrorResponse(f'JenkinsServer({config.jenkins_server}, {config.jenkins_user}) returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
         source_name= request.values.get("source", "default")
         #source_name = "default"
@@ -527,7 +527,7 @@ class Builds(MethodView):
             
             js = jenkins_server.JenkinsServer(host, username, password)
         except Exception as e:
-            raise ErrorResponse(f'JenkinsServer() returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+            raise ErrorResponse(f'JenkinsServer({host}, {username}) returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
         ecr_db = ecrdb.EcrDB()
         app_spec = ecr_db.getApp(app_id)

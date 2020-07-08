@@ -1,0 +1,21 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: ecr-api-ingress
+  namespace: sage
+  annotations:
+    #kubernetes.io/ingress.class: traefik
+    kubernetes.io/ingress.class: nginx
+spec:
+  rules:
+  #- host: sage.nautilus.optiputer.net
+  - http:
+      paths:
+      - path: /
+        backend:
+          serviceName: ecr-api
+          servicePort: 5000
+      - path: /jenkins
+        backend:
+          serviceName: ecr-jenkins
+          servicePort: 8080
