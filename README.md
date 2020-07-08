@@ -23,14 +23,17 @@ These usage examples assume you are running ECR locally via `./run.sh`.
 export ECR_API="localhost:5000"
 ```
 
-Visit Jenkins in your browser via: [http://localhost:8082](http://localhost:8082)
-Login as user `ecrdb` with password `test`.
-
-
 After uploading an app (explained below), defining enviornment variable `APP_ID` makes it easier to use the example API calls below.
 ```bash
 export APP_ID='3a7ea5da-517e-4d00-8fcc-1f3e78aca85e'
 ```
+
+## Jenkins
+Visit Jenkins in your browser via: [http://localhost:8082](http://localhost:8082)
+
+Note: After the start of Jenkins you have to login as user `ecrdb` with password `test`. You can skip the "Getting Started" dialogue but clicking the `X` in the upper right corner. Then click on the blue button `Start using Jenkins`. After that your are logged in, but that is not a requirement. Users can view the Jenkins instance without logging in.
+
+
 
 ## POST /apps
 ```bash
