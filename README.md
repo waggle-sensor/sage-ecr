@@ -4,7 +4,9 @@ SAGE Edge Code Repository
 ![CI](https://github.com/sagecontinuum/sage-ecr/workflows/CI/badge.svg)
 
 
-Start test environment:
+# Test environment
+
+The test environment uses docker-compose but has to be invoked by a wrapper script:
 
 ```
 ./run.sh -d
@@ -15,11 +17,17 @@ Option -d will deamonize the docker-compose environment.
 
 # usage
 
+These usage examples assume you are running ECR locally via `./run.sh`.
+
 ```bash
 export ECR_API="localhost:5000"
 ```
 
-After uploading an app, defining enviornment variable `APP_ID` makes it easier to use the example API calls below.
+Visit Jenkins in your browser via: [http://localhost:8082](http://localhost:8082)
+Login as user `ecrdb` with password `test`.
+
+
+After uploading an app (explained below), defining enviornment variable `APP_ID` makes it easier to use the example API calls below.
 ```bash
 export APP_ID='3a7ea5da-517e-4d00-8fcc-1f3e78aca85e'
 ```
