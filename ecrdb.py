@@ -11,6 +11,10 @@ from error_response import *
 
 class EcrDB():
     def __init__ ( self , retries=60) :
+
+        if not config.mysql_host:
+            raise Exception("mysql_host is not defined")
+        
         count = 0
         while True:
             try:
