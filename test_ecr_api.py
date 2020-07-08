@@ -17,7 +17,7 @@ import time
 
 carped_app =  {
     "name" : "carped",
-    "description": "very important app",
+    "description": "Car and pedestrian counter",
     "version" : "1.0", 
     "namespace":"sage", 
     "sources" : 
