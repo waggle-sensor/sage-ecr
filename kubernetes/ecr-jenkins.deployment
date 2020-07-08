@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    k8s-app: ecr-jenkins
+  name: ecr-jenkins
+  namespace: sage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: ecr-jenkins
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        k8s-app: ecr-jenkins
+    spec:
+      containers:
+      - image: sagecontinuum/ecr-jenkins
+        name: ecr-jenkins
+        #resources:
+        #  limits:
+        #    cpu: 4
+        #    memory: 4Gi
+        #  requests:
+        #    memory: 2Gi
+        #    cpu: 2
+        volumeMounts:
+        - mountPath: /var/jenkins_home
+          name: ecr-jenkins
+        - name: dockersock
+          mountPath: "/var/run/docker.sock"
+        - mountPath: /casc_jenkins.yaml
+          name: ecr-jenkins-casc-secret
+        env:
+          - name: JENKINS_OPTS
+            valueFrom:
+              configMapKeyRef:
+                name: ecr-jenkins-config
+                key: JENKINS_OPTS
+          - name: JAVA_OPTS
+            valueFrom:
+              configMapKeyRef:
+                name: ecr-jenkins-config
+                key: JAVA_OPTS
+          - name: USE_HOST_DOCKER
+            value: "0"
+        ports:
+          - name: ui
+            containerPort: 8080
+          - name: jnlp
+            containerPort: 50000
+      restartPolicy: Always
+      volumes:
+      - name: ecr-jenkins
+        persistentVolumeClaim:
+          claimName: ecr-jenkins-pvc
+      - name: dockersock
+        hostPath:
+          path: /var/run/docker.sock
+      - name: ecr-jenkins-casc-secret
+        secret:
+          secretName: ecr-jenkins-casc-secret

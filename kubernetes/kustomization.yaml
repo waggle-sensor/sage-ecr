@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  
+  - ecr-api.deployment
+  - ecr-api.ingress
+  - ecr-api.secret
+  - ecr-api.service
+
+  - ecr-db.deployment
+  - ecr-db.secret
+  - ecr-db.service
+  - ecr-db-local.pvc
+
+  - ecr-jenkins.config
+  - ecr-jenkins-casc.secret
+  - ecr-jenkins.deployment
+  - ecr-jenkins.service
+  - ecr-jenkins-local.pvc
+
+  

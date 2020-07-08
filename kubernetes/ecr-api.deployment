@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    k8s-app: ecr-api
+  name: ecr-api
+  namespace: sage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: ecr-api
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        k8s-app: ecr-api
+    spec:
+      containers:
+      - image: sagecontinuum/sage-ecr:latest
+        name: ecr-api
+        #resources:
+        #  limits:
+        #    cpu: 4
+        #    memory: 4Gi
+        #  requests:
+        #    memory: 2Gi
+        #    cpu: 2
+        env:
+        - name: DISABLE_AUTH
+          valueFrom:
+            secretKeyRef:
+              name: ecr-api-secret
+              key: DISABLE_AUTH
+        - name: tokenInfoEndpoint
+          valueFrom:
+            secretKeyRef:
+              name: ecr-api-secret
+              key: tokenInfoEndpoint
+        - name: tokenInfoUser
+          valueFrom:
+            secretKeyRef:
+              name: ecr-api-secret
+              key: tokenInfoUser
+        - name: tokenInfoPassword
+          valueFrom:
+            secretKeyRef:
+              name: ecr-api-secret
+              key: tokenInfoPassword
+        - name: JENKINS_SERVER
+          valueFrom:
+            secretKeyRef:
+              name: ecr-api-secret
+              key: JENKINS_SERVER
+        - name: JENKINS_USER
+          valueFrom:
+            secretKeyRef:
+              name: ecr-api-secret
+              key: JENKINS_USER
+        - name: JENKINS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: ecr-api-secret
+              key: JENKINS_TOKEN
+        - name: MYSQL_HOST
+          valueFrom:
+            secretKeyRef:
+              name: ecr-api-secret
+              key: MYSQL_HOST
+        - name: MYSQL_USER
+          valueFrom:
+            secretKeyRef:
+              name: ecr-db-secret
+              key: MYSQL_USER
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ecr-db-secret
+              key: MYSQL_PASSWORD
+        - name: MYSQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: ecr-db-secret
+              key: MYSQL_DATABASE
+        ports:
+          - name: api
+            containerPort: 5000
+          
+      restartPolicy: Always
