@@ -30,6 +30,9 @@ kubectl kustomize . | kubectl apply -f -
 ```
 
 ## Inject token
+
+To let `ecr-api` talk to Jenkins a token is needed. Because Jenkins does not let us inject a token on startup, it is automatically generated when Jenkins starts. After Jenkins has started and generated a token for user `ecrdb`, the token has to be extracted form the Jenkins pod (container) and stored as a secret.
+
 ```
 
 # get token from Jenkins or user ecrdb
