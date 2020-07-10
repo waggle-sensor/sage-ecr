@@ -17,6 +17,8 @@ resources:
   - ecr-jenkins-casc.secret
   - ecr-jenkins.deployment
   - ecr-jenkins.service
-  - ecr-jenkins-local.pvc
+  #- ecr-jenkins-local.pvc  
+  # was giving me
+  # WARNING	j.branch.WorkspaceLocatorImpl#getWorkspaceRoot: JENKINS-2111 path sanitization ineffective when using legacy Workspace Root Directory ‘${ITEM_ROOTDIR}/workspace’; switch to ‘${JENKINS_HOME}/workspace/${ITEM_FULL_NAME}’ as in JENKINS-8446 / JENKINS-21942
 
   

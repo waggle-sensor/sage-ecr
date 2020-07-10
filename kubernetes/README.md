@@ -22,7 +22,20 @@ minikube addons enable ingress
 
 kubectl create configmap ecr-db-initdb-config -n sage --from-file=../schema.sql
 
+
+# this starts all services, but Jenkins creates a token which the ecr-api will need
 kubectl kustomize . | kubectl apply -f -
+
+
+# get token from Jenkins or user ecrdb
+export JENKINS_TOKEN=$(kubectl exec -ti $(kubectl get pods | grep "^ecr-jenkins-" | cut -f 1 -d ' ') -- /bin/cat /var/jenkins_home/secrets/ecrdb_token.txt)
+echo "JENKINS_TOKEN=${JENKINS_TOKEN}"
+
+# inject token as a secret
+kubectl create secret generic ecr-api-token-secret --from-literal="token=${JENKINS_TOKEN}"
+
+# restart api to use new token from secret
+kubectl rollout restart deployment ecr-api
 
 ```
 

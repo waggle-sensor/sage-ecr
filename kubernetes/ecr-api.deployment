@@ -61,8 +61,8 @@ spec:
         - name: JENKINS_TOKEN
           valueFrom:
             secretKeyRef:
-              name: ecr-api-secret
-              key: JENKINS_TOKEN
+              name: ecr-api-token-secret
+              key: token
         - name: MYSQL_HOST
           valueFrom:
             secretKeyRef:

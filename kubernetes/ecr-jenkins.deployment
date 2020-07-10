@@ -28,8 +28,8 @@ spec:
         #    memory: 2Gi
         #    cpu: 2
         volumeMounts:
-        - mountPath: /var/jenkins_home
-          name: ecr-jenkins
+        #- mountPath: /var/jenkins_home
+        #  name: ecr-jenkins
         - name: dockersock
           mountPath: "/var/run/docker.sock"
         - mountPath: /casc_jenkins.yaml
@@ -56,9 +56,9 @@ spec:
             containerPort: 50000
       restartPolicy: Always
       volumes:
-      - name: ecr-jenkins
-        persistentVolumeClaim:
-          claimName: ecr-jenkins-pvc
+      #- name: ecr-jenkins
+      #  persistentVolumeClaim:
+      #    claimName: ecr-jenkins-pvc
       - name: dockersock
         hostPath:
           path: /var/run/docker.sock
