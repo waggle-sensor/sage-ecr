@@ -14,6 +14,11 @@ The test environment uses docker-compose but has to be invoked by a wrapper scri
 
 Option -d will deamonize the docker-compose environment.
 
+To stop:
+```bash
+./run.sh stop
+```
+
 
 ## Jenkins
 Visit Jenkins in your browser via: [http://localhost:8082](http://localhost:8082)

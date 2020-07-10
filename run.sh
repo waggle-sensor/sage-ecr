@@ -8,11 +8,20 @@ export JENKINS_SERVER=http://host.docker.internal:8082
 export JENKINS_USER=ecrdb
 export JENKINS_TOKEN=""
 
+
+
+if [ "$1"_ == "stop_" ] ; then
+
+    set -x
+    docker-compose down --remove-orphans
+    docker rm -fv jenkins
+    set +x
+
+    exit 0
+fi
+
 docker-compose down --remove-orphans
-
-
 docker rm -fv jenkins
-
 
 cd jenkins/
 docker build -t sagecontinuum/ecr-jenkins .
