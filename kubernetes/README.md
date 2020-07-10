@@ -1,7 +1,10 @@
 
 # Kubernetes deployment of ECR
 
-WARNING: THIS IS WORK-IN-PROGRESS
+The following instructions are targeted at a local test deployment via [minikube](https://kubernetes.io/docs/tasks/tools/install-minikube/). Everything is already pre-configured and should run as is. For a production deployment the configuration should be overwritten with kubernetes kustomize overlays.
+
+
+## Preparation
 
 ```bash
 kubectl config use-context minikube
@@ -15,6 +18,8 @@ kubectl config set-context --current --namespace=sage
 
 ## Deploy
 ```
+minikube addons enable ingress
+
 kubectl create configmap ecr-db-initdb-config -n sage --from-file=../schema.sql
 
 kubectl kustomize . | kubectl apply -f -
