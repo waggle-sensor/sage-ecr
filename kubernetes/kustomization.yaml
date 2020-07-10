@@ -6,6 +6,7 @@ resources:
   - ecr-api.deployment
   - ecr-api.ingress
   - ecr-api.secret
+  - ecr-api-token.secret
   - ecr-api.service
 
   - ecr-db.deployment
