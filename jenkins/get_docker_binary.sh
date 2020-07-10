@@ -7,7 +7,7 @@ if [ -z "${DATADIR}" ]; then
 fi
 
 if [ "${USE_HOST_DOCKER}_" != "1_" ] ; then
-  export DOCKER_VERSION=$(curl --unix-socket /var/run/docker.sock http://localhost/version | jq -r '.Version')
+  export DOCKER_VERSION=$(curl --silent --unix-socket /var/run/docker.sock http://localhost/version | jq -r '.Version')
   export DOCKER_BINARY=${DATADIR}/docker-${DOCKER_VERSION}
 
   mkdir -p ${DATADIR}
@@ -16,7 +16,7 @@ if [ "${USE_HOST_DOCKER}_" != "1_" ] ; then
   if [ ! -e ${DOCKER_BINARY} ] ; then
     set -e
     set -x
-    curl -fsSL -o ${DOCKER_BINARY}.part  https://web.lcrc.anl.gov/public/waggle/docker_binaries/x86_64/docker-${DOCKER_VERSION}
+    curl --fail --silent --show-error --location -o ${DOCKER_BINARY}.part  https://web.lcrc.anl.gov/public/waggle/docker_binaries/x86_64/docker-${DOCKER_VERSION}
     set +x
     set +e
     mv ${DOCKER_BINARY}.part ${DOCKER_BINARY}
