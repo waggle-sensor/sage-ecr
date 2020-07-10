@@ -18,7 +18,7 @@ spec:
         k8s-app: ecr-jenkins
     spec:
       containers:
-      - image: sagecontinuum/ecr-jenkins
+      - image: sagecontinuum/ecr-jenkins:latest
         name: ecr-jenkins
         #resources:
         #  limits:
@@ -33,7 +33,9 @@ spec:
         - name: dockersock
           mountPath: "/var/run/docker.sock"
         - mountPath: /casc_jenkins.yaml
+          subPath: "casc_jenkins.yaml"
           name: ecr-jenkins-casc-secret
+          readOnly: true
         env:
           - name: JENKINS_OPTS
             valueFrom:
@@ -63,3 +65,6 @@ spec:
       - name: ecr-jenkins-casc-secret
         secret:
           secretName: ecr-jenkins-casc-secret
+          items:
+          - key: casc_jenkins.yaml
+            path: casc_jenkins.yaml
