@@ -113,7 +113,7 @@ class EcrDB():
             returnObj["resources"] = resources
 
 
-        stmt = f'SELECT  BIN_TO_UUID(id), name, architectures , url, branch, directory, dockerfile FROM Sources WHERE BIN_TO_UUID(id) = %s'
+        stmt = f'SELECT  BIN_TO_UUID(id), name, architectures , url, branch, directory, dockerfile, build_args FROM Sources WHERE BIN_TO_UUID(id) = %s'
         print(f'stmt: {stmt} app_id={app_id}', file=sys.stderr)
         self.cur.execute(stmt, (app_id, ))
         sources_array = []
@@ -127,7 +127,7 @@ class EcrDB():
             source_obj["branch"] = row[4]
             source_obj["directory"] = row[5]
             source_obj["dockerfile"] = row[6]
-
+            source_obj["build_args"] = json.loads(row[7])
 
             sources_array.append(source_obj)
 

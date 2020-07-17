@@ -70,7 +70,10 @@ simple_app =  {
                 "url": "https://github.com/waggle-sensor/edge-plugins.git" ,  # required
                 "branch": "master",  # optional, default: master
                 "directory" : "plugin-simple" , # optional, default: root of git repository
-                "dockerfile" : "Dockerfile_sage"  # optional, default: Dockerfile , relative to context directory
+                "dockerfile" : "Dockerfile_sage" ,  # optional, default: Dockerfile , relative to context directory
+                "build_args" : {
+                    "VARIABLE1": "value1"
+                    }
             },
             {
                 "name" : "armv7",  # optional, default: "default"

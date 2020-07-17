@@ -12,7 +12,9 @@ The test environment uses docker-compose but has to be invoked by a wrapper scri
 ./run.sh -d
 ```
 
-Option -d will deamonize the docker-compose environment.
+Option `-d` will deamonize the docker-compose environment.
+Option `--build` will build docker images first.
+
 
 To stop:
 ```bash

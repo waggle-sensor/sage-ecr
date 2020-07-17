@@ -338,10 +338,24 @@ class AppList(MethodView):
             if dockerfile == "":
                 dockerfile = "Dockerfile"
 
+            
+            build_args_dict = build_source.get("build_args", {})
+            if not isinstance(build_args_dict, dict):
+                raise ErrorResponse(f'build_args needs to be a dictonary', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+            
+            for key in build_args_dict:
+                value = build_args_dict[key]
+                if not isinstance(value, str):
+                    raise ErrorResponse(f'build_args values have to be strings', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
+
+            build_args_str = json.dumps(build_args_dict) 
+           
             #appSources = postData["sources"]
-            stmt = f'INSERT INTO Sources ( id, name, architectures , url, branch, directory, dockerfile ) VALUES (UUID_TO_BIN(%s) , %s , %s, %s, %s, %s, %s)'
-            ecr_db.cur.execute(stmt, (newID_str, source_name, architectures , url, branch, directory, dockerfile,))
+            stmt = f'INSERT INTO Sources ( id, name, architectures , url, branch, directory, dockerfile, build_args ) VALUES (UUID_TO_BIN(%s) , %s , %s, %s, %s, %s, %s, %s)'
+            print(f"insert statement: {stmt}")
+            print(f"build_args_str: {build_args_str}")
+            ecr_db.cur.execute(stmt, (newID_str, source_name, architectures , url, branch, directory, dockerfile, build_args_str))
 
        
         for res in resourcesArray:
