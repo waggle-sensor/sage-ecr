@@ -10,6 +10,8 @@ from config import dbFields
 import json
 import time
 
+import requests
+
 #test_app_def = '{"name" : "testapp", "description": "blabla", "architecture" : ["linux/amd64" , "linux/arm/v7"] , "version" : "1.0", "namespace":"sage", "source" :"https://github.com/user/repo.git#v1.0", "resources": [{"type":"RGB_image_producer", "view": "top", "min_resolution":"600x800"}], "inputs": [{"id":"speed" , "type":"int" }] , "metadata": {"my-science-data" : 12345} }'
 
 # carped
@@ -215,7 +217,76 @@ def test_upload_and_build(client):
         assert result_status == "SUCCESS"
         break
 
+@pytest.mark.slow
+def test_upload_and_build_failure(client):
 
+    headers = {"Authorization" : "sage user:testuser"}
+    
+    # make copy
+    test_app_def_failure_obj  = json.loads(json.dumps(test_app_def_obj))
+
+    test_app_def_failure_obj["name"] = "test_app_fail"
+    sources =  test_app_def_obj["sources"][0]["url"] = "https://github.com/waggle-sensor/does_not_exists.git"
+
+
+    test_app_def = json.dumps(test_app_def_failure_obj)
+
+
+    rv = client.post('/apps', data = test_app_def, headers=headers)
+    assert rv.data != ""
+    print(f'rv.data: {rv.data}' , file=sys.stderr)
+    
+    result = rv.get_json()
+    
+    
+    assert result != None
+    assert result["name"] ==  test_app_def_failure_obj["name"]
+    
+
+    assert "id" in result
+    app_id = result["id"]
+
+    # build "default"
+    
+    rv = client.post(f'/apps/{app_id}/builds', headers=headers)
+    
+    assert rv.data != ""
+    print(f'rv.data: {rv.data}' , file=sys.stderr)
+    
+    result = rv.get_json()
+
+    assert "error" not in result
+    assert "build_number" in result
+
+    # TODO add timeout
+    while True:
+        rv = client.get(f'/apps/{app_id}/builds', headers=headers)
+    
+        assert rv.data != ""
+        print(f'rv.data: {rv.data}' , file=sys.stderr)
+    
+        result = rv.get_json()
+
+        assert "error" not in result
+        assert "result" in result
+
+        result_status = result["result"]
+
+        if result_status == None:
+            time.sleep(2)
+            continue
+        
+        print(f'result_status: {result_status}' , file=sys.stderr)
+        assert result_status == "FAILURE"
+        break
+
+    # extract build log
+    assert "url" in result
+    build_log_url = result["url"]
+    consoleTextURL = f'{build_log_url}/consoleText' 
+    r = requests.get(consoleTextURL)
+    print(r.text)
+    
 
 
 def test_app_upload_and_download(client):
