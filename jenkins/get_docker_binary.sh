@@ -41,7 +41,13 @@ fi
 #set +e
 # moved to dockerfile
 
-
+if [ ! -e /usr/local/bin/docker  ] ; then
+  echo "/usr/local/bin/docker not found"
+  set -x
+  which docker
+  set +x
+  exit 1
+fi
 
 /usr/local/bin/docker buildx create --name sage --use
 
