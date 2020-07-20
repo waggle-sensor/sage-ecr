@@ -49,6 +49,9 @@ if [ ! -e /usr/local/bin/docker  ] ; then
   exit 1
 fi
 
+
+ls -latr /usr/local/bin/docker
+
 /usr/local/bin/docker buildx create --name sage --use
 
 #echo "DOCKER_BINARY=${DOCKER_BINARY}"
