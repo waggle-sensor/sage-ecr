@@ -6,6 +6,9 @@ if [ -z "${DATADIR}" ]; then
   DATADIR=/docker/
 fi
 
+
+echo "USE_HOST_DOCKER: ${USE_HOST_DOCKER}"
+
 if [ "${USE_HOST_DOCKER}_" != "1_" ] ; then
   export DOCKER_VERSION=$(curl --silent --unix-socket /var/run/docker.sock http://localhost/version | jq -r '.Version')
   export DOCKER_BINARY=${DATADIR}/docker-${DOCKER_VERSION}
@@ -38,8 +41,35 @@ fi
 #set +e
 # moved to dockerfile
 
+if [ ! -e /usr/local/bin/docker  ] ; then
+  echo "/usr/local/bin/docker not found"
+  set -x
+  which docker
+  set +x
+  exit 1
+fi
 
 
-docker buildx create --name sage --use
+ls -latr /usr/local/bin/docker
+
+set -e
+set -x
+
+file /usr/local/bin/docker
+
+/usr/local/bin/docker --help
+set +x
+set +e
+
+echo docker buildx inspect sage
+docker buildx inspect sage
+
+if [[ ! $? -eq 0 ]] ; then  
+  set -e
+  set -x
+  /usr/local/bin/docker buildx create --name sage --use
+  set +x
+  set +e
+fi
 
 #echo "DOCKER_BINARY=${DOCKER_BINARY}"

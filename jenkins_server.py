@@ -106,6 +106,14 @@ class JenkinsServer():
             raise Exception("No architectures specified")
         platforms_str = ",".join(platforms)
 
+        build_args = source.get("build_args", {})
+        build_args_command_line = ""
+        for key in build_args:
+            value = build_args[key]
+            build_args_command_line += f" --build-arg {key}={value}"
+
+
+
 
         actual_namespace = ""
         namespace = app_spec.get("namespace", "")
@@ -123,7 +131,7 @@ class JenkinsServer():
         name = app_spec["name"]
         template = Template(jenkinsfileTemplate)
         try:
-            jenkinsfile = template.substitute(url=git_url, branch=git_branch, directory=git_directory, namespace=actual_namespace,  name=name, platforms=platforms_str)
+            jenkinsfile = template.substitute(url=git_url, branch=git_branch, directory=git_directory, namespace=actual_namespace,  name=name, platforms=platforms_str, build_args_command_line=build_args_command_line)
         except Exception as e:
             raise Exception(f'  url={git_url}, branch={git_branch}, directory={git_directory}  e={str(e)}')
 
