@@ -52,6 +52,11 @@ fi
 
 ls -latr /usr/local/bin/docker
 
+set -e
+set -x
+/usr/local/bin/docker --help
+set +x
+set +e
 
 echo docker buildx inspect sage
 docker buildx inspect sage

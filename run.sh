@@ -38,7 +38,7 @@ if [ "${USE_HOST_DOCKER}_" == "1_" ] ; then
         exit 1
     fi
 
-    DOCKER_MOUNT="-v ${DOCKER_PATH}:/usr/local/bin/docker"
+    DOCKER_MOUNT="-v ${DOCKER_PATH}:/usr/local/bin/docker:ro"
 
 else
     USE_HOST_DOCKER=0
