@@ -34,7 +34,7 @@ COPY init.groovy /var/jenkins_home/
 # this is needed to for docker
 USER root
 
-RUN apk update && apk add jq curl
+RUN apk update && apk add jq curl file
 
 #ENV JAVA_OPTS="-Djenkins.install.runSetupWizard=false"
 

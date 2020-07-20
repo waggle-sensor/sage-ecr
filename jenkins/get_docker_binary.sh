@@ -52,6 +52,9 @@ fi
 
 ls -latr /usr/local/bin/docker
 
+ldd /usr/local/bin/docker
+
+
 set -e
 set -x
 
