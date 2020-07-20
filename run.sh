@@ -32,7 +32,13 @@ cd ..
 DOCKER_MOUNT=""
 if [ "${USE_HOST_DOCKER}_" == "1_" ] ; then
 
-    DOCKER_MOUNT="-v $(which docker):/usr/local/bin/docker"
+    DOCKER_PATH=$(which docker)
+    if [ ${DOCKER_PATH}_ == "_" ] ; then
+        echo "docker binary not found on host"
+        exit 1
+    fi
+
+    DOCKER_MOUNT="-v ${DOCKER_PATH}:/usr/local/bin/docker"
 
 else
     USE_HOST_DOCKER=0
