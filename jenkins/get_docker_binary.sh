@@ -52,6 +52,16 @@ fi
 
 ls -latr /usr/local/bin/docker
 
-/usr/local/bin/docker buildx create --name sage --use
+
+echo docker buildx inspect sage
+docker buildx inspect sage
+
+if [[ ! $? -eq 0 ]] ; then  
+  set -e
+  set -x
+  /usr/local/bin/docker buildx create --name sage --use
+  set +x
+  set +e
+fi
 
 #echo "DOCKER_BINARY=${DOCKER_BINARY}"
