@@ -214,6 +214,19 @@ def test_upload_and_build(client):
             continue
         
         print(f'result_status: {result_status}' , file=sys.stderr)
+
+        if not result_status == "SUCCESS":
+            assert "url" in result
+            build_log_url = result["url"]
+            consoleTextURL = f'{build_log_url}/consoleText' 
+            r = requests.get(consoleTextURL)
+            print("consoleText:", file=sys.stderr)
+            print("--------------------------------------", file=sys.stderr)
+            print(r.text, file=sys.stderr)
+            print("--------------------------------------", file=sys.stderr)
+            
+            
+
         assert result_status == "SUCCESS"
         break
 
@@ -226,7 +239,7 @@ def test_upload_and_build_failure(client):
     test_app_def_failure_obj  = json.loads(json.dumps(test_app_def_obj))
 
     test_app_def_failure_obj["name"] = "test_app_fail"
-    sources =  test_app_def_obj["sources"][0]["url"] = "https://github.com/waggle-sensor/does_not_exists.git"
+    test_app_def_failure_obj["sources"][0]["url"] = "https://github.com/waggle-sensor/does_not_exists.git"
 
 
     test_app_def = json.dumps(test_app_def_failure_obj)
@@ -277,7 +290,7 @@ def test_upload_and_build_failure(client):
             continue
         
         print(f'result_status: {result_status}' , file=sys.stderr)
-        assert result_status == "FAILURE"
+        
         break
 
     # extract build log
@@ -285,7 +298,12 @@ def test_upload_and_build_failure(client):
     build_log_url = result["url"]
     consoleTextURL = f'{build_log_url}/consoleText' 
     r = requests.get(consoleTextURL)
-    print(r.text)
+    print("consoleText:", file=sys.stderr)
+    print("--------------------------------------", file=sys.stderr)
+    print(r.text, file=sys.stderr)
+    print("--------------------------------------", file=sys.stderr)
+    assert "ERROR: Error cloning remote repo 'origin'" in r.text
+    assert result_status == "FAILURE"
     
 
 
