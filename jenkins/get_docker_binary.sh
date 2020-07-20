@@ -54,6 +54,9 @@ ls -latr /usr/local/bin/docker
 
 set -e
 set -x
+
+file /usr/local/bin/docker
+
 /usr/local/bin/docker --help
 set +x
 set +e
