@@ -181,6 +181,18 @@ def test_upload_and_build(client):
                 continue
             
             print(f'result_status: {result_status}' , file=sys.stderr)
+
+            if not result_status == "SUCCESS":
+                assert "url" in result
+                build_log_url = result["url"]
+                consoleTextURL = f'{build_log_url}/consoleText' 
+                r = requests.get(consoleTextURL)
+                print("consoleText:", file=sys.stderr)
+                print("--------------------------------------", file=sys.stderr)
+                print(r.text, file=sys.stderr)
+                print("--------------------------------------", file=sys.stderr)
+
+
             assert result_status == "SUCCESS"
             break
 
