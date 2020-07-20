@@ -43,6 +43,6 @@ fi
 
 
 
-docker buildx create --name sage --use
+/usr/local/bin/docker buildx create --name sage --use
 
 #echo "DOCKER_BINARY=${DOCKER_BINARY}"
