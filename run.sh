@@ -8,11 +8,20 @@ export JENKINS_SERVER=http://host.docker.internal:8082
 export JENKINS_USER=ecrdb
 export JENKINS_TOKEN=""
 
+
+
+if [ "$1"_ == "stop_" ] ; then
+
+    set -x
+    docker-compose down --remove-orphans
+    docker rm -fv jenkins
+    set +x
+
+    exit 0
+fi
+
 docker-compose down --remove-orphans
-
-
 docker rm -fv jenkins
-
 
 cd jenkins/
 docker build -t sagecontinuum/ecr-jenkins .
@@ -23,7 +32,13 @@ cd ..
 DOCKER_MOUNT=""
 if [ "${USE_HOST_DOCKER}_" == "1_" ] ; then
 
-    DOCKER_MOUNT="-v $(which docker):/usr/local/bin/docker"
+    DOCKER_PATH=$(which docker)
+    if [ ${DOCKER_PATH}_ == "_" ] ; then
+        echo "docker binary not found on host"
+        exit 1
+    fi
+
+    DOCKER_MOUNT="-v ${DOCKER_PATH}:/usr/local/bin/docker:ro"
 
 else
     USE_HOST_DOCKER=0

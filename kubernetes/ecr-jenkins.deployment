@@ -18,7 +18,7 @@ spec:
         k8s-app: ecr-jenkins
     spec:
       containers:
-      - image: sagecontinuum/ecr-jenkins
+      - image: sagecontinuum/ecr-jenkins:latest
         name: ecr-jenkins
         #resources:
         #  limits:
@@ -28,12 +28,14 @@ spec:
         #    memory: 2Gi
         #    cpu: 2
         volumeMounts:
-        - mountPath: /var/jenkins_home
-          name: ecr-jenkins
+        #- mountPath: /var/jenkins_home
+        #  name: ecr-jenkins
         - name: dockersock
           mountPath: "/var/run/docker.sock"
         - mountPath: /casc_jenkins.yaml
+          subPath: "casc_jenkins.yaml"
           name: ecr-jenkins-casc-secret
+          readOnly: true
         env:
           - name: JENKINS_OPTS
             valueFrom:
@@ -54,12 +56,15 @@ spec:
             containerPort: 50000
       restartPolicy: Always
       volumes:
-      - name: ecr-jenkins
-        persistentVolumeClaim:
-          claimName: ecr-jenkins-pvc
+      #- name: ecr-jenkins
+      #  persistentVolumeClaim:
+      #    claimName: ecr-jenkins-pvc
       - name: dockersock
         hostPath:
           path: /var/run/docker.sock
       - name: ecr-jenkins-casc-secret
         secret:
           secretName: ecr-jenkins-casc-secret
+          items:
+          - key: casc_jenkins.yaml
+            path: casc_jenkins.yaml
