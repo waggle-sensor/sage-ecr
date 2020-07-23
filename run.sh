@@ -47,7 +47,7 @@ fi
 if [[ "$OSTYPE" == "darwin"* ]] ; then
     export DOCKER_GATEWAY_HOST="host.docker.internal"
 else 
-    export DOCKER_GATEWAY_HOST = ${DOCKER_GATEWAY_IP}
+    export DOCKER_GATEWAY_HOST=${DOCKER_GATEWAY_IP}
 fi    
 
 
