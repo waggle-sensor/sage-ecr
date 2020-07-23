@@ -47,8 +47,7 @@ fi
 if [[ "$OSTYPE" == "darwin"* ]] ; then
     DOCKER_GATEWAY_HOST="host.docker.internal"
 else 
-    DOCKER_GATEWAY_HOST = DOCKER_GATEWAY_IP
-
+    DOCKER_GATEWAY_HOST = ${DOCKER_GATEWAY_IP}
 fi    
 
 
@@ -129,15 +128,19 @@ echo "staring docker-compose..."
 
 if [[ "$OSTYPE" == "darwin"* ]] ; then
     set -x
+    set -e
     docker-compose up $@
     set +x
+    set +e
 else 
     
     # this requires DOCKER_INTERNAL
     export DOCKER_INTERNAL=${DOCKER_GATEWAY_HOST}
+    set -e
     set -x
     docker-compose -f docker-compose.yaml -f docker-compose.extra_hosts.yaml up $@
     set +x
+    set +e
 fi
 
 
