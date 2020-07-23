@@ -34,20 +34,20 @@ export DOCKER_GATEWAY_IP=""
 export DOCKER_GATEWAY_IP=$(docker network inspect ${ECR_NETWORK_NAME} -f '{{(index .IPAM.Config 0).Gateway}}')
 
 if [ ${DOCKER_GATEWAY_IP}x == x ] ; then
-# try another method of extracting ip address
-export DOCKER_GATEWAY_IP=$(docker network inspect ${ECR_NETWORK_NAME} | grep Gateway | cut -d : -f 2 | cut -d '"' -f 2)
+  # try another method of extracting ip address
+  export DOCKER_GATEWAY_IP=$(docker network inspect ${ECR_NETWORK_NAME} | grep Gateway | cut -d : -f 2 | cut -d '"' -f 2)
 fi
 
 
 if [ ${DOCKER_GATEWAY_IP}x == x ] ; then
-echo "DOCKER_GATEWAY_IP could not be obtained."
-exit 1
+  echo "DOCKER_GATEWAY_IP could not be obtained."
+  exit 1
 fi
 
 if [[ "$OSTYPE" == "darwin"* ]] ; then
-    DOCKER_GATEWAY_HOST="host.docker.internal"
+    export DOCKER_GATEWAY_HOST="host.docker.internal"
 else 
-    DOCKER_GATEWAY_HOST = ${DOCKER_GATEWAY_IP}
+    export DOCKER_GATEWAY_HOST = ${DOCKER_GATEWAY_IP}
 fi    
 
 
