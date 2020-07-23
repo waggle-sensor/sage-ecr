@@ -9,6 +9,12 @@ fi
 export DOCKER_VERSION=$(curl --silent --unix-socket /var/run/docker.sock http://localhost/version | jq -r '.Version')
 echo "DOCKER_VERSION: ${DOCKER_VERSION}"
 
+
+if [[ ${DOCKER_VERSION} == *"azure"* ]]; then
+  echo "Azure...skip docker"
+  exit 0
+fi
+
 echo "USE_HOST_DOCKER: ${USE_HOST_DOCKER}"
 
 if [ "${USE_HOST_DOCKER}_" != "1_" ] ; then
