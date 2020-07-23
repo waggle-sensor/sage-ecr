@@ -48,6 +48,9 @@ jenkins_user = os.environ.get("JENKINS_USER", "anonymous")
 jenkins_token = os.environ.get("JENKINS_TOKEN", "")
 jenkins_server = os.getenv('JENKINS_SERVER', default="http://localhost:8082")
 
+# docker registry
+docker_registry_url = os.environ.get("DOCKER_REGISTRY_URL", "registry.local:5001")
+
 jenkinsfileTemplate = '''pipeline {
     agent any
     
@@ -60,6 +63,8 @@ jenkinsfileTemplate = '''pipeline {
                     sh "docker version"
                     sh "docker buildx version"
                     sh "docker buildx build --pull --platform ${platforms} ${build_args_command_line} -t ${namespace}/${name} ."
+                    sh "docker tag ${namespace}/${name} ${docker_registry_url}/${namespace}/${name}"
+                    sh "docker push ${docker_registry_url}/${namespace}/${name}"
                 }
                 sleep 10
                 echo 'Building..'

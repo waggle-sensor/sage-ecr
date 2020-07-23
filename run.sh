@@ -4,10 +4,6 @@
 # this script starts Jenkins as an independent docker container, waits until it is up and running,
 #  extracts the user token and passes the token to the docker-compose environment
 
-export JENKINS_SERVER=http://host.docker.internal:8082
-export JENKINS_USER=ecrdb
-export JENKINS_TOKEN=""
-
 
 
 if [ "$1"_ == "stop_" ] ; then
@@ -20,8 +16,48 @@ if [ "$1"_ == "stop_" ] ; then
     exit 0
 fi
 
+echo "cleanup... (ignore warnings)"
 docker-compose down --remove-orphans
 docker rm -fv jenkins
+echo "cleanup done"
+
+# because we want to extract the docker IP from the docker network (linux), we have to create the nwteork first and control the name of the newtork.
+ECR_NETWORK_NAME=sage-ecr
+if [ $(docker network list --filter name=${ECR_NETWORK_NAME} -q | wc -l ) -eq 0 ] ; then
+    docker network create ${ECR_NETWORK_NAME}
+fi
+
+export DOCKER_GATEWAY_HOST=""  # this is cleaner, but --add-host option requires IP address
+export DOCKER_GATEWAY_IP=""
+
+
+export DOCKER_GATEWAY_IP=$(docker network inspect ${ECR_NETWORK_NAME} -f '{{(index .IPAM.Config 0).Gateway}}')
+
+if [ ${DOCKER_GATEWAY_IP}x == x ] ; then
+# try another method of extracting ip address
+export DOCKER_GATEWAY_IP=$(docker network inspect ${ECR_NETWORK_NAME} | grep Gateway | cut -d : -f 2 | cut -d '"' -f 2)
+fi
+
+
+if [ ${DOCKER_GATEWAY_IP}x == x ] ; then
+echo "DOCKER_GATEWAY_IP could not be obtained."
+exit 1
+fi
+
+if [[ "$OSTYPE" == "darwin"* ]] ; then
+    DOCKER_GATEWAY_HOST="host.docker.internal"
+else 
+    DOCKER_GATEWAY_HOST = DOCKER_GATEWAY_IP
+
+fi    
+
+
+export JENKINS_SERVER=http://${DOCKER_GATEWAY_HOST}:8082
+
+
+echo "DOCKER_GATEWAY_HOST: ${DOCKER_GATEWAY_HOST}"
+echo "DOCKER_GATEWAY_IP: ${DOCKER_GATEWAY_IP}"
+echo "JENKINS_SERVER: ${JENKINS_SERVER}"
 
 cd jenkins/
 docker build -t sagecontinuum/ecr-jenkins .
@@ -47,13 +83,14 @@ fi
 
 
 set -x
-docker run -d --name jenkins --env USE_HOST_DOCKER=${USE_HOST_DOCKER} --env JAVA_OPTS=-Dhudson.footerURL=http://localhost:8082 -p 8082:8080  -p 50000:50000 -v `pwd`/jenkins/casc_jenkins.yaml:/casc_jenkins.yaml:ro -v `pwd`/temp:/docker:rw -v /var/run/docker.sock:/var/run/docker.sock ${DOCKER_MOUNT} sagecontinuum/ecr-jenkins 
+docker run -d --name jenkins --env USE_HOST_DOCKER=${USE_HOST_DOCKER} --add-host registry.local:${DOCKER_GATEWAY_IP} --env JAVA_OPTS=-Dhudson.footerURL=http://localhost:8082 -p 8082:8080  -p 50000:50000 -v `pwd`/jenkins/casc_jenkins.yaml:/casc_jenkins.yaml:ro -v `pwd`/temp:/docker:rw -v /var/run/docker.sock:/var/run/docker.sock ${DOCKER_MOUNT} sagecontinuum/ecr-jenkins 
 set +x
 
 echo "waiting for jenkins..."
 sleep 3
 
 
+export JENKINS_TOKEN=""
 
 while [ 1 ] ; do 
 
@@ -95,8 +132,9 @@ if [[ "$OSTYPE" == "darwin"* ]] ; then
     docker-compose up $@
     set +x
 else 
-    export DOCKER_INTERNAL=$(ip -4 addr show docker0 | grep -Po 'inet \K[\d.]+')
-    echo "DOCKER_INTERNAL=${DOCKER_INTERNAL}"
+    
+    # this requires DOCKER_INTERNAL
+    export DOCKER_INTERNAL=${DOCKER_GATEWAY_HOST}
     set -x
     docker-compose -f docker-compose.yaml -f docker-compose.extra_hosts.yaml up $@
     set +x

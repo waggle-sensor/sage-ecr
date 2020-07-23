@@ -314,7 +314,7 @@ def test_upload_and_build_failure(client):
     print("--------------------------------------", file=sys.stderr)
     print(r.text, file=sys.stderr)
     print("--------------------------------------", file=sys.stderr)
-    assert "ERROR: Error cloning remote repo 'origin'" in r.text
+    assert ("ERROR: Error cloning remote repo 'origin'" in r.text) or ("ERROR: Error fetching remote repo 'origin'" in r.text)
     assert result_status == "FAILURE"
     
 
