@@ -67,7 +67,7 @@ echo docker buildx inspect sage
 docker buildx inspect sage
 
 if [[ ! $? -eq 0 ]] ; then  
-  
+  set +e # ignore error
   set -x
   /usr/local/bin/docker buildx create --name sage --use
   set +x
