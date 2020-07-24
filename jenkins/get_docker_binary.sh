@@ -6,11 +6,19 @@ if [ -z "${DATADIR}" ]; then
   DATADIR=/docker/
 fi
 
+export DOCKER_VERSION=$(curl --silent --unix-socket /var/run/docker.sock http://localhost/version | jq -r '.Version')
+echo "DOCKER_VERSION: ${DOCKER_VERSION}"
+
+
+if [[ ${DOCKER_VERSION} == *"azure"* ]]; then
+  echo "Azure...skip docker"
+  exit 0
+fi
 
 echo "USE_HOST_DOCKER: ${USE_HOST_DOCKER}"
 
 if [ "${USE_HOST_DOCKER}_" != "1_" ] ; then
-  export DOCKER_VERSION=$(curl --silent --unix-socket /var/run/docker.sock http://localhost/version | jq -r '.Version')
+  
   export DOCKER_BINARY=${DATADIR}/docker-${DOCKER_VERSION}
 
   mkdir -p ${DATADIR}
@@ -52,24 +60,24 @@ fi
 
 ls -latr /usr/local/bin/docker
 
-set -e
+
 set -x
 
 file /usr/local/bin/docker
 
 /usr/local/bin/docker --help
 set +x
-set +e
+
 
 echo docker buildx inspect sage
 docker buildx inspect sage
 
 if [[ ! $? -eq 0 ]] ; then  
-  set -e
+  set +e # ignore error
   set -x
   /usr/local/bin/docker buildx create --name sage --use
   set +x
-  set +e
+ 
 fi
 
 #echo "DOCKER_BINARY=${DOCKER_BINARY}"

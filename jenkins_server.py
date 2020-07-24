@@ -131,7 +131,7 @@ class JenkinsServer():
         name = app_spec["name"]
         template = Template(jenkinsfileTemplate)
         try:
-            jenkinsfile = template.substitute(url=git_url, branch=git_branch, directory=git_directory, namespace=actual_namespace,  name=name, platforms=platforms_str, build_args_command_line=build_args_command_line)
+            jenkinsfile = template.substitute(url=git_url, branch=git_branch, directory=git_directory, namespace=actual_namespace,  name=name, platforms=platforms_str, build_args_command_line=build_args_command_line, docker_registry_url=docker_registry_url)
         except Exception as e:
             raise Exception(f'  url={git_url}, branch={git_branch}, directory={git_directory}  e={str(e)}')
 

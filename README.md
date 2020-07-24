@@ -6,6 +6,21 @@ SAGE Edge Code Repository
 
 # Test environment
 
+Add `registry.local` to docker daemon settings: (OSX -> Docker Desktop -> Preferences... -> Docker Engine)
+```bash
+{
+  "experimental": true,
+  "debug": true,
+  "insecure-registries" : ["registry.local:5001"]
+}
+```
+
+Add `registry.local` to `/etc/hosts`:
+```bash
+sudo ./scripts/add_etc_hosts_entry.sh 
+```
+
+
 The test environment uses docker-compose but has to be invoked by a wrapper script:
 
 ```
