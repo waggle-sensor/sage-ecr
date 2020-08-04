@@ -54,7 +54,7 @@ if [ ! -e /usr/local/bin/docker  ] ; then
   set -x
   which docker
   set +x
-  exit 1
+  #exit 1
 fi
 
 
