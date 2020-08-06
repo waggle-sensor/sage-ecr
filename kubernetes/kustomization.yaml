@@ -4,7 +4,7 @@ kind: Kustomization
 resources:
   
   - ecr-api.deployment
-  - ecr-api.ingress
+  #- ecr-api.ingress
   - ecr-api.secret
   - ecr-api-token.secret
   - ecr-api.service
@@ -19,7 +19,7 @@ resources:
   - ecr-jenkins.deployment
   - ecr-jenkins.service
 
-  - ecr-registry.deployment
+  #- ecr-registry.deployment
 
   #- ecr-jenkins-local.pvc  
   # was giving me
