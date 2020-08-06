@@ -1,6 +1,10 @@
 
 # Kubernetes deployment of ECR
 
+
+WARNING: this is currently not working with a local docker registry. It will work with a local docker registry only if the registry can be reached by a unique global url (hostname or domain) that can be reached from the docker engine as well as the docker client (engine and client run in different networks in kubernetes).
+
+
 The following instructions are targeted at a local test deployment via [minikube](https://kubernetes.io/docs/tasks/tools/install-minikube/). Everything is already pre-configured and should run as is. For a production deployment the configuration should be overwritten with kubernetes kustomize overlays.
 
 
@@ -8,6 +12,8 @@ The following instructions are targeted at a local test deployment via [minikube
 
 ```bash
 minikube start
+minikube start --insecure-registry "10.0.0.0/24" --insecure-registry "ecr-registry:5000"
+
 
 kubectl config use-context minikube
 

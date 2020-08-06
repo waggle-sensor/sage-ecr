@@ -33,6 +33,11 @@ spec:
             secretKeyRef:
               name: ecr-api-secret
               key: DISABLE_AUTH
+        - name: DOCKER_REGISTRY_URL
+          valueFrom:
+            secretKeyRef:
+              name: ecr-api-secret
+              key: DOCKER_REGISTRY_URL
         - name: tokenInfoEndpoint
           valueFrom:
             secretKeyRef:
