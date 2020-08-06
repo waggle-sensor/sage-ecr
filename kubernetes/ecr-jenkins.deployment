@@ -50,7 +50,10 @@ spec:
                 name: ecr-jenkins-config
                 key: JAVA_OPTS
           - name: USE_HOST_DOCKER
-            value: "1"
+            valueFrom:
+              configMapKeyRef:
+                name: ecr-jenkins-config
+                key: USE_HOST_DOCKER
         ports:
           - name: ui
             containerPort: 8080
