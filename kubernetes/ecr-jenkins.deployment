@@ -30,6 +30,8 @@ spec:
         volumeMounts:
         #- mountPath: /var/jenkins_home
         #  name: ecr-jenkins
+        #- name: dockerbinary
+        #  mountPath: "/usr/local/bin/docker"
         - name: dockersock
           mountPath: "/var/run/docker.sock"
         - mountPath: /casc_jenkins.yaml
@@ -48,7 +50,7 @@ spec:
                 name: ecr-jenkins-config
                 key: JAVA_OPTS
           - name: USE_HOST_DOCKER
-            value: "0"
+            value: "1"
         ports:
           - name: ui
             containerPort: 8080
@@ -59,6 +61,9 @@ spec:
       #- name: ecr-jenkins
       #  persistentVolumeClaim:
       #    claimName: ecr-jenkins-pvc
+      #- name: dockerbinary
+      #  hostPath:
+      #    path: /services/docker/rootfs/usr/local/bin/docker
       - name: dockersock
         hostPath:
           path: /var/run/docker.sock
