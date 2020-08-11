@@ -4,9 +4,9 @@ metadata:
   name: ecr-api-ingress
   namespace: sage
   annotations:
-    #kubernetes.io/ingress.class: traefik
+    
     kubernetes.io/ingress.class: nginx
-    nginx.ingress.kubernetes.io/proxy-body-size: "0" # required for docker registry
+    #nginx.ingress.kubernetes.io/proxy-body-size: "0" # required for docker registry
 spec:
   rules:
   - host: ecr.localhost
@@ -16,17 +16,11 @@ spec:
         backend:
           serviceName: ecr-api
           servicePort: 5000
-  - host: ecr-jenkins.localhost
-    http:
-      paths:
-      - path: /
-        backend:
-          serviceName: ecr-jenkins
-          servicePort: 8080
-  - host: ecr-registry
-    http:
-      paths:
-      - path: /
-        backend:
-          serviceName: ecr-registry
-          servicePort: 5000
+  
+  #- host: ecr-registry
+  #  http:
+  #    paths:
+  #    - path: /
+  #      backend:
+  #        serviceName: ecr-registry
+  #        servicePort: 5000
