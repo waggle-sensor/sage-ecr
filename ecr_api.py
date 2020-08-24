@@ -39,7 +39,7 @@ from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from prometheus_client import Counter, make_wsgi_app
 
 app_submission_counter = Counter("app_submission_counter", "This metric counts the total number of successful app submissions.")
-build_request_counter = Counter("build_request_counter", "This metric counts the total number of successful builds.")
+build_request_counter = Counter("build_request_counter", "This metric counts the total number of requested builds.")
 
 
 # refs/tags/<tagName> or  refs/heads/<branchName>
