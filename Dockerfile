@@ -10,6 +10,9 @@ WORKDIR /usr/src/app
 # required for python library mysqlclient
 RUN apk add  mariadb-connector-c-dev gcc musl-dev
 
+# required for wsgi
+RUN apk add linux-headers
+
 RUN /usr/local/bin/python -m pip install --upgrade pip
 
 COPY  . /usr/src/app

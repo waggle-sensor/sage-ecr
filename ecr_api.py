@@ -35,6 +35,11 @@ from decorators import *
 
 import config
 
+from werkzeug.middleware.dispatcher import DispatcherMiddleware
+from prometheus_client import Counter, make_wsgi_app
+
+app_submission_counter = Counter("app_submission_counter", "This metric counts the total number of successful app submissions.")
+build_request_counter = Counter("build_request_counter", "This metric counts the total number of requested builds.")
 
 
 # refs/tags/<tagName> or  refs/heads/<branchName>
@@ -384,7 +389,7 @@ class AppList(MethodView):
         
         returnObj=ecr_db.getApp(newID_str)
         
-
+        app_submission_counter.inc(1)
 
         #args = parser.parse_args()
         return returnObj
@@ -628,6 +633,7 @@ class Builds(MethodView):
 
         #returnObj = {"queue_item_number":queue_item_number, "queued_item": queued_item}
         #return returnObj
+        build_request_counter.inc(1)
         return {"build_number": number }
 
 
@@ -742,7 +748,9 @@ app.add_url_rule('/apps/<string:app_id>', view_func=Apps.as_view('appsAPI'))
 app.add_url_rule('/apps/<string:app_id>/permissions', view_func=Permissions.as_view('permissionsAPI'))
 
 app.add_url_rule('/apps/<string:app_id>/builds', view_func=Builds.as_view('buildsAPI'))
-
+app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
+    '/metrics': make_wsgi_app()
+})
 
 
 if __name__ == '__main__':
