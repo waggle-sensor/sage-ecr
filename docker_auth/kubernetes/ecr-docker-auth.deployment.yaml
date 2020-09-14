@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    k8s-app: ecr-docker-auth
+  name: ecr-docker-auth
+  namespace: sage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: ecr-docker-auth
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        k8s-app: ecr-docker-auth
+    spec:
+      volumes:
+      - name: ssl-volume
+        secret:
+          secretName: ecr-docker-auth-ssl
+      containers:
+      - image: sagecontinuum/docker-auth:latest
+        name: ecr-docker-auth
+        env:
+        - name: tokenInfoEndpoint
+          valueFrom:
+            secretKeyRef:
+              name: ecr-docker-auth-secret
+              key: tokenInfoEndpoint
+        - name: tokenInfoUser
+          valueFrom:
+            secretKeyRef:
+              name: ecr-docker-auth-secret
+              key: tokenInfoUser
+        - name: tokenInfoPassword
+          valueFrom:
+            secretKeyRef:
+              name: ecr-docker-auth-secret
+              key: tokenInfoPassword
+        volumeMounts:
+        - name: ssl-volume
+          readOnly: true
+          mountPath: "/ssl/"
+        ports:
+          - name: api
+            containerPort: 5001
+          
+      restartPolicy: Always
