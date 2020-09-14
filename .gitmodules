@@ -1,3 +1,0 @@
-[submodule "docker_auth/docker_auth"]
-	path = docker_auth/docker_auth
-	url = https://github.com/cesanta/docker_auth.git
