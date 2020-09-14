@@ -6,11 +6,20 @@ SAGE uses [docker_auth](https://github.com/cesanta/docker_auth) for authenticati
 
 
 
+## build docker_auth image with sage plugin
 
-git clone https://github.com/cesanta/docker_auth.git
-cd docker_auth
-git checkout 519c5d79072481d6312a57673e3f6ab242e66514  # this is from Jul 13, 2020
 
+Clone docker_auth and copy files:
+```bash
+git clone https://github.com/sagecontinuum/docker_auth.git
+mkdir docker_auth/auth_server/plugins 
+cp sage_plugin.go docker_auth/auth_server/plugins/
+```
+
+Build image:
+```bash
+docker build -t sagecontinuum/docker_auth:latest -f ./Dockerfile ./docker_auth/
+```
 
 
 
