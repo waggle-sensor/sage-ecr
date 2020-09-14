@@ -8,13 +8,13 @@
 ARG BASE_IMAGE=scratch
 
 
-FROM golang:1.15-alpine AS build-env
+FROM golang:1.15-alpine 
+# AS build-env
 RUN apk --no-cache add git make py3-pip && \
     pip3 install gitpython
 RUN apk add gcc musl-dev  # for plugin
 COPY . /go/src/app
 WORKDIR /go/src/app/auth_server
-
 
 RUN make deps
 
