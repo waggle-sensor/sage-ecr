@@ -1,0 +1,29 @@
+# config for docker_auth 
+
+server:
+  addr: ":5001"
+  certificate: /server.crt # "/server.pem"
+  key: "/server.key" # "/server.key"
+
+token:
+  issuer: self-signed   # "Acme auth server"  # Must match issuer in the Registry config.
+  expiration: 900
+
+plugin_authn:
+  plugin_path: "/go/src/app/auth_server/plugins/sage_plugin.so"
+
+
+acl:
+  #- match: {account: "admin"}
+  #  actions: ["*"]
+  #  comment: "Admin has full access to everything."
+  - match: {account: "sage-ecr"}
+    actions: ["*"]
+    comment: "ECR has full access to everything."
+  - match: {account: ""}
+    actions: ["pull"]
+    comment: "Anonymous users can pull anything."
+
+  
+
+
