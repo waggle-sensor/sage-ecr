@@ -4,6 +4,7 @@
 
 SAGE uses [docker_auth](https://github.com/cesanta/docker_auth) for authentication and authorization of the ECR docker registry. SAGE specific code is integrated as a plugin into docker_auth. 
 
+The latest docker_auth image with SAGE plugin is `sagecontinuum/docker_auth:latest`.
 
 
 ## build docker_auth image with sage plugin
@@ -21,7 +22,9 @@ Build image:
 docker build -t sagecontinuum/docker_auth:latest -f ./Dockerfile ./docker_auth/
 ```
 
+Notes:
 
+In contrast to the offical docker_auth image, this Dockerfile builds a dynamically compiled binary of docker_auth together with the plugin for SAGE. 
 
 
 
