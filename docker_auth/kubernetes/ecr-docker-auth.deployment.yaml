@@ -21,9 +21,13 @@ spec:
       - name: ssl-volume
         secret:
           secretName: ecr-docker-auth-ssl
+      - name: cfgmap
+        configMap:
+          name: ecr-docker-auth-config
       containers:
-      - image: sagecontinuum/docker-auth:latest
+      - image: sagecontinuum/docker_auth:latest
         name: ecr-docker-auth
+        #args: /config/docker-auth.yml
         env:
         - name: tokenInfoEndpoint
           valueFrom:
@@ -44,6 +48,9 @@ spec:
         - name: ssl-volume
           readOnly: true
           mountPath: "/ssl/"
+        - mountPath: /config/auth_config.yml
+          name: cfgmap
+          subPath: docker-auth.yml
         ports:
           - name: api
             containerPort: 5001
