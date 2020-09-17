@@ -6,6 +6,7 @@ kind: Kustomization
 resources:
   
   - ecr-docker-auth.deployment.yaml
+  - ecr-docker-auth.service.yaml
   - ecr-docker-auth.ingress.yaml
   - ecr-docker-auth.secret.yaml
 
