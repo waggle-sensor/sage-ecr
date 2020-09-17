@@ -50,6 +50,10 @@ type SageAuthn struct {
 // Authenticate _
 func (sa *SageAuthn) Authenticate(user string, password api.PasswordString) (bool, api.Labels, error) {
 
+	if user == "" {
+		return true, api.Labels{}, nil
+	}
+
 	passwordString := string([]byte(password))
 
 	err := SageAuthenticate(user, passwordString)
