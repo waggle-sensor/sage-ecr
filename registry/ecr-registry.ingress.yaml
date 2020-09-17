@@ -1,0 +1,16 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: ecr-registry
+  namespace: sage
+  annotations:
+    traefik.ingress.kubernetes.io/router.tls: ""
+spec:
+  rules:
+  - host: sage-registry.nautilus.optiputer.net
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: ecr-registry
+          servicePort: 80
