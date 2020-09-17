@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    k8s-app: ecr-registry
+  name: ecr-registry
+  namespace: sage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: ecr-registry
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        k8s-app: ecr-registry
+    spec:
+      containers:
+      - image: registry:2
+        name: ecr-registry
+        ports:
+          - name: api
+            containerPort: 5000
+        volumeMounts:
+          - mountPath: /etc/docker/registry/config.yml
+            name: cfgmap
+            subPath: registry.conf
+          - mountPath: /ssl/server.crt
+            name: cfgmap
+            subPath: server.crt 
+          - mountPath: /var/lib/registry
+            name: ecr-registry
+            
+      restartPolicy: Always
+      volumes:
+      - name: ecr-registry
+        persistentVolumeClaim:
+          claimName: ecr-registry-pvc
+      - name: cfgmap
+        configMap:
+          name: ecr-registry-config

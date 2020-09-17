@@ -1,4 +1,5 @@
 temp/
+docker_auth/docker_auth/
 
 .vscode/*
 
