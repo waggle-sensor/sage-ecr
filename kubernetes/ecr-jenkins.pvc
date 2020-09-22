@@ -5,8 +5,8 @@ metadata:
   namespace: sage
 spec:
   #storageClassName: manual
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: 100Mi
+  #accessModes:
+  #- ReadWriteOnce
+  #resources:
+  #  requests:
+  #    storage: 100Mi

@@ -32,28 +32,32 @@ kubectl create configmap ecr-db-initdb-config -n sage --from-file=../schema.sql
 
 
 # this starts all services, but Jenkins creates a token which the ecr-api will need
-kubectl kustomize . | kubectl apply -f -
+kubectl kustomize ./overlay/ | kubectl apply -f -
 ```
+
+# fix if needed
+`sed -e 's/^  name: ecr-jenkins-casc-secret.*/  name: ecr-jenkins-casc-secret/`
+Note that the `sed` may be needed due to a bug where the automatic suffix-hash after the secret name is not replaced in the reference in the deployment. Thus we simply remove the suffix.
+
 
 ## Inject token
 
 To let `ecr-api` talk to Jenkins a token is needed. Because Jenkins does not let us inject a token on startup, it is automatically generated when Jenkins starts. After Jenkins has started and generated a token for user `ecrdb`, the token has to be extracted form the Jenkins pod (container) and stored as a secret.
 
-```
+```bash
 
 # get token from Jenkins or user ecrdb
-export JENKINS_TOKEN=$(kubectl exec -ti $(kubectl get pods | grep "^ecr-jenkins-" | cut -f 1 -d ' ') -- /bin/cat /var/jenkins_home/secrets/ecrdb_token.txt)
+export JENKINS_TOKEN=$(kubectl exec -ti $(kubectl get pods -n sage | grep "^ecr-jenkins-" | cut -f 1 -d ' ') -n sage -- /bin/cat /var/jenkins_home/secrets/ecrdb_token.txt)
 echo "JENKINS_TOKEN=${JENKINS_TOKEN}"
 
 
-# delete empty dummy secret
-kubectl delete secret ecr-api-token-secret
+sed -i -e 's/JENKINS_TOKEN: .*/JENKINS_TOKEN: "'${JENKINS_TOKEN}'"/' overlay/ecr-api.secret.yaml 
 
-# inject token as a secret
-kubectl create secret generic ecr-api-token-secret --from-literal="token=${JENKINS_TOKEN}"
+
+kubectl kustomize ./overlay/ | kubectl apply -f -
 
 # restart api to use new token from secret
-kubectl rollout restart deployment ecr-api
+kubectl rollout restart deployment ecr-api -n sage
 
 ```
 

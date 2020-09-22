@@ -82,7 +82,7 @@ fi
 
 
 set -x
-docker run -d --name jenkins --env USE_HOST_DOCKER=${USE_HOST_DOCKER} --add-host registry.local:${DOCKER_GATEWAY_IP} --env JAVA_OPTS=-Dhudson.footerURL=http://localhost:8082 -p 8082:8080  -p 50000:50000 -v `pwd`/jenkins/casc_jenkins.yaml:/casc_jenkins.yaml:ro -v `pwd`/temp:/docker:rw -v /var/run/docker.sock:/var/run/docker.sock ${DOCKER_MOUNT} sagecontinuum/ecr-jenkins 
+docker run -d --name jenkins --env USE_HOST_DOCKER=${USE_HOST_DOCKER} --add-host registry.local:${DOCKER_GATEWAY_IP} --env JAVA_OPTS=-Dhudson.footerURL=http://localhost:8082 -p 8082:8080  -p 50000:50000 -v `pwd`/jenkins/casc_jenkins.yaml:/config/casc_jenkins.yaml:ro -v `pwd`/temp:/docker:rw -v /var/run/docker.sock:/var/run/docker.sock ${DOCKER_MOUNT} sagecontinuum/ecr-jenkins 
 set +x
 
 echo "waiting for jenkins..."

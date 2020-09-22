@@ -34,8 +34,7 @@ spec:
         #  mountPath: "/usr/local/bin/docker"
         - name: dockersock
           mountPath: "/var/run/docker.sock"
-        - mountPath: /casc_jenkins.yaml
-          subPath: "casc_jenkins.yaml"
+        - mountPath: /config
           name: ecr-jenkins-casc-secret
           readOnly: true
         env:
@@ -73,6 +72,4 @@ spec:
       - name: ecr-jenkins-casc-secret
         secret:
           secretName: ecr-jenkins-casc-secret
-          items:
-          - key: casc_jenkins.yaml
-            path: casc_jenkins.yaml
+         
