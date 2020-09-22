@@ -17,7 +17,8 @@ RUN install-plugins.sh \
     email-ext \
     mailer \
     configuration-as-code \
-    configuration-as-code-groovy
+    configuration-as-code-groovy \
+    credentials-binding                 # required for ecr-registry credentials 
 
 
 
@@ -25,7 +26,7 @@ COPY ./get_docker_binary.sh /
 
 # Jenkins: Configuration as Code
 #COPY casc_jenkins.yaml /     # this config should better be mounted into container as is contains passwords
-ENV CASC_JENKINS_CONFIG /casc_jenkins.yaml
+ENV CASC_JENKINS_CONFIG /config/casc_jenkins.yaml
 
 # Jenkins: groovy, create token
 COPY init.groovy /var/jenkins_home/
