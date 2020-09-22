@@ -1,6 +1,7 @@
 
 import jenkins
 # https://python-jenkins.readthedocs.io/en/latest/
+# https://opendev.org/jjb/python-jenkins
 # pip install python-jenkins
 
 
@@ -112,7 +113,8 @@ class JenkinsServer():
             value = build_args[key]
             build_args_command_line += f" --build-arg {key}={value}"
 
-
+        if docker_build_args != "":
+            build_args_command_line += f" {docker_build_args}"
 
 
         actual_namespace = ""
@@ -124,14 +126,27 @@ class JenkinsServer():
         
 
         
-        
+      
+            
+        docker_login='''withCredentials([usernamePassword(credentialsId: 'registry-user', passwordVariable: 'REGISTRY_USER_PWD', usernameVariable: 'REGISTRY_USERNAME')]) {
+                sh "echo $REGISTRY_USER_PWD | docker login -u $REGISTRY_USERNAME --password-stdin ''' +docker_registry_url +'''"
+            }
+        '''
         
         
 
         name = app_spec["name"]
         template = Template(jenkinsfileTemplate)
         try:
-            jenkinsfile = template.substitute(url=git_url, branch=git_branch, directory=git_directory, namespace=actual_namespace,  name=name, platforms=platforms_str, build_args_command_line=build_args_command_line, docker_registry_url=docker_registry_url)
+            jenkinsfile = template.substitute(  url=git_url, 
+                                                branch=git_branch,
+                                                directory=git_directory,
+                                                namespace=actual_namespace, 
+                                                name=name,
+                                                platforms=platforms_str,
+                                                build_args_command_line=build_args_command_line,
+                                                docker_registry_url=docker_registry_url,
+                                                docker_login=docker_login)
         except Exception as e:
             raise Exception(f'  url={git_url}, branch={git_branch}, directory={git_directory}  e={str(e)}')
 
