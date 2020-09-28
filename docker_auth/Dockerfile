@@ -22,7 +22,8 @@ RUN make generate
 
 # has to dynamically for plugin
 RUN CGO_ENABLED=1 go build -v --ldflags=--s
-RUN cd plugins && go build -buildmode=plugin sage_plugin.go
+RUN cd plugins && go build -buildmode=plugin sage_plugin.go 
+RUN cd plugins && go build -buildmode=plugin sage_plugin_z.go
 
 
 WORKDIR /go/src/app/

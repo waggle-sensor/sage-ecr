@@ -10,11 +10,11 @@ The latest docker_auth image with SAGE plugin is `sagecontinuum/docker_auth:late
 ## build docker_auth image with sage plugin
 
 
-Clone docker_auth and copy files:
+Clone docker_auth and move files into the build context:
 ```bash
 git clone https://github.com/sagecontinuum/docker_auth.git
-mkdir docker_auth/auth_server/plugins 
-cp sage_plugin.go docker_auth/auth_server/plugins/
+mkdir -p docker_auth/auth_server/plugins 
+cp sage_plugin.go sage_plugin_z.go docker_auth/auth_server/plugins/
 ```
 
 Build image:
@@ -30,7 +30,7 @@ In contrast to the offical docker_auth image, this Dockerfile builds a dynamical
 
 ## SSL certificates for token validation (not used for https)
 cd ssl
-./create_certs.sh registry.local  # registry.local for local test deployment
+../create_certs.sh registry.local  # registry.local for local test deployment
 
 
 
@@ -60,35 +60,28 @@ export tokenInfoEndpoint=".../token_info/"
 export tokenInfoUser="XXX"  
 export tokenInfoPassword="XXX"
 
-# prod
+export ecrAuthZEndpoint="X"
+export ecrAuthZUser="X"
+export ecrAuthZPassword="X"
+
+
 docker run \
     --env tokenInfoEndpoint=${tokenInfoEndpoint} \
     --env tokenInfoUser=${tokenInfoUser} \
     --env tokenInfoPassword=${tokenInfoPassword} \
+    --env ecrAuthZEndpoint=${ecrAuthZEndpoint} \
+    --env ecrAuthZUser=${ecrAuthZUser} \
+    --env ecrAuthZPassword=${ecrAuthZPassword} \
+    --env DEBUG_MODE=1 \
     --network registrytest \
     --add-host registry.local:${DOCKER_GATEWAY_IP} \
     --rm -it --name docker_auth -p 5001:5001 \
     -v ${PWD}/ssl/server.key:/server.key \
     -v ${PWD}/ssl/server.crt:/server.crt  \
     -v ${PWD}/docker-auth.yml:/config/auth_config.yml:ro \
-    cesanta/docker_auth:latest
+    sagecontinuum/docker_auth:latest
      /config/auth_config.yml
 
-# dev
-docker run \
-    --env tokenInfoEndpoint=${tokenInfoEndpoint} \
-    --env tokenInfoUser=${tokenInfoUser} \
-    --env tokenInfoPassword=${tokenInfoPassword} \
-    --network registrytest \
-    --add-host registry.local:${DOCKER_GATEWAY_IP} \
-    --rm -it --name docker_auth -p 5001:5001 \
-    -v ${HOME}/git/docker_auth:/go/src/app \
-    -v ${PWD}/ssl/server.key:/server.key \
-    -v ${PWD}/ssl/server.crt:/server.crt  \
-    -v ${PWD}/docker-auth.yml:/config/auth_config.yml:ro \
-    --entrypoint /bin/ash \
-    cesanta/docker_auth:latest
-     /config/auth_config.yml
 
 
 # login with username and password
