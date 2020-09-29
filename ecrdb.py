@@ -8,6 +8,8 @@ import MySQLdb
 import config
 import json
 from error_response import *
+from datetime import datetime , timedelta
+
 
 class EcrDB():
     def __init__ ( self , retries=60) :
@@ -302,9 +304,38 @@ class EcrDB():
 
         self.db.commit()
 
+
         return
         
 
+    # return user id if token found, empty string otherwise
+    def getTokenInfo(self, token):
+        stmt = 'SELECT user, scopes, is_admin FROM TokenCache WHERE SHA2(%s, 512) = token'
+        print(f'stmt: {stmt} token={token[:4]}...', file=sys.stderr)
+        
+        self.cur.execute(stmt, (token,))
+
+
+        row = self.cur.fetchone()
+        i = 0
+        if row == None:
+            return "", "", False
+
+        if len(row) != 3 :
+            return "", "", False
+
+        return row[0], row[1] , row[2]
+
+    def setTokenInfo(self, token, user_id, scopes, is_admin):
+        stmt = 'INSERT IGNORE INTO TokenCache (token, user, scopes, is_admin, expires) VALUES (SHA2(%s, 512), %s, %s, %s, %s)'
+    
+        expires = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
+
+        self.cur.execute(stmt, (token, user_id, scopes, is_admin, expires))
+
+        self.db.commit()
+
+        return
 
     # def setLastBuildID(self, app_id, source_name, queue_item_number, number):
         

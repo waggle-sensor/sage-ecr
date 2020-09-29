@@ -83,3 +83,25 @@ CREATE TABLE IF NOT EXISTS SageECR.Resources (
     resource            VARCHAR(256),
     PRIMARY KEY(`id`, `resource`)
 );
+
+
+/* Token Cache */
+
+CREATE EVENT IF NOT EXISTS `SageECR`.`AuthNCacheEvent`
+ON SCHEDULE
+EVERY 1 HOUR
+COMMENT 'Description'
+DO
+DELETE FROM `SageECR`.`TokenCache` WHERE `expires` < NOW();
+
+
+
+
+CREATE TABLE IF NOT EXISTS SageECR.TokenCache (
+    token               VARCHAR(256) NOT NULL,
+    user                VARCHAR(256) NOT NULL,
+    scopes              VARCHAR(512) NOT NULL,
+    is_admin            BOOLEAN,
+    expires             TIMESTAMP,
+    PRIMARY KEY (token)
+);

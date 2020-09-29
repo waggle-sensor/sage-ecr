@@ -1,4 +1,4 @@
-import os
+import os, sys
 # https://mysqlclient.readthedocs.io/user_guide.html#mysqldb-mysql
 mysql_host = os.getenv('MYSQL_HOST')
 mysql_db =os.getenv('MYSQL_DATABASE')
@@ -37,10 +37,31 @@ dbFields = mysql_fields + ["owner"]
 dbFields_str  = ",".join(dbFields)
 
 
+
+auth_method = os.getenv('AUTH_METHOD', default="static") # or sage
+if auth_method=="":
+    auth_method = "static"
+if auth_method != "static" and auth_method != "sage":
+    sys.exit(f"AUTH_METHOD {auth_method} invalid")
+
+# for auth_method==sage
 tokenInfoEndpoint = os.getenv('tokenInfoEndpoint')
 tokenInfoUser = os.getenv('tokenInfoUser')
 tokenInfoPassword = os.getenv('tokenInfoPassword')
-auth_disabled = os.getenv('DISABLE_AUTH', default="0") == "1"
+
+if auth_method == "sage":
+    if tokenInfoEndpoint == "":
+        sys.exit("tokenInfoEndpoint not defined")
+    if tokenInfoUser == "":
+        sys.exit("tokenInfoUser not defined")
+    if tokenInfoPassword == "":
+        sys.exit("tokenInfoPassword not defined")
+        
+
+
+# users: only used for testing
+users = { "token1" : { "id": "testuser"} , "token2": {"id":"admin", "is_admin": True} }
+
 
 
 # jenkins

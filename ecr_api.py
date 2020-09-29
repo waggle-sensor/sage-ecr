@@ -85,7 +85,7 @@ class ecr_middleware():
             res = Response(f'Authorization failed (could not parse Authorization header)', mimetype= 'text/plain', status=401)
             return res(environ, start_response)
 
-        if authHeaderArray[0].lower() != "sage":
+        if authHeaderArray[0].lower() != "sage" and authHeaderArray[0].lower() != "static":
             res = Response(f'Authorization failed (Authorization bearer not supported)', mimetype= 'text/plain', status=401)
             return res(environ, start_response)
 
@@ -97,41 +97,79 @@ class ecr_middleware():
         # example: curl -X POST -H 'Accept: application/json; indent=4' -H "Authorization: Basic c2FnZS1hcGktc2VydmVyOnRlc3Q=" -d 'token=<SAGE-USER-TOKEN>'  <sage-ui-hostname>:80/token_info/
         # https://github.com/sagecontinuum/sage-ui/#token-introspection-api
 
-        if config.auth_disabled:
+        
+        
+
+
+        # check token cache
+        ecr_db = ecrdb.EcrDB()
+        user_id, scopes , is_admin = ecr_db.getTokenInfo(token)
+        if user_id != "":
+            print(f'found cached token', file=sys.stderr)
+            environ['authenticated'] = True
+            environ['user'] = user_id
+            return self.app(environ, start_response)
+
+        print(f'did not find cached token...', file=sys.stderr)
+        
+
+        if config.auth_method == "static":
             # "user:"
-            tokenArray = token.split(":")
-            if tokenArray[0] != "user" or len(tokenArray) < 2 or  len(tokenArray) > 3:
-                res = Response(f'Authorization is disabled but token requires format user:<name>', mimetype= 'text/plain', status=401)
+            # tokenArray = token.split(":")
+            # if tokenArray[0] != "user" or len(tokenArray) < 2 or  len(tokenArray) > 3:
+            #     res = Response(f'Authorization is disabled but token requires format user:<name>', mimetype= 'text/plain', status=401)
+            #     return res(environ, start_response)
+
+            # if len(tokenArray) == 3:
+            #     if tokenArray[2] == "admin":
+            #         environ['admin'] = True
+            userObj = config.users.get(token)
+            if not userObj:
+                res = Response(f'Token not found', mimetype= 'text/plain', status=401)
                 return res(environ, start_response)
 
-            if len(tokenArray) == 3:
-                if tokenArray[2] == "admin":
-                    environ['admin'] = True
 
            # self.authenticated
-            environ['authenticated'] = True
-            environ['user'] = tokenArray[1]
-            return self.app(environ, start_response)
+            user_id = userObj.get("id")
+            is_admin = userObj.get("is_admin", False)
+
+            
+
+        if config.auth_method == "sage":
+
+            # ask sage token introspection
+            headers = {"Accept":"application/json; indent=4", "Authorization": f"Basic {config.tokenInfoPassword}" , "Content-Type":"application/x-www-form-urlencoded"}
+            data=f"token={token}"
+            r = requests.post(config.tokenInfoEndpoint, data = data, headers=headers, timeout=5)
+
+            
+
+            result_obj = r.json()
+            if not "active" in result_obj:
+                res = Response(f'Authorization failed (broken response) {result_obj}', mimetype= 'text/plain', status=500)
+                return res(environ, start_response)
+
+            is_active = result_obj.get("active", False)
+            if not is_active:
+                res = Response(f'Authorization failed (token not active)', mimetype= 'text/plain', status=401)
+                return res(environ, start_response)
+            
+            
+            
+            user_id = result_obj.get("username")
         
-        headers = {"Accept":"application/json; indent=4", "Authorization": f"Basic {config.tokenInfoPassword}" , "Content-Type":"application/x-www-form-urlencoded"}
-        data=f"token={token}"
-        r = requests.post(config.tokenInfoEndpoint, data = data, headers=headers, timeout=5)
-
         
 
-        result_obj = r.json()
-        if not "active" in result_obj:
-            res = Response(f'Authorization failed (broken response) {result_obj}', mimetype= 'text/plain', status=500)
-            return res(environ, start_response)
+        ecr_db.setTokenInfo(token, user_id, scopes, is_admin)
 
-        is_active = result_obj["active"]
-        if is_active:
-            environ['authenticated'] = True
-            environ['user'] = result_obj["username"]
-            return self.app(environ, start_response)
+        environ['authenticated'] = True
+        environ['user'] = user_id 
+        environ['scopes'] = scopes 
+        environ['admin'] = is_admin
 
-        res = Response(f'Authorization failed (token not active)', mimetype= 'text/plain', status=401)
-        return res(environ, start_response)
+        return self.app(environ, start_response)
+
+            
         
 
 
@@ -655,7 +693,7 @@ class Permissions(MethodView):
     @has_permission( "ACL_WRITE", "FULL_CONTROL" )
     def put(self, app_id):
         # example to make app public:
-        # curl -X PUT localhost:5000/permissions/{id} -H "Authorization: sage user:testuser" -d '{"granteeType": "GROUP", "grantee": "AllUsers", "permission": "READ"}'
+        # curl -X PUT localhost:5000/permissions/{id} -H "Authorization: sage token1" -d '{"granteeType": "GROUP", "grantee": "AllUsers", "permission": "READ"}'
        
 
         postData = request.get_json(force=True)
@@ -714,6 +752,9 @@ class Healthy(MethodView):
         return "ok"
 
 
+# /authz
+class AuthZ(MethodView):
+    pass
 
 
 def createJenkinsName(app_spec, source_name):
@@ -748,9 +789,17 @@ app.add_url_rule('/apps/<string:app_id>', view_func=Apps.as_view('appsAPI'))
 app.add_url_rule('/apps/<string:app_id>/permissions', view_func=Permissions.as_view('permissionsAPI'))
 
 app.add_url_rule('/apps/<string:app_id>/builds', view_func=Builds.as_view('buildsAPI'))
+
+# endpoint used by docker_auth to verify access rights
+app.add_url_rule('/authz', view_func=AuthZ.as_view('authz'))
+
+
+
 app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
     '/metrics': make_wsgi_app()
 })
+
+
 
 
 if __name__ == '__main__':

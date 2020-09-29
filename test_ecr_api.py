@@ -134,7 +134,7 @@ def test_connect(client):
 @pytest.mark.slow
 def test_upload_and_build(client):
 
-    headers = {"Authorization" : "sage user:testuser"}
+    headers = {"Authorization" : "sage token1"}
 
     rv = client.post('/apps', data = test_app_def, headers=headers)
     assert rv.data != ""
@@ -245,7 +245,7 @@ def test_upload_and_build(client):
 @pytest.mark.slow
 def test_upload_and_build_failure(client):
 
-    headers = {"Authorization" : "sage user:testuser"}
+    headers = {"Authorization" : "sage token1"}
     
     # make copy
     test_app_def_failure_obj  = json.loads(json.dumps(test_app_def_obj))
@@ -323,7 +323,7 @@ def test_app_upload_and_download(client):
     """Start with a blank database."""
 
     
-    headers = {"Authorization" : "sage user:testuser"}
+    headers = {"Authorization" : "sage token1"}
 
     rv = client.post('/apps', data = test_app_def, headers=headers)
     assert rv.data != ""
@@ -379,7 +379,7 @@ def test_app_upload_and_download(client):
 
 
 def test_listApps(client):
-    headers = {"Authorization" : "sage user:testuser"}
+    headers = {"Authorization" : "sage token1"}
 
     rv = client.post('/apps', data = test_app_def, headers=headers)
     assert rv.data != ""
@@ -409,7 +409,7 @@ def test_listApps(client):
 
 
 def test_permissions(client):
-    headers = {"Authorization" : "sage user:testuser"}
+    headers = {"Authorization" : "sage token1"}
 
     # create app
     rv = client.post('/apps', data = test_app_def, headers=headers)

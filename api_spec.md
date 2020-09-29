@@ -10,7 +10,7 @@ export APP_ID=
 
 ## POST /apps
 ```bash
-curl -X POST ${ECR_API}/apps -H "Authorization: sage user:testuser" -d '{"name":"simple","description":"very important app","version":"1.0","namespace":"sage","sources":[{"name":"default","architectures":["linux/amd64"],"url":"https://github.com/waggle-sensor/edge-plugins.git","branch":"master","directory":"plugin-simple","dockerfile":"Dockerfile_sage"},{"name":"armv7","architectures":["linux/arm/v7"],"url":"https://github.com/waggle-sensor/edge-plugins.git","branch":"master","directory":"plugin-simple","dockerfile":"Dockerfile_sage"}],"resources":[{"type":"RGB_image_producer","view":"top","min_resolution":"600x800"}],"inputs":[{"id":"speed","type":"int"}],"metadata":{"my-science-data":12345}}'
+curl -X POST ${ECR_API}/apps -H "Authorization: sage token1" -d '{"name":"simple","description":"very important app","version":"1.0","namespace":"sage","sources":[{"name":"default","architectures":["linux/amd64"],"url":"https://github.com/waggle-sensor/edge-plugins.git","branch":"master","directory":"plugin-simple","dockerfile":"Dockerfile_sage"},{"name":"armv7","architectures":["linux/arm/v7"],"url":"https://github.com/waggle-sensor/edge-plugins.git","branch":"master","directory":"plugin-simple","dockerfile":"Dockerfile_sage"}],"resources":[{"type":"RGB_image_producer","view":"top","min_resolution":"600x800"}],"inputs":[{"id":"speed","type":"int"}],"metadata":{"my-science-data":12345}}'
 ```
 
 returns:
@@ -69,7 +69,7 @@ returns:
 ## GET /apps/{id}
 
 ```bash
-curl ${ECR_API}/apps/${APP_ID} -H "Authorization: sage user:testuser"
+curl ${ECR_API}/apps/${APP_ID} -H "Authorization: sage token1"
 ```
 
 returns same as above
@@ -78,7 +78,7 @@ returns same as above
 ## DELETE /apps/{id}
 
 ```bash
-curl -X DELETE ${ECR_API}/apps/${APP_ID} -H "Authorization: sage user:testuser"
+curl -X DELETE ${ECR_API}/apps/${APP_ID} -H "Authorization: sage token1"
 ```
 
 returns
@@ -92,7 +92,7 @@ returns
 
 ```bash
 curl ${ECR_API}/apps
-curl ${ECR_API}/apps -H "Authorization: sage user:testuser"
+curl ${ECR_API}/apps -H "Authorization: sage token1"
 ```
 
 returns
@@ -119,7 +119,7 @@ returns
 ## GET /apps/{id}/permissions
 
 ```bash
-curl -X GET ${ECR_API}/apps/${APP_ID}/permissions -H "Authorization: sage user:testuser" 
+curl -X GET ${ECR_API}/apps/${APP_ID}/permissions -H "Authorization: sage token1" 
 ```
 returns
 ```json5
@@ -136,7 +136,7 @@ returns
 ## PUT /apps/{id}/permissions
 
 ```bash
-curl -X PUT ${ECR_API}/apps/${APP_ID}/permissions -H "Authorization: sage user:testuser" -d '{"granteeType": "GROUP", "grantee": "AllUsers", "permission": "READ"}'
+curl -X PUT ${ECR_API}/apps/${APP_ID}/permissions -H "Authorization: sage token1" -d '{"granteeType": "GROUP", "grantee": "AllUsers", "permission": "READ"}'
 ```
 
 returns
@@ -149,7 +149,7 @@ returns
 ## DELETE /apps/{id}/permissions
 
 ```bash
-curl -X DELETE ${ECR_API}/apps/${APP_ID}/permissions -H "Authorization: sage user:testuser" -d '{"granteeType": "GROUP", "grantee": "AllUsers", "permission": "READ"}'
+curl -X DELETE ${ECR_API}/apps/${APP_ID}/permissions -H "Authorization: sage token1" -d '{"granteeType": "GROUP", "grantee": "AllUsers", "permission": "READ"}'
 ```
 
 returns
@@ -165,7 +165,7 @@ returns
 
 Triggers a new build
 ```bash
-curl -X POST ${ECR_API}/apps/${APP_ID}/builds -H "Authorization: sage user:testuser"
+curl -X POST ${ECR_API}/apps/${APP_ID}/builds -H "Authorization: sage token1"
 ```
 
 ## GET /apps/${APP_ID}/builds
@@ -173,7 +173,7 @@ curl -X POST ${ECR_API}/apps/${APP_ID}/builds -H "Authorization: sage user:testu
 Returns state of last build.
 
 ```bash
-curl ${ECR_API}/apps/${APP_ID}/builds -H "Authorization: sage user:testuser"
+curl ${ECR_API}/apps/${APP_ID}/builds -H "Authorization: sage token1"
 ```
 
 
