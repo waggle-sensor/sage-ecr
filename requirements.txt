@@ -7,3 +7,4 @@ requests
 python-jenkins
 xmltodict
 prometheus_client
+pyyaml

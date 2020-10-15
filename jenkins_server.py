@@ -79,7 +79,7 @@ class JenkinsServer():
         # format https://github.com/user/repo.git#v1.0
 
         
-
+        version = app_spec["version"]
 
         sources=app_spec.get("sources", [])
         if len(sources) == 0 :
@@ -143,6 +143,7 @@ class JenkinsServer():
                                                 directory=git_directory,
                                                 namespace=actual_namespace, 
                                                 name=name,
+                                                version=version,
                                                 platforms=platforms_str,
                                                 build_args_command_line=build_args_command_line,
                                                 docker_registry_url=docker_registry_url,

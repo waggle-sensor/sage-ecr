@@ -5,10 +5,11 @@
 /* TODO: save commit hash to prevent changes */
 CREATE TABLE IF NOT EXISTS SageECR.Apps (
     id                  BINARY(16) NOT NULL PRIMARY KEY,
-    name                VARCHAR(64),
-    description         VARCHAR(128),
-    version             VARCHAR(64),
     namespace           VARCHAR(64),
+    name                VARCHAR(64),
+    version             VARCHAR(64),
+    frozen              BOOLEAN DEFAULT FALSE,
+    description         TEXT,
     depends_on          VARCHAR(128),
     baseCommand         VARCHAR(64),
     arguments           VARCHAR(256),
@@ -34,13 +35,34 @@ CREATE TABLE IF NOT EXISTS SageECR.Sources (
 
 
 
+/*  namespace   */
+CREATE TABLE IF NOT EXISTS SageECR.Namespaces (
+    id                  VARCHAR(32) NOT NULL,
+    owner_id            VARCHAR(64) NOT NULL,
+    PRIMARY KEY (id)
+);
 
-CREATE TABLE IF NOT EXISTS SageECR.AppPermissions (
-    id                  BINARY(16) NOT NULL,
+
+
+/*  repository (id format: namespace/repository )  */
+CREATE TABLE IF NOT EXISTS SageECR.Repositories (
+    namespace             VARCHAR(32) NOT NULL,
+    name                  VARCHAR(256) NOT NULL,
+    owner_id            VARCHAR(64) NOT NULL,
+    PRIMARY KEY (namespace,name)
+);
+
+
+
+/* Owner of repositories is the namespace owner  */
+
+CREATE TABLE IF NOT EXISTS SageECR.Permissions ( # /* formerly SageECR.AppPermissions */
+    resourceType        VARCHAR(64),  /* namespace or repository */
+    resourceName        VARCHAR(64),  /* e.g. "username" in case of namespace, or "simple-plugin" in case of repository  */
     granteeType         ENUM('USER', 'GROUP'),
     grantee             VARCHAR(64), 
     permission          ENUM('READ', 'WRITE', 'READ_ACP', 'WRITE_ACP', 'FULL_CONTROL'),
-    PRIMARY KEY (id, granteeType, grantee, permission)
+    PRIMARY KEY (resourceType, resourceName, granteeType, grantee, permission)
 );
 # permissions similar to https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html
 
