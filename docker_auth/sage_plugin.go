@@ -19,6 +19,8 @@ var (
 	tokenInfoUser     string
 	tokenInfoPassword string
 
+	DEBUG_MODE bool
+
 	Authn SageAuthn
 )
 
@@ -26,6 +28,8 @@ func init() {
 	tokenInfoEndpoint = os.Getenv("tokenInfoEndpoint")
 	tokenInfoUser = os.Getenv("tokenInfoUser")
 	tokenInfoPassword = os.Getenv("tokenInfoPassword")
+
+	DEBUG_MODE = os.Getenv("DEBUG_MODE") == "1"
 
 	if tokenInfoEndpoint == "" {
 		log.Fatalf("Environment variable \"tokenInfoEndpoint\" not defined")
@@ -92,8 +96,10 @@ func SageAuthenticate(user string, tokenStr string) (err error) {
 
 	url := tokenInfoEndpoint
 
-	log.Printf("url: %s\n", url)
-	log.Printf("tokenStr: %s\n", tokenStr)
+	if DEBUG_MODE {
+		log.Printf("url: %s\n", url)
+		log.Printf("tokenStr: %s\n", tokenStr)
+	}
 
 	payload := strings.NewReader("token=" + tokenStr)
 	client := &http.Client{
@@ -135,8 +141,9 @@ func SageAuthenticate(user string, tokenStr string) (err error) {
 	dat := TokenResponse{}
 	jsonErr := json.Unmarshal(body, &dat)
 
-	log.Printf("dat.Username: %s\n", dat.Username)
-
+	if DEBUG_MODE {
+		log.Printf("dat.Username: %s\n", dat.Username)
+	}
 	if res.StatusCode == 401 {
 		err = api.WrongPass
 		return

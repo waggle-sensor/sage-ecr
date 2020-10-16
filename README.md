@@ -24,7 +24,7 @@ sudo ./scripts/add_etc_hosts_entry.sh
 The test environment uses docker-compose but has to be invoked by a wrapper script:
 
 ```
-./run.sh -d
+./run.sh -d --build
 ```
 
 Option `-d` will deamonize the docker-compose environment.

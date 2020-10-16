@@ -22,7 +22,7 @@ services:
     networks:
       - sage-ecr
     environment:
-      DISABLE_AUTH: 1
+      AUTH_METHOD: ${AUTH_METHOD}
       tokenInfoEndpoint: ${SageTokenInfoEndpoint} 
       tokenInfoUser: ${SageTokenInfoUser}  
       tokenInfoPassword: ${SageTokenInfoPassword}

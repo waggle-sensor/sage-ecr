@@ -12,6 +12,8 @@ token:
 plugin_authn:
   plugin_path: "/go/src/app/auth_server/plugins/sage_plugin.so"
 
+plugin_authz:
+  plugin_path: "/go/src/app/auth_server/plugins/sage_plugin_z.so"
 
 acl:
   #- match: {account: "admin"}
@@ -20,9 +22,9 @@ acl:
   - match: {account: "sage-ecr"}
     actions: ["*"]
     comment: "ECR has full access to everything."
-  - match: {account: ""}
-    actions: ["pull"]
-    comment: "Anonymous users can pull anything."
+#  - match: {account: ""}
+#    actions: ["pull"]
+#    comment: "Anonymous users can pull anything."
 
   
 
