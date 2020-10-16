@@ -129,7 +129,7 @@ class ecr_middleware():
             # if len(tokenArray) == 3:
             #     if tokenArray[2] == "admin":
             #         environ['admin'] = True
-            userObj = config.users.get(token)
+            userObj = config.static_tokens.get(token)
             if not userObj:
                 res = Response(f'Token not found', mimetype= 'text/plain', status=401)
                 return res(environ, start_response)

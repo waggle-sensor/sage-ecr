@@ -59,8 +59,11 @@ if auth_method == "sage":
         
 
 
-# users: only used for testing
-users = { "token1" : { "id": "testuser"} , "token2": {"id":"admin", "is_admin": True} }
+# static_tokens: only used for testing
+static_tokens = {   "token1" : { "id": "testuser"} , 
+                    "token2" : { "id":"admin", "is_admin": True} ,
+                    "token3" : { "id": "sage_docker_auth"} 
+                }
 
 
 
