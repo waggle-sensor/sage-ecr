@@ -73,7 +73,9 @@ docker_build_args= os.environ.get("DOCKER_BUILD_ARGS", "")
 
 
 # docker registry
-docker_registry_url = os.environ.get("DOCKER_REGISTRY_URL", "registry.local:5001")
+docker_registry_url = os.environ.get("DOCKER_REGISTRY_URL", "")
+if docker_registry_url == "":
+        sys.exit("docker_registry_url not defined")
 
 
 jenkinsfileTemplate = '''pipeline {
