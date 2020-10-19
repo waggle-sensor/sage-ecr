@@ -7,6 +7,12 @@ SAGE uses [docker_auth](https://github.com/cesanta/docker_auth) for authenticati
 The latest docker_auth image with SAGE plugin is `sagecontinuum/docker_auth:latest`.
 
 
+Before you run ECR in test enviornment, you can add a custom user/token. That is useful if you test docker_auth with a production SAGE token introspection.
+```bash
+export ADD_USER="token10,your-user-id"
+```
+
+
 ## build docker_auth image with sage plugin
 
 
@@ -49,39 +55,47 @@ Add to your /etc/hosts
 
 ## docker network
 
-docker network create registrytest
-export DOCKER_GATEWAY_IP=$(docker network inspect registrytest -f '{{(index .IPAM.Config 0).Gateway}}')
-echo ${DOCKER_GATEWAY_IP}
+```bash
+docker network create sage-ecr
+```
+
 
 ## start registry
+Delete previous registry first
 ```bash
-cd ..
-docker run -ti --rm --network registrytest --name registry -p 5002:5000  --add-host registry.local:${DOCKER_GATEWAY_IP}  -v ${PWD}/registry.conf:/etc/docker/registry/config.yml -v ${PWD}/ssl/server.crt:/server.crt registry:2
+docker rm -f sage-ecr_registry.local_1
+
+export DOCKER_GATEWAY_IP=$(docker network inspect sage-ecr -f '{{(index .IPAM.Config 0).Gateway}}')
+echo ${DOCKER_GATEWAY_IP}
+
+docker run -ti --rm --network sage-ecr --name registry -p 5002:5000  --add-host registry.local:${DOCKER_GATEWAY_IP}  -v ${PWD}/registry.conf:/etc/docker/registry/config.yml -v ${PWD}/ssl/server.crt:/server.crt registry:2
 ```
 Note: Port 5000 conflicts with ECR port.
 
 
 ## start docker_auth
 
-
+```bash
 export tokenInfoEndpoint=".../token_info/" 
 export tokenInfoUser="XXX"  
 export tokenInfoPassword="XXX"
 
-export ecrAuthZEndpoint="X"
-export ecrAuthZUser="X"
-export ecrAuthZPassword="X"
+export ecrAuthZEndpoint="http://sage-ecr:5000/authz"
+#export ecrAuthZEndpoint="http://${DOCKER_GATEWAY_IP}:5000/authz"
+export ecrAuthZToken="token3"
 
+
+export DOCKER_GATEWAY_IP=$(docker network inspect sage-ecr -f '{{(index .IPAM.Config 0).Gateway}}')
+echo ${DOCKER_GATEWAY_IP}
 
 docker run \
     --env tokenInfoEndpoint=${tokenInfoEndpoint} \
     --env tokenInfoUser=${tokenInfoUser} \
     --env tokenInfoPassword=${tokenInfoPassword} \
     --env ecrAuthZEndpoint=${ecrAuthZEndpoint} \
-    --env ecrAuthZUser=${ecrAuthZUser} \
-    --env ecrAuthZPassword=${ecrAuthZPassword} \
+    --env ecrAuthZToken=${ecrAuthZToken} \
     --env DEBUG_MODE=1 \
-    --network registrytest \
+    --network sage-ecr \
     --add-host registry.local:${DOCKER_GATEWAY_IP} \
     --rm -it --name docker_auth -p 5001:5001 \
     -v ${PWD}/ssl/server.key:/server.key \
@@ -90,10 +104,13 @@ docker run \
     sagecontinuum/docker_auth:latest
      /config/auth_config.yml
 
-
+```
 
 # login with username and password
-docker login registry.local:5000
 
-docker tag alpine:latest registry.local:5000/test/alpine:latest
-docker push registry.local:5000/test/alpine:latest
+```bash
+docker login registry.local:5002
+
+docker tag alpine:latest registry.local:5002/test/alpine:latest
+docker push registry.local:5002/test/alpine:latest
+```

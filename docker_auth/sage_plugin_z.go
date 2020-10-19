@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -28,8 +27,7 @@ import (
 
 var (
 	ecrAuthZEndpoint string
-	ecrAuthZUser     string
-	ecrAuthZPassword string
+	ecrAuthZToken    string
 
 	DEBUG_MODE bool
 
@@ -65,8 +63,7 @@ func NewAuthRequestInfo(ai *api.AuthRequestInfo) AuthRequestInfo {
 
 func init() {
 	ecrAuthZEndpoint = os.Getenv("ecrAuthZEndpoint")
-	ecrAuthZUser = os.Getenv("ecrAuthZUser")
-	ecrAuthZPassword = os.Getenv("ecrAuthZPassword")
+	ecrAuthZToken = os.Getenv("ecrAuthZToken")
 
 	DEBUG_MODE = os.Getenv("DEBUG_MODE") == "1"
 
@@ -75,15 +72,20 @@ func init() {
 		return
 	}
 
-	if ecrAuthZUser == "" {
-		log.Fatalf("Environment variable \"ecrAuthZUser\" not defined")
+	if ecrAuthZToken == "" {
+		log.Fatalf("Environment variable \"ecrAuthZToken\" not defined")
 		return
 	}
 
-	if ecrAuthZPassword == "" {
-		log.Fatalf("Environment variable \"ecrAuthZPassword\" not defined")
-		return
-	}
+	// if ecrAuthZUser == "" {
+	// 	log.Fatalf("Environment variable \"ecrAuthZUser\" not defined")
+	// 	return
+	// }
+
+	// if ecrAuthZPassword == "" {
+	// 	log.Fatalf("Environment variable \"ecrAuthZPassword\" not defined")
+	// 	return
+	// }
 
 }
 
@@ -94,16 +96,10 @@ type SageAuthz struct {
 //Authorize _
 func (sa *SageAuthz) Authorize(ai *api.AuthRequestInfo) ([]string, error) {
 
-	ai_new := NewAuthRequestInfo(ai)
+	//ai_new := NewAuthRequestInfo(ai)
 
-	something, err := SageAuthorize(ai)
+	return SageAuthorize(ai)
 
-	if err != nil {
-		return something, nil
-
-	}
-
-	return something, nil
 }
 
 // Stop _
@@ -116,12 +112,13 @@ func (sa *SageAuthz) Name() string {
 	return "SAGE Authorization"
 }
 
-func (sa *SageAuthz) SageAuthorize(ai *api.AuthRequestInfo) ([]string, error) {
+// SageAuthorize _
+func SageAuthorize(ai *api.AuthRequestInfo) (authorized_actions []string, err error) {
 
-	ai_new := NewAuthRequestInfo(ai)
+	aiNew := NewAuthRequestInfo(ai)
 
 	var jsonData []byte
-	jsonData, err := json.Marshal(ai_new)
+	jsonData, err = json.Marshal(aiNew)
 	if err != nil {
 		log.Println(err)
 	}
@@ -129,11 +126,12 @@ func (sa *SageAuthz) SageAuthorize(ai *api.AuthRequestInfo) ([]string, error) {
 		fmt.Println(string(jsonData))
 	}
 
-	payload := string(jsonData)
+	payload := strings.NewReader(string(jsonData))
 	client := &http.Client{
 		Timeout: time.Second * 5,
 	}
-	req, err := http.NewRequest("POST", url, payload)
+	var req *http.Request
+	req, err = http.NewRequest("POST", ecrAuthZEndpoint, payload)
 	if err != nil {
 		log.Print("NewRequest returned: " + err.Error())
 		//http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -141,15 +139,16 @@ func (sa *SageAuthz) SageAuthorize(ai *api.AuthRequestInfo) ([]string, error) {
 		return
 	}
 
-	auth := ecrAuthZUser + ":" + ecrAuthZPassword
+	//auth := ecrAuthZUser + ":" + ecrAuthZPassword
 	//fmt.Printf("auth: %s\n", auth)
-	authEncoded := base64.StdEncoding.EncodeToString([]byte(auth))
-	req.Header.Add("Authorization", "Basic "+authEncoded)
+	//authEncoded := base64.StdEncoding.EncodeToString([]byte(auth))
+	req.Header.Add("Authorization", "sage "+ecrAuthZToken)
 
-	req.Header.Add("Accept", "application/json; indent=4")
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	//req.Header.Add("Accept", "application/json; indent=4")
+	//req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
-	res, err := client.Do(req)
+	var res *http.Response
+	res, err = client.Do(req)
 	if err != nil {
 		log.Print(err)
 		//http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -158,7 +157,8 @@ func (sa *SageAuthz) SageAuthorize(ai *api.AuthRequestInfo) ([]string, error) {
 		return
 	}
 	defer res.Body.Close()
-	body, err := ioutil.ReadAll(res.Body)
+	var body []byte
+	body, err = ioutil.ReadAll(res.Body)
 	if err != nil {
 		//http.Error(w, err.Error(), http.StatusInternalServerError)
 
@@ -177,20 +177,16 @@ func (sa *SageAuthz) SageAuthorize(ai *api.AuthRequestInfo) ([]string, error) {
 	}
 
 	if res.StatusCode != 200 {
-		fmt.Printf("%s", body)
+		fmt.Printf("request was denied: %s", body)
 		//http.Error(w, fmt.Sprintf("token introspection failed (%d) (%s)", res.StatusCode, body), http.StatusInternalServerError)
 
 		err = fmt.Errorf("authorization failed (%d) (%s)", res.StatusCode, body)
 		return
 	}
 
-	if body != "ok" {
-		fmt.Printf("%s", body)
-		//http.Error(w, fmt.Sprintf("token introspection failed (%d) (%s)", res.StatusCode, body), http.StatusInternalServerError)
+	log.Printf("looks good: %s\n", string(body))
 
-		err = fmt.Errorf("authorization failed (%d) (%s)", res.StatusCode, body)
-		return
-	}
+	authorized_actions = strings.Split(string(body), ",")
 
-	return []string{}, nil
+	return
 }
