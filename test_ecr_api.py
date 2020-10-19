@@ -492,6 +492,25 @@ def test_repositories(client):
     assert rv.status_code == 200
 
 
+def test_authz(client):
+    headers = {"Authorization" : "sage token3"}
+
+
+    sample_request = { 
+        "account": "testuser",
+        "type": "repository",
+        "name": "sage/simple",
+        "service": "Docker registry",
+        "actions": ["pull"]
+    }
+
+
+    rv = client.post(f'/authz', headers=headers,  data = json.dumps(sample_request) )
+   
+    
+    print(f'rv.data: {rv.data}', file=sys.stderr)
+
+    assert rv.status_code == 200
 
 
 def test_health(client):
