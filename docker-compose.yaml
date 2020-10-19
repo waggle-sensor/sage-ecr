@@ -27,11 +27,11 @@ services:
       tokenInfoUser: ${SageTokenInfoUser}  
       tokenInfoPassword: ${SageTokenInfoPassword}
       JENKINS_SERVER: ${JENKINS_SERVER}
-      JENKINS_USER: ${JENKINS_USER}
+      JENKINS_USER: ecrdb
       JENKINS_TOKEN: ${JENKINS_TOKEN}
       DOCKER_REGISTRY_PASSWORD: ${DOCKER_REGISTRY_PASSWORD}
-    
-
+      DOCKER_REGISTRY_URL: "registry.local:5002"
+      ADD_USER: ${ADD_USER}
 
   db:
     image: mysql:8.0.20
@@ -46,7 +46,7 @@ services:
     restart: always
     image: registry:2
     ports:
-      - 5001:5000
+      - 5002:5000
     networks:
       - sage-ecr
 

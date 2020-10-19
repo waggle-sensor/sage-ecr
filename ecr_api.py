@@ -16,11 +16,14 @@ from flask import jsonify
 
 import MySQLdb
 from flask import request
+from flask import abort, jsonify
+
 import re
 import uuid
 import json
 import time
 
+import werkzeug
 from werkzeug.wrappers import Request, Response, ResponseStream
 from middleware import middleware
 import requests
@@ -37,6 +40,8 @@ import config
 import yaml
 
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
+from werkzeug.exceptions import HTTPException
+
 from prometheus_client import Counter, make_wsgi_app
 
 app_submission_counter = Counter("app_submission_counter", "This metric counts the total number of successful app submissions.")
@@ -129,16 +134,25 @@ class ecr_middleware():
             # if len(tokenArray) == 3:
             #     if tokenArray[2] == "admin":
             #         environ['admin'] = True
-            userObj = config.users.get(token)
+            userObj = config.static_tokens.get(token)
             if not userObj:
                 res = Response(f'Token not found', mimetype= 'text/plain', status=401)
                 return res(environ, start_response)
 
+            
+           
+
 
            # self.authenticated
-            user_id = userObj.get("id")
-            is_admin = userObj.get("is_admin", False)
+            user_id = userObj.get("id", "")
+            if not user_id:
+                res = Response(f'id missing in user object', mimetype= 'text/plain', status=401)
+                return res(environ, start_response)
 
+
+
+            is_admin = userObj.get("is_admin", False)
+            scopes = userObj.get("scopes", "")
             
 
         if config.auth_method == "sage":
@@ -168,6 +182,10 @@ class ecr_middleware():
         if USE_TOKEN_CACHE:
             ecr_db.setTokenInfo(token, user_id, scopes, is_admin)
 
+        if not user_id:
+            res= Response("something went wrong, user_id is missing", status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            return res(environ, start_response)
+
         environ['authenticated'] = True
         environ['user'] = user_id
         environ['scopes'] = scopes 
@@ -177,6 +195,9 @@ class ecr_middleware():
 
             
         
+
+
+
 
 
 
@@ -939,22 +960,63 @@ class AuthZ(MethodView):
     @login_required
     def post(self):
 
+        print(f"AuthZ request received", file=sys.stderr)
         
         user_scopes = request.environ.get('scopes', "")
         user_scopes_array = user_scopes.split()
         if not "ecr_authz_introspection" in user_scopes_array:
+            print(f"AuthZ rejected, user is not allowed to ask, got user_scopes: {user_scopes}", file=sys.stderr)
             raise ErrorResponse("User does not have permission to access the introspection", status_code=HTTPStatus.UNAUTHORIZED)
 
         postData = request.get_json(force=True)
         
         if postData.get("type", "") != "repository":
+            print(f"AuthZ rejected, type not supported", file=sys.stderr)
             raise ErrorResponse("This type is not supported", status_code=HTTPStatus.UNAUTHORIZED)
 
+        print(f"AuthZ request object: {postData}", file=sys.stderr)
+
+        actions = postData.get("actions", [])
         request_user_id = postData.get("account", "")
         registry_repository_name = postData.get("name", "")
 
+        
+        ecr_db = ecrdb.EcrDB()
 
-    pass
+        perm_table = {
+            "pull" : "READ",
+            "push" : "WRITE"
+        }
+
+        approved_permissions = []
+
+        
+        for act in actions:
+
+            if act == "push" and (not config.docker_registry_push_allowed):
+                continue
+
+            asking_permission = perm_table.get(act, "")
+            if not asking_permission:
+                print(f"AuthZ rejected, action {act} unknown", file=sys.stderr)
+                raise ErrorResponse(f"Action {act} unknown", status_code=HTTPStatus.UNAUTHORIZED)
+
+            if ecr_db.hasPermission("repository", registry_repository_name, "USER", request_user_id, asking_permission):
+                print(f"AuthZ {act} request approved", file=sys.stderr)
+                approved_permissions.append(act)
+                continue
+            
+            print(f"AuthZ {act} request NOT approved", file=sys.stderr)
+            
+        if len(approved_permissions) == 0:
+            raise ErrorResponse(f"No actions approved", status_code=HTTPStatus.UNAUTHORIZED)
+        
+        response_str = ",".join(approved_permissions)
+        print(f"response_str: {response_str}", file=sys.stderr)
+
+
+        return response_str
+        
 
 
 def createJenkinsName(app_spec, source_name):
@@ -973,13 +1035,34 @@ def createJenkinsName(app_spec, source_name):
 
 
 app = Flask(__name__)
+app.config["PROPAGATE_EXCEPTIONS"] = True
 app.wsgi_app = ecr_middleware(app.wsgi_app)
+
 
 @app.errorhandler(ErrorResponse)
 def handle_invalid_usage(error):
     response = jsonify(error.to_dict())
     response.status_code = error.status_code
     return response
+
+
+    
+#@app.errorhandler(ErrorResponse)
+#@app.errorhandler(Exception)
+#def handle_invalid_usage(error):
+#    print(f"HELLO ***********************************", file=sys.stderr)
+#    response = error.get_response()
+    #response.data = jsonify(error.to_dict())
+    #response.status_code = error.status_code
+    #response.content_type = "application/json"
+#    return response
+
+
+#@app.errorhandler(ErrorResponse)
+#def resource_not_found(e):
+#    return jsonify(error=str(e)), 404
+
+
 
 app.add_url_rule('/', view_func=Base.as_view('appsBase'))
 app.add_url_rule('/healthy', view_func=Healthy.as_view('healthy'))

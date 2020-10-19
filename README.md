@@ -11,7 +11,7 @@ Add `registry.local` to docker daemon settings: (OSX -> Docker Desktop -> Prefer
 {
   "experimental": true,
   "debug": true,
-  "insecure-registries" : ["registry.local:5001"]
+  "insecure-registries" : ["registry.local:5002"]
 }
 ```
 
@@ -36,6 +36,7 @@ To stop:
 ./run.sh stop
 ```
 
+Note that this test environment does not run the registry with authorization enabled. To start a registry with authorization enabled follow instructions in `docker_auth` subfolder. For production deployments use the kubernetes config files.
 
 ## Jenkins
 Visit Jenkins in your browser via: [http://localhost:8082](http://localhost:8082)
@@ -61,7 +62,7 @@ docker exec -ti sage-ecr_sage-ecr_1 /bin/ash -c 'coverage run -m pytest -v --run
 ```
 
 
-# debugging
+# debugging MySQL
 
 ```bash
 docker exec -ti sage-ecr_db_1 mysql -u sage -p SageECR
