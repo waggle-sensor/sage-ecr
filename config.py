@@ -62,13 +62,24 @@ if auth_method == "sage":
 # static_tokens: only used for testing
 static_tokens = {   "token1" : { "id": "testuser"} , 
                     "token2" : { "id":"admin", "is_admin": True} ,
-                    "token3" : { "id": "sage_docker_auth"} 
+                    "token3" : { "id": "sage_docker_auth", "scopes":"ecr_authz_introspection"} 
                 }
+
+add_user=os.getenv('ADD_USER', default="")
+if add_user:
+    add_user_array = add_user.split(",")
+    if len(add_user_array) != 2:
+        sys.exit(f"Cannot parse ADD_USER")
+
+    x_token = add_user_array[0]
+    x_user_id = add_user_array[1]
+    static_tokens[x_token] = {  "id":x_user_id }
+    print(f'added token {x_token} for user {x_user_id}', file=sys.stderr)
 
 
 
 # jenkins
-jenkins_user = os.environ.get("JENKINS_USER", "anonymous")
+jenkins_user = os.environ.get("JENKINS_USER", "ecrdb")
 jenkins_token = os.environ.get("JENKINS_TOKEN", "")
 jenkins_server = os.getenv('JENKINS_SERVER', default="http://localhost:8082")
 
@@ -79,6 +90,9 @@ docker_build_args= os.environ.get("DOCKER_BUILD_ARGS", "")
 docker_registry_url = os.environ.get("DOCKER_REGISTRY_URL", "")
 if docker_registry_url == "":
         sys.exit("docker_registry_url not defined")
+
+
+docker_registry_push_allowed = os.environ.get("DOCKER_REGISTRY_PUSH_ALLOWED", "0") == "1"
 
 
 jenkinsfileTemplate = '''pipeline {

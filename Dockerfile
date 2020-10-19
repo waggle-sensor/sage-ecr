@@ -19,4 +19,5 @@ COPY  . /usr/src/app
 RUN pip install -r requirements.txt
 
 CMD ./ecr_api.py
+#CMD gunicorn ecr_api:app --bind=0.0.0.0:5000
 

@@ -39,6 +39,8 @@ class EcrDB():
     # returns true if user has the permissions
     def hasPermission(self, resourceType, resourceName, granteeType, grantee, permission):
 
+        if not grantee:
+            raise Exception("grantee undefined")
 
         permissions = [permission]
 
