@@ -3,8 +3,7 @@ name: "simple"
 description: "very important app"
 version : "1.0"
 namespace: "sage"
-sources : 
-  - name : "default"  # optional, default: "default"
+source: 
     architectures :
         - "linux/amd64"  # required
     url: "https://github.com/waggle-sensor/edge-plugins.git"   # required
@@ -13,15 +12,6 @@ sources :
     dockerfile : "Dockerfile_sage"   # optional, default: Dockerfile , relative to context directory
     build_args:
       VARIABLE1: "value1"
-        
-  - name : armv7,  # optional, default: "default"
-    architectures : 
-      - "linux/arm/v7" # required
-    url: "https://github.com/waggle-sensor/edge-plugins.git"   # required
-    branch: "master"  # optional, default: master
-    directory : "plugin-simple"  # optional, default: root of git repository
-    dockerfile : "Dockerfile_sage"  # optional, default: Dockerfile , relative to context directory
-   
 resources: 
   - type: "RGB_image_producer"
     view: "top"

@@ -23,14 +23,13 @@ CREATE TABLE IF NOT EXISTS SageECR.Apps (
 
 CREATE TABLE IF NOT EXISTS SageECR.Sources (
     id                  BINARY(16) NOT NULL,
-    name                VARCHAR(256) NOT NULL,
     architectures       VARCHAR(256),
     url                 VARCHAR(256) NOT NULL,
     branch              VARCHAR(64),
     directory           VARCHAR(256),
     dockerfile          VARCHAR(256),
     build_args          VARCHAR(256),
-    PRIMARY KEY (id, name)
+    PRIMARY KEY (id)
 );
 
 

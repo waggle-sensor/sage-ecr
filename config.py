@@ -15,9 +15,9 @@ mysql_password =  os.getenv('MYSQL_PASSWORD')
 
 
 # app definition
-valid_fields =["name", "description", "version", "namespace", "sources", "depends_on", "baseCommand", "arguments", "inputs", "resources", "metadata", "frozen"]
+valid_fields =["name", "description", "version", "namespace", "source", "depends_on", "baseCommand", "arguments", "inputs", "resources", "metadata", "frozen"]
 valid_fields_set = set(valid_fields)
-required_fields = set(["name", "description", "version", "sources"])
+required_fields = set(["name", "description", "version", "source"])
 
 mysql_fields = ["name", "description", "version", "namespace", "depends_on", "baseCommand", "arguments", "inputs", "metadata", "frozen"]
 mysql_fields_det = set(valid_fields)
@@ -101,6 +101,9 @@ jenkinsfileTemplate = '''pipeline {
     stages {
         stage('Build') {
             steps {
+                script {
+                    currentBuild.displayName = "${version}"
+                }
                 git branch: '${branch}',
                     url: '${url}'
                 dir("$${env.WORKSPACE}/${directory}"){
