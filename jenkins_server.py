@@ -72,7 +72,7 @@ class JenkinsServer():
 
 
 
-    def createJob(self, id, app_spec, source_name, overwrite=False):
+    def createJob(self, id, app_spec, overwrite=False):
 
        
 
@@ -81,18 +81,10 @@ class JenkinsServer():
         
         version = app_spec["version"]
 
-        sources=app_spec.get("sources", [])
-        if len(sources) == 0 :
-            raise Exception("field sources empty")
-
-        source = None
-        for src in sources:
-            if src.get("name", "") == source_name:
-                source = src
-                break
-
+        source=app_spec.get("source", None)
         if not source :
-            raise Exception(f'Source with name {source_name} not found')
+            raise Exception("field source empty")
+
 
         #sourceArray = source.split("#", 3)
 
@@ -152,7 +144,7 @@ class JenkinsServer():
             raise Exception(f'  url={git_url}, branch={git_branch}, directory={git_directory}  e={str(e)}')
 
         #print(jenkins.EMPTY_CONFIG_XML)
-        newJob = createPipelineJobConfig(jenkinsfile)
+        newJob = createPipelineJobConfig(jenkinsfile, f'{actual_namespace}/{name}')
         #print(newJob)
 
 
@@ -196,9 +188,10 @@ class JenkinsServer():
         #print("jobs: "+server.jobs_count())
 
     
-def createPipelineJobConfig(jenkinsfile):
+def createPipelineJobConfig(jenkinsfile, displayName):
     jenkins_job_example_xml = '''<?xml version='1.1' encoding='UTF-8'?>
     <flow-definition plugin="workflow-job@2.39">
+    <displayName>overwrite_me</displayName>
     <description></description>
     <keepDependencies>false</keepDependencies>
     <properties/>
@@ -231,6 +224,7 @@ def createPipelineJobConfig(jenkinsfile):
     print(json.dumps(job, indent=4))
 
     job["flow-definition"]["definition"]["script"] = jenkinsfile # cgi.escape(jenkinsfile)
+    job["flow-definition"]["displayName"] = displayName
     #job["project"]["scm"]["userRemoteConfigs"]["hudson.plugins.git.UserRemoteConfig"]["url"] = 'https://github.com/sagecontinuum/sage-cli.git'
 
 

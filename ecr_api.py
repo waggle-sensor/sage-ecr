@@ -304,9 +304,10 @@ class Submit(MethodView):
         # http://sagecontinuum.org/bucket/<bucket_id>
 
         
-
-        sourcesArray = postData.get("sources",[])
-        if len(sourcesArray) == 0:
+        build_source = postData.get("source",None)
+        #sourcesArray = postData.get("source",[])
+        #if len(sourcesArray) == 0:
+        if not build_source:
             raise ErrorResponse("Field source is missing")
 
 
@@ -402,65 +403,65 @@ class Submit(MethodView):
         ecr_db = ecrdb.EcrDB()
         
 
-        for build_source in sourcesArray:
+        #for build_source in sourcesArray:
 
 
-            source_name = build_source.get("name", "default")
-            
-            
-            architectures_array = build_source.get("architectures", [])
+        #source_name = build_source.get("name", "default")
+        
+        
+        architectures_array = build_source.get("architectures", [])
+
+        if len(architectures_array) == 0:
+            raise ErrorResponse("architectures missing in source")
+
+        ##### architecture
     
-            if len(architectures_array) == 0:
-                raise ErrorResponse("architectures missing in source")
+    
+        for arch in architectures_array:
+            if not arch in config.architecture_valid:
+                valid_arch_str = ",".join(config.architecture_valid)
+                raise ErrorResponse(f'Architecture {arch} not supported, valid values: {valid_arch_str}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+            
+        
 
-            ##### architecture
+        architectures = json.dumps(architectures_array)    
+
+        url = build_source.get("url", "")
+        if url == "":
+            raise ErrorResponse("url missing in source")
+
+
+        branch = build_source.get("branch", "master")
+        if branch == "":
+            raise ErrorResponse("branch missing in source")
+
+
+        directory = build_source.get("directory", ".")
+        if directory == "":
+            directory = "."
+
+        dockerfile = build_source.get("dockerfile", "Dockerfile")
+        if dockerfile == "":
+            dockerfile = "Dockerfile"
+
+        
+        build_args_dict = build_source.get("build_args", {})
+        if not isinstance(build_args_dict, dict):
+            raise ErrorResponse(f'build_args needs to be a dictonary', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+        
+        for key in build_args_dict:
+            value = build_args_dict[key]
+            if not isinstance(value, str):
+                raise ErrorResponse(f'build_args values have to be strings', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+
+        build_args_str = json.dumps(build_args_dict) 
         
         
-            for arch in architectures_array:
-                if not arch in config.architecture_valid:
-                    valid_arch_str = ",".join(config.architecture_valid)
-                    raise ErrorResponse(f'Architecture {arch} not supported, valid values: {valid_arch_str}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-                
-            
-
-            architectures = json.dumps(architectures_array)    
-
-            url = build_source.get("url", "")
-            if url == "":
-                raise ErrorResponse("url missing in source")
-
-
-            branch = build_source.get("branch", "master")
-            if branch == "":
-                raise ErrorResponse("branch missing in source")
-
-
-            directory = build_source.get("directory", ".")
-            if directory == "":
-                directory = "."
-
-            dockerfile = build_source.get("dockerfile", "Dockerfile")
-            if dockerfile == "":
-                dockerfile = "Dockerfile"
-
-            
-            build_args_dict = build_source.get("build_args", {})
-            if not isinstance(build_args_dict, dict):
-                raise ErrorResponse(f'build_args needs to be a dictonary', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-            
-            for key in build_args_dict:
-                value = build_args_dict[key]
-                if not isinstance(value, str):
-                    raise ErrorResponse(f'build_args values have to be strings', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-
-            build_args_str = json.dumps(build_args_dict) 
-           
-            #appSources = postData["sources"]
-            stmt = f'REPLACE INTO Sources ( id, name, architectures , url, branch, directory, dockerfile, build_args ) VALUES (UUID_TO_BIN(%s) , %s , %s, %s, %s, %s, %s, %s)'
-            print(f"replae statement: {stmt}", file=sys.stderr)
-            print(f"build_args_str: {build_args_str}", file=sys.stderr)
-            ecr_db.cur.execute(stmt, (id_str, source_name, architectures , url, branch, directory, dockerfile, build_args_str))
+        stmt = f'REPLACE INTO Sources ( id, architectures , url, branch, directory, dockerfile, build_args ) VALUES (UUID_TO_BIN(%s) , %s, %s, %s, %s, %s, %s)'
+        print(f"replace statement: {stmt}", file=sys.stderr)
+        print(f"build_args_str: {build_args_str}", file=sys.stderr)
+        ecr_db.cur.execute(stmt, (id_str, architectures , url, branch, directory, dockerfile, build_args_str))
 
        
         for res in resourcesArray:
@@ -535,7 +536,7 @@ def get_build(namespace, repository, version):
     except Exception as e:
         raise ErrorResponse(f'JenkinsServer({config.jenkins_server}, {config.jenkins_user}) returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
-    source_name= request.values.get("source", "default")
+    #source_name= request.values.get("source", "default")
     #source_name = "default"
 
     # strategy to find last build
@@ -556,7 +557,7 @@ def get_build(namespace, repository, version):
 
     
 
-    app_human_id = createJenkinsName(app_spec, source_name)
+    app_human_id = createJenkinsName(app_spec)
 
 
     # strategy 1: try to find build number in database
@@ -564,7 +565,7 @@ def get_build(namespace, repository, version):
     number = -1
     architectures = ""
     try:
-        number, architectures = ecr_db.getBuildInfo(app_id, source_name)
+        number, architectures = ecr_db.getBuildInfo(app_id, "some name")
     except Exception as e:
         raise ErrorResponse(f'Could not get build number: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
@@ -602,22 +603,13 @@ def build_app(namespace, repository, version):
     if not app_id:
         return {"error":"app id not found"}
 
-    source_name= request.values.get("source", "default")
-
-    #source_name = "default"
-
-    sources = app_spec.get("sources", [])
-    source = None
-    for src in sources:
-        src_name = src.get("name", "none")
-        if src_name == source_name:
-            source = src
-            break
-
+    source = app_spec.get("source", None)
     if not source:
-        raise ErrorResponse(f'No source found in app spec', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+        return {"error":"source  not found"}
+    
 
-    app_human_id = createJenkinsName(app_spec, source_name)
+    
+    app_human_id = createJenkinsName(app_spec)
     
 
 
@@ -629,7 +621,7 @@ def build_app(namespace, repository, version):
     
     
     try:
-        js.createJob(app_human_id, app_spec, source_name, overwrite=overwrite)
+        js.createJob(app_human_id, app_spec, overwrite=overwrite)
     except Exception as e:
         raise ErrorResponse(f'createJob() returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR) 
 
@@ -667,16 +659,16 @@ def build_app(namespace, repository, version):
         break
 
         
-
+    build_name = "some name"
     architectures = source.get("architectures", None)
     if not architectures:
         raise ErrorResponse(f'architectures not specified in source', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
     try:
-        ecr_db.SaveBuildInfo(app_id, source_name, number, architectures)
+        ecr_db.SaveBuildInfo(app_id, build_name, number, architectures)
     
     except Exception as e:
-        raise ErrorResponse(f'error inserting build info for {app_id}, {source_name}, {number} , SaveBuildInfo: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+        raise ErrorResponse(f'error inserting build info for {app_id}, {build_name}, {number} , SaveBuildInfo: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
     
     #time.sleep(6)
 
@@ -1019,7 +1011,7 @@ class AuthZ(MethodView):
         
 
 
-def createJenkinsName(app_spec, source_name):
+def createJenkinsName(app_spec):
     import urllib.parse
 
     namespace = ""
@@ -1029,7 +1021,7 @@ def createJenkinsName(app_spec, source_name):
         namespace = app_spec["owner"]
        
 
-    return f'{namespace}_{app_spec["name"]}_{app_spec["version"]}_{source_name}'
+    return f'{namespace}.{app_spec["name"]}'
 
 
 

@@ -174,26 +174,28 @@ class EcrDB():
             returnObj["resources"] = resources
 
 
-        stmt = f'SELECT  BIN_TO_UUID(id), name, architectures , url, branch, directory, dockerfile, build_args FROM Sources WHERE BIN_TO_UUID(id) = %s'
+        stmt = f'SELECT  BIN_TO_UUID(id), architectures , url, branch, directory, dockerfile, build_args FROM Sources WHERE BIN_TO_UUID(id) = %s'
         print(f'stmt: {stmt} app_id={app_id}', file=sys.stderr)
         self.cur.execute(stmt, (app_id, ))
-        sources_array = []
+        #sources_array = []
         rows = self.cur.fetchall()
-        for row in rows:
 
-            source_obj = {}
-            source_obj["name"] = row[1]
-            source_obj["architectures"] = json.loads(row[2])
-            source_obj["url"] = row[3]
-            source_obj["branch"] = row[4]
-            source_obj["directory"] = row[5]
-            source_obj["dockerfile"] = row[6]
-            source_obj["build_args"] = json.loads(row[7])
+        row = rows[0]
+       
 
-            sources_array.append(source_obj)
+        source_obj = {}
+        
+        source_obj["architectures"] = json.loads(row[1])
+        source_obj["url"] = row[2]
+        source_obj["branch"] = row[3]
+        source_obj["directory"] = row[4]
+        source_obj["dockerfile"] = row[5]
+        source_obj["build_args"] = json.loads(row[6])
+
+        #sources_array.append(source_obj)
 
 
-        returnObj["sources"] = sources_array
+        returnObj["source"] = source_obj
 
         return returnObj, True
     
@@ -452,7 +454,7 @@ class EcrDB():
 
         return (number, architectures)
 
-    def SaveBuildInfo(self, app_id, source_name, build_number, architectures):
+    def SaveBuildInfo(self, app_id, build_name, build_number, architectures):
 
         architectures_str = json.dumps(architectures)
 
@@ -460,7 +462,7 @@ class EcrDB():
         stmt = 'REPLACE INTO Builds ( id, build_name, build_number, architectures)  VALUES (UUID_TO_BIN(%s) , %s,  %s, %s) '
 
 
-        self.cur.execute(stmt, (app_id, source_name, build_number, architectures_str))
+        self.cur.execute(stmt, (app_id, build_name, build_number, architectures_str))
 
         self.db.commit()
 

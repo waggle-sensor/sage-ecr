@@ -46,7 +46,7 @@ Example repsonse:
       "view": "top"
     }
   ], 
-  "sources": [
+  "source": 
     {
       "architectures": [
         "linux/arm/v7"
@@ -57,17 +57,6 @@ Example repsonse:
       "name": "armv7", 
       "url": "https://github.com/waggle-sensor/edge-plugins.git"
     }, 
-    {
-      "architectures": [
-        "linux/amd64"
-      ], 
-      "branch": "master", 
-      "directory": "plugin-simple", 
-      "dockerfile": "Dockerfile_sage", 
-      "name": "default", 
-      "url": "https://github.com/waggle-sensor/edge-plugins.git"
-    }
-  ], 
   "version": "1.0"
 }
 ```

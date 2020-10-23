@@ -60,8 +60,8 @@ def upload_and_build(client, test_failure=False):
         test_app_def_failure_obj  = json.loads(json.dumps(test_app_def_obj))
 
         test_app_def_failure_obj["name"] = "test_app_fail"
-        test_app_def_failure_obj["sources"][0]["url"] = "https://github.com/waggle-sensor/does_not_exist.git"
-        test_app_def_failure_obj["sources"][1]["url"] = "https://github.com/waggle-sensor/does_not_exist.git"
+        test_app_def_failure_obj["source"]["url"] = "https://github.com/waggle-sensor/does_not_exist.git"
+        
 
         local_test_app_def = json.dumps(test_app_def_failure_obj)
         
@@ -81,7 +81,7 @@ def upload_and_build(client, test_failure=False):
     assert result != None
 
     if test_failure:
-        assert result["sources"][0]["url"] == "https://github.com/waggle-sensor/does_not_exist.git"
+        assert result["source"]["url"] == "https://github.com/waggle-sensor/does_not_exist.git"
 
     if not test_failure:
         assert result["name"] ==  test_app_def_obj["name"]
