@@ -331,7 +331,7 @@ def test_listApps(client):
 
 def test_permissions(client):
     headers = {"Authorization" : "sage token1"}
-
+    headers_testuser2 = {"Authorization" : "sage token10"}
     # create app
     rv = client.post('/submit', data = test_app_def, headers=headers)
     assert rv.data != ""
@@ -421,7 +421,7 @@ def test_permissions(client):
 
     # share with other people
 
-    for user in ['other1', 'other2', 'other3']:
+    for user in ['other1', 'other2', 'other3', 'testuser2']:
         other = {"granteeType": "USER", "grantee":  user , "permission": "READ"}
         rv = client.put(f'/permissions/{app_namespace}/{app_repository}', data=json.dumps(other), headers=headers)
 
@@ -437,7 +437,7 @@ def test_permissions(client):
 
     print(json.dumps(result), file=sys.stderr)
 
-    assert len(result) ==4
+    assert len(result) ==5
 
     # remove all permissions (except owners FULL_CONTROLL)
     rv = client.delete(f'/permissions/{app_namespace}/{app_repository}', data=json.dumps({}), headers=headers)
@@ -446,7 +446,7 @@ def test_permissions(client):
     print(f'Deletion result: {json.dumps(result)}', file=sys.stderr)
     deleted = result.get("deleted", -1)
 
-    assert deleted == 3
+    assert deleted == 4
 
     # check app permissions
     rv = client.get(f'/permissions/{app_namespace}/{app_repository}', headers=headers)
@@ -466,7 +466,42 @@ def test_permissions(client):
 
     error_msg = result.get("error", "")
     assert "Not authorized" in  error_msg
+
+
+    # check namespace permission, give testuser2 WRITE permission for namespace
+
+   
+    acl = {"granteeType": "USER", "grantee":  "testuser2" , "permission": "WRITE"}
+    rv = client.put(f'/permissions/{app_namespace}', data=json.dumps(acl), headers=headers)
+
+    result = rv.get_json()
+
+    added = result.get("added", -1)
+    assert added == 1
+
     
+    # verify testuser2 can see repository inside of namespace
+    rv = client.get(f'/apps/{app_namespace}', headers=headers_testuser2)
+    result = rv.get_json()
+    repositories = result.get("repositories", -1)
+    print(f'result: {json.dumps(result)}', file=sys.stderr)
+    print(f'repositories: {json.dumps(repositories)}', file=sys.stderr)
+    assert len(repositories) == 1
+    assert repositories[0]["name"] == "simple"
+
+    # list all namespaces
+    rv = client.get(f'/apps', headers=headers)
+
+
+    result = rv.get_json()
+    print(f'result: {json.dumps(result)}', file=sys.stderr)
+    
+    
+    assert len(result) == 1
+    assert result[0]["id"] == "sage"
+    assert result[0]["owner_id"] == "testuser"
+    assert result[0]["type"] == "namespace"
+
 
 def test_namespaces(client):
     headers = {"Authorization" : "sage token1"}

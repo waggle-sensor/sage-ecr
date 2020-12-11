@@ -54,13 +54,22 @@ def has_permission(*permission):
 
 
 
-def has_repository_permission(permission):
+def has_resource_permission(permission):
     def real_decorator(func):
-        def wrapper2(self, namespace, repository, version=None):
+        def wrapper2(self, namespace, repository=None, version=None):
 
-            resourceType="repository"    
-            resourceName=f'{namespace}/{repository}'
+
             authenticated = request.environ['authenticated']
+
+
+            resourceType = ""
+            resourceName = ""
+            if repository:
+                resourceType="repository"    
+                resourceName=f'{namespace}/{repository}'
+            else:
+                resourceType="namespace"    
+                resourceName=namespace
 
             ecr_db = ecrdb.EcrDB()
 
@@ -75,8 +84,20 @@ def has_repository_permission(permission):
             requestUser = request.environ.get('user', "")
             isAdmin = request.environ.get('admin', False)
 
+            if not repository:
+                # check namespace permission only
 
-            if (isAdmin or ecr_db.hasPermission(resourceType, resourceName, "USER", requestUser ,permission)):
+                if (isAdmin or ecr_db.hasPermission(resourceType, resourceName, "USER", requestUser ,permission)):
+                    #return func(self, namespace, repository, version)
+                    return func(self, namespace)
+                    
+                raise ErrorResponse(f'Not authorized. (User {requestUser} does not have permission {permission} for {resourceType} {resourceName})', status_code=HTTPStatus.UNAUTHORIZED)
+
+
+            # check repository permission and namespace-inherited permission
+            hasNamespaceAccess = ecr_db.hasPermission("namespace", resourceName, "USER", requestUser , permission)
+
+            if (isAdmin or hasNamespaceAccess or ecr_db.hasPermission(resourceType, resourceName, "USER", requestUser ,permission)):
                 return func(self, namespace, repository, version)
 
             raise ErrorResponse(f'Not authorized. (User {requestUser} does not have permission {permission} for {resourceType} {resourceName})', status_code=HTTPStatus.UNAUTHORIZED)

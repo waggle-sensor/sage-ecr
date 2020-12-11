@@ -501,7 +501,7 @@ class Submit(MethodView):
 # /apps/<string:namespace>/<string:repository>/<string:version>
 class Apps(MethodView):
     @login_required
-    @has_repository_permission( "FULL_CONTROL" )
+    @has_resource_permission( "FULL_CONTROL" )
     def delete(self, namespace, repository, version):
         
         isAdmin = request.environ.get('admin', False)
@@ -515,7 +515,7 @@ class Apps(MethodView):
 
         return {"deleted": 1}
 
-    @has_repository_permission( "READ")
+    @has_resource_permission( "READ")
     def get(self, namespace, repository, version):
 
 
@@ -685,7 +685,7 @@ def build_app(namespace, repository, version):
 # /builds/<string:namespace>/<string:repository>/<version>
 class Builds(MethodView):
     @login_required
-    @has_repository_permission( "READ" )  
+    @has_resource_permission( "READ" )  
     #def get(self, app_id):
     def get(self, namespace, repository, version):
 
@@ -700,7 +700,7 @@ class Builds(MethodView):
         
     
     @login_required
-    @has_repository_permission( "FULL_CONTROL" )
+    @has_resource_permission( "FULL_CONTROL" )
     def post(self, namespace, repository, version):
 
        result = build_app(namespace, repository, version)
@@ -708,6 +708,7 @@ class Builds(MethodView):
 
 # /apps
 class NamespacesList(MethodView):
+
     def get(self):
 
 
@@ -747,7 +748,9 @@ class NamespacesList(MethodView):
 
 # /x/<namespace>
 class Namespace(MethodView):
-    def get(self, namespace):
+
+    @has_resource_permission( "READ" )
+    def get(self, namespace, repository = None):
         # list repositories
 
         requestUser = request.environ.get('user', "")
@@ -761,19 +764,21 @@ class Namespace(MethodView):
 
         repList = ecr_db.listRepositories(user=requestUser, namespace=namespace)
 
+        nameObj["type"] = "namespace"
         nameObj["repositories"] = repList
         #app_list = ecr_db.listApps(user=requestUser)
         return jsonify(nameObj) 
 
-    def delete(self, namespace):
+    @has_resource_permission( "WRITE" )
+    def delete(self, namespace, repository = None):
 
         requestUser = request.environ.get('user', "")
         isAdmin = request.environ.get('admin', "")
 
         # check permission
         ecr_db = ecrdb.EcrDB()
-        if (not isAdmin) and (not ecr_db.hasPermission("namespace", namespace, "USER", requestUser, "FULL_CONTROL")):
-            raise ErrorResponse(f'Not authorized', status_code=HTTPStatus.UNAUTHORIZED)
+        #if (not isAdmin) and (not ecr_db.hasPermission("namespace", namespace, "USER", requestUser, "FULL_CONTROL")):
+        #    raise ErrorResponse(f'Not authorized', status_code=HTTPStatus.UNAUTHORIZED)
 
         # check if empty
         repo_list = ecr_db.listRepositories(namespace=namespace)
@@ -808,7 +813,7 @@ class Repository(MethodView):
 
     # delete repository (and permissions) if it is empty
     @login_required
-    @has_repository_permission( "FULL_CONTROL" )  
+    @has_resource_permission( "FULL_CONTROL" )  
     def delete(self, namespace, repository, version=None):
 
         #requestUser = request.environ.get('user', "")
@@ -832,19 +837,26 @@ class Repository(MethodView):
 # /apps/{app_id}/permissions
 class Permissions(MethodView):
     @login_required
-    @has_repository_permission( "ACL_READ" )
-    def get(self, namespace, repository, version=None):
+    @has_resource_permission( "READ_ACP" )
+    def get(self, namespace, repository=None, version=None):
         
-        repository_full = f'{namespace}/{repository}'
+
+        if repository:
+            repository_full = f'{namespace}/{repository}'
+
+            ecr_db = ecrdb.EcrDB()
+            result = ecr_db.getPermissions("repository", repository_full)
+            
+            return jsonify(result)
 
         ecr_db = ecrdb.EcrDB()
-        result = ecr_db.getPermissions("repository", repository_full)
-        
+        result = ecr_db.getPermissions("namespace", namespace)
+            
         return jsonify(result)
 
     @login_required
-    @has_repository_permission( "ACL_WRITE" )
-    def put(self, namespace, repository, version=None):
+    @has_resource_permission( "WRITE_ACP" )
+    def put(self, namespace, repository=None, version=None):
         # example to make app public:
         # curl -X PUT localhost:5000/permissions/{id} -H "Authorization: sage token1" -d '{"granteeType": "GROUP", "grantee": "AllUsers", "permission": "READ"}'
        
@@ -857,8 +869,15 @@ class Permissions(MethodView):
         
         ecr_db = ecrdb.EcrDB()
 
-        repo_name_full = f'{namespace}/{repository}'
-        result = ecr_db.addPermission("repository", repo_name_full, postData["granteeType"], postData["grantee"], postData["permission"])
+        resource_type = "namespace"
+        resource_name_full = namespace
+        
+        if repository:
+            resource_type = "repository"
+            resource_name_full = f'{namespace}/{repository}'
+         
+
+        result = ecr_db.addPermission(resource_type, resource_name_full, postData["granteeType"], postData["grantee"], postData["permission"])
 
         #result = ecr_db.addPermission(app_id, postData["granteeType"], postData["grantee"], postData["permission"])
         
@@ -870,7 +889,7 @@ class Permissions(MethodView):
 
 
     @login_required
-    @has_repository_permission( "ACL_WRITE" )
+    @has_resource_permission( "WRITE_ACP" )
     def delete(self, namespace, repository, version=None):
         
 
@@ -1068,6 +1087,7 @@ app.add_url_rule('/apps/<string:namespace>/<string:repository>/<string:version>'
 
 app.add_url_rule('/permissions/<string:namespace>/<string:repository>/<string:version>', view_func=Permissions.as_view('permissionsAPI'))
 app.add_url_rule('/permissions/<string:namespace>/<string:repository>', view_func=Permissions.as_view('permissionsAPI_2'))
+app.add_url_rule('/permissions/<string:namespace>', view_func=Permissions.as_view('permissionsAPI_3'))
 
 #app.add_url_rule('/apps/<string:namespace>/<string:repository>/<version>/build', view_func=Builds.as_view('buildAPI'))
 
