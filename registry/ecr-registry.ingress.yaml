@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: ecr-registry
@@ -11,6 +11,9 @@ spec:
     http:
       paths:
       - path: /
+        pathType: Prefix
         backend:
-          serviceName: ecr-registry
-          servicePort: 80
+          service: 
+            name: ecr-registry
+            port:
+              number: 80
