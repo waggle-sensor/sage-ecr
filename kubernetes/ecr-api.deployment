@@ -78,6 +78,11 @@ spec:
             secretKeyRef:
               name: ecr-api-secret
               key: MYSQL_HOST
+        - name: AUTH_METHOD
+          valueFrom:
+            secretKeyRef:
+              name: ecr-api-secret
+              key: AUTH_METHOD
         - name: MYSQL_USER
           valueFrom:
             secretKeyRef:
