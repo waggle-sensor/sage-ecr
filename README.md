@@ -44,12 +44,12 @@ Visit Jenkins in your browser via: [http://localhost:8082](http://localhost:8082
 Note: After the start of Jenkins you have to login as user `ecrdb` with password `test`. You can skip the "Getting Started" dialogue but clicking the `X` in the upper right corner. Then click on the blue button `Start using Jenkins`. After that your are logged in, but that is not a requirement. Users can view the Jenkins instance without logging in.
 
 # Tutorial
-[./tutorial.md](./tutorial.md)
+[./docs/tutorial.md](./docs/tutorial.md)
 
 
 # API Specification
 
-[./api_spec.md](./api_spec.md)
+[./docs/api_spec.md](./docs/api_spec.md)
 
 
 # testing
