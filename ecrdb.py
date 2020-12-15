@@ -37,6 +37,7 @@ class EcrDB():
         return
 
     # returns true if user has the permissions
+    # TODO if resourceType  = repository, also check namespace 
     def hasPermission(self, resourceType, resourceName, granteeType, grantee, permission):
 
         if not grantee:
@@ -255,7 +256,7 @@ class EcrDB():
         # this line matches the correct app row with the correct permissions rows
         sub_stmt =  'Permissions.resourceType="repository" AND Permissions.resourceName=CONCAT(Apps.namespace , "/", Apps.name )  OR (Permissions.resourceType="namespace" AND Permissions.resourceName=Apps.namespace)'
 
-        stmt = f'SELECT DISTINCT BIN_TO_UUID(id), namespace, name, version FROM Apps INNER JOIN Permissions  ON {sub_stmt} {appID_condition} {repo_condition} {namespace_condition} AND ( ({user_condition}) OR (granteeType="GROUP" AND grantee="AllUsers")) AND (permission="READ" OR permission="FULL_CONTROL")'
+        stmt = f'SELECT DISTINCT BIN_TO_UUID(id), namespace, name, version FROM Apps INNER JOIN Permissions  ON {sub_stmt} {appID_condition} {repo_condition} {namespace_condition} AND ( ({user_condition}) OR (granteeType="GROUP" AND grantee="AllUsers")) AND (permission in ("READ", "WRITE", "FULL_CONTROL"))'
         
         debug_stmt = ""
         for key in query_data:
@@ -291,7 +292,7 @@ class EcrDB():
 
 
 
-        stmt = f'SELECT DISTINCT id , owner_id FROM Namespaces INNER JOIN Permissions  ON Permissions.resourceType="namespace" AND Permissions.resourceName=Namespaces.id  AND ( ({user_condition}) OR (granteeType="GROUP" AND grantee="AllUsers")) AND (permission="READ" OR permission="FULL_CONTROL")'
+        stmt = f'SELECT DISTINCT id , owner_id FROM Namespaces INNER JOIN Permissions  ON Permissions.resourceType="namespace" AND Permissions.resourceName=Namespaces.id  AND ( ({user_condition}) OR (granteeType="GROUP" AND grantee="AllUsers")) AND (permission in ("READ", "WRITE", "FULL_CONTROL"))'
         
 
         print(f'stmt: {stmt}', file=sys.stderr)
@@ -338,7 +339,7 @@ class EcrDB():
 
             # not needed ?  --->    AND ( Permissions.resourceName LIKE CONCAT(Repositories.namespace, \"%%\") )
 
-        stmt = f'''SELECT DISTINCT namespace , name , owner_id FROM Repositories INNER JOIN Permissions ON {sub_stmt} {namespace_condition}    AND ( ({user_condition}) OR (granteeType="GROUP" AND grantee="AllUsers")) AND (permission="READ" OR permission="FULL_CONTROL")'''
+        stmt = f'''SELECT DISTINCT namespace , name , owner_id FROM Repositories INNER JOIN Permissions ON {sub_stmt} {namespace_condition}    AND ( ({user_condition}) OR (granteeType="GROUP" AND grantee="AllUsers")) AND (permission in ("READ", "WRITE", "FULL_CONTROL"))'''
         
         
         
