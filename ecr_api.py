@@ -226,22 +226,23 @@ class Submit(MethodView):
 
         ### namespace
         # check if namespace exists (create if not) and check permissions
+        userHasNamespaceWritePermission = False
         namespace = postData.get("namespace", "")
         _, ok = ecr_db.getNamespace(namespace)
-        
-        
         if not ok: 
             # namespace does not exist. Unless sage assigns usernames, any available namespace can be used
             try:
                 ecr_db.addNamespace(namespace, requestUser, public=True)
             except Exception as e:
                 raise ErrorResponse(f'Could not create namespace {namespace}: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
+            userHasNamespaceWritePermission = True
 
         else: 
+            # Namespace exists. Check if User has permission to write.
+            # If not, user may still have permission to write to existing Repo.
 
-            if not ecr_db.hasPermission("namespace", namespace, "USER", requestUser, "WRITE"):
-                raise ErrorResponse(f'Not authorized to access namespace {namespace}', status_code=HTTPStatus.UNAUTHORIZED)
+            userHasNamespaceWritePermission = ecr_db.hasPermission("namespace", namespace, "USER", requestUser, "WRITE")
+            
 
         ### repository (app name, without version)
         repo_name = postData.get("name", "")
@@ -250,15 +251,19 @@ class Submit(MethodView):
         _, ok = ecr_db.getRepository(namespace, repo_name)
         if not ok: 
             # namespace does not exist. Unless sage assigns usernames, any available namespace can be used
-            try:
-                ecr_db.addRepository(namespace, repo_name, requestUser)
-            except Exception as e:
-                raise ErrorResponse(f'Could not create repository {namespace}/{repo_name}: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+            if userHasNamespaceWritePermission:
+                try:
+                    ecr_db.addRepository(namespace, repo_name, requestUser)
+                except Exception as e:
+                    raise ErrorResponse(f'Could not create repository {namespace}/{repo_name}: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+            else:
+               raise ErrorResponse(f'Not authorized to access namespace {namespace}', status_code=HTTPStatus.UNAUTHORIZED) 
 
 
         else: 
-
-            if not ecr_db.hasPermission("repository", f'{namespace}/{repo_name}', "USER", requestUser, "WRITE"):
+            # repo exists, check if user has namespace or repo permission
+            userHasRepoWritePermission = ecr_db.hasPermission("repository", f'{namespace}/{repo_name}', "USER", requestUser, "WRITE")
+            if (not userHasNamespaceWritePermission ) and (not userHasRepoWritePermission):
                 raise ErrorResponse(f'Not authorized to access repository {namespace}/{repo_name}', status_code=HTTPStatus.UNAUTHORIZED)
         
         ### check if versioned app already exists and if it can be overwritten
@@ -721,10 +726,19 @@ class NamespacesList(MethodView):
         return jsonify(namespaces) 
 
     @login_required
-    def post(self):
+    def put(self):
 
         requestUser = request.environ.get('user', "")
-        requestNamespace = request.environ.get('namespace', "")
+        #requestNamespace = request.environ.get('namespace', "")
+
+        postData = request.get_json(force=True, silent=True)
+
+        if not "id"  in postData:
+            raise ErrorResponse(f'Field \"id\" missing in json', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        requestNamespace = postData["id"]
+
+        
 
         if not requestNamespace:
             raise ErrorResponse(f'Field \"namespace\" missing in request', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
@@ -763,6 +777,10 @@ class Namespace(MethodView):
             raise ErrorResponse(f'Namespace not found', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
         repList = ecr_db.listRepositories(user=requestUser, namespace=namespace)
+
+        for rep in repList:
+            if rep["namespace"] != namespace:
+                raise ErrorResponse(f'Namespace does not match', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
         nameObj["type"] = "namespace"
         nameObj["repositories"] = repList

@@ -254,7 +254,7 @@ class EcrDB():
 
 
         # this line matches the correct app row with the correct permissions rows
-        sub_stmt =  'Permissions.resourceType="repository" AND Permissions.resourceName=CONCAT(Apps.namespace , "/", Apps.name )  OR (Permissions.resourceType="namespace" AND Permissions.resourceName=Apps.namespace)'
+        sub_stmt =  '( Permissions.resourceType="repository" AND Permissions.resourceName=CONCAT(Apps.namespace , "/", Apps.name )  OR (Permissions.resourceType="namespace" AND Permissions.resourceName=Apps.namespace) )'
 
         stmt = f'SELECT DISTINCT BIN_TO_UUID(id), namespace, name, version FROM Apps INNER JOIN Permissions  ON {sub_stmt} {appID_condition} {repo_condition} {namespace_condition} AND ( ({user_condition}) OR (granteeType="GROUP" AND grantee="AllUsers")) AND (permission in ("READ", "WRITE", "FULL_CONTROL"))'
         
@@ -335,7 +335,7 @@ class EcrDB():
             query_data.append(user)
            
 
-        sub_stmt =  'Permissions.resourceType="repository" AND Permissions.resourceName=CONCAT(Repositories.namespace , "/", Repositories.name )  OR (Permissions.resourceType="namespace" AND Permissions.resourceName=Repositories.namespace)'
+        sub_stmt =  '( Permissions.resourceType="repository" AND Permissions.resourceName=CONCAT(Repositories.namespace , "/", Repositories.name )  OR (Permissions.resourceType="namespace" AND Permissions.resourceName=Repositories.namespace) )'
 
             # not needed ?  --->    AND ( Permissions.resourceName LIKE CONCAT(Repositories.namespace, \"%%\") )
 

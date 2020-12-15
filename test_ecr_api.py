@@ -224,21 +224,37 @@ def test_app_upload_and_download(client):
 
     
     # delete app in case app already exists and is frozen
-    rv = client.delete(f'/apps/{app_namespace}/{app_repository}/{app_version}', data = test_app_def, headers=admin_headers)
+    rv = client.delete(f'/apps/{app_namespace}/{app_repository}/{app_version}', headers=admin_headers)
     print(f'rv.data: {rv.data}' , file=sys.stderr)
     if not "App not found" in  str(rv.data):
         assert rv.status_code == 200
 
     # delete repository:
-    rv = client.delete(f'/apps/{app_namespace}/{app_repository}', data = test_app_def, headers=admin_headers)
+    rv = client.delete(f'/apps/{app_namespace}/{app_repository}', headers=admin_headers)
     print(f'rv.data: {rv.data}' , file=sys.stderr)
     assert rv.status_code == 200
 
-    # delete namespace:
-    rv = client.delete(f'/apps/{app_namespace}', data = test_app_def, headers=admin_headers)
-    print(f'rv.data: {rv.data}' , file=sys.stderr)
-    assert rv.status_code == 200
+    # delete namespace
+    rv = client.get(f'/apps/{app_namespace}', headers=admin_headers)
+    if rv.status_code == 200:
+        rv = client.delete(f'/apps/{app_namespace}', headers=admin_headers)
+        print(f'rv.data: {rv.data}' , file=sys.stderr)
+        assert rv.status_code == 200
+        result = rv.get_json()
+        assert result != None
+        assert "error"  not in result
 
+    # create namespace (not needed, but increases test coverage)
+    rv = client.put(f'/apps', data = json.dumps({"id":app_namespace}), headers=headers)    
+    print(f'(create namespace) rv.data: {rv.data}' , file=sys.stderr)
+    assert rv.data != ""
+    assert rv.status_code == 200
+    result = rv.get_json()
+    assert result != None
+    assert "error"  not in result
+
+
+    # submit
     rv = client.post('/submit', data = test_app_def, headers=headers)
     assert rv.data != ""
     print(f'rv.data: {rv.data}' , file=sys.stderr)
@@ -247,6 +263,7 @@ def test_app_upload_and_download(client):
     
     
     assert result != None
+    assert "error" not in result
     assert "name" in result
     assert result["name"] ==  test_app_def_obj["name"]
     
@@ -498,7 +515,7 @@ def test_permissions(client):
     
     
     assert len(result) == 1
-    assert result[0]["id"] == "sage"
+    assert result[0]["id"] == app_namespace
     assert result[0]["owner_id"] == "testuser"
     assert result[0]["type"] == "namespace"
 
@@ -534,7 +551,7 @@ def test_authz(client):
     sample_request = { 
         "account": "testuser",
         "type": "repository",
-        "name": "sage/simple",
+        "name": f"{app_namespace}/{app_repository}",
         "service": "Docker registry",
         "actions": ["pull"]
     }
