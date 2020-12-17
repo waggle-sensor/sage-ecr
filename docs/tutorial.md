@@ -27,6 +27,32 @@ export APP_ID=<...>
 curl -X GET  ${ECR_API}/apps/sage/simple/1.0 -H "Authorization: sage token1"
 ```
 
+
+## share sage/simple with testuser2
+```bash
+curl -X PUT  ${ECR_API}/permissions/sage/simple -H "Authorization: sage token1" -d '{"granteeType": "USER", "grantee": "testuser2", "permission":"WRITE"}'
+```
+
+verify (view permissions as testuser):
+```bash
+curl ${ECR_API}/permissions/sage/simple -H "Authorization: sage token1"
+```
+
+verify (view app as testuser2)
+```bash
+curl ${ECR_API}/apps/sage/simple/1.0 -H "Authorization: sage token10"
+```
+
+## share namespace sage with testuser2
+```bash
+curl -X PUT  ${ECR_API}/permissions/sage -H "Authorization: sage token1" -d '{"granteeType": "USER", "grantee": "testuser2", "permission":"WRITE"}'
+```
+
+verify
+```bash
+curl ${ECR_API}/permissions/sage -H "Authorization: sage token1"
+```
+
 ## list all namespaces
 
 ```bash

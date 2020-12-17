@@ -77,6 +77,21 @@ Example repsonse:
 ]
 ```
 
+
+## PUT /apps/
+Create namespace:
+```bash
+curl ${ECR_API}/apps -d "{\"id\":\"${APP_NAMESPACE}\"}" -H "Authorization: sage ${SAGE_TOKEN}"
+```
+
+Example repsonse:
+```json5
+{
+  "id": "testtest", 
+  "owner_id": "testuser"
+}
+```
+
 ## GET /apps/{namespace}
 List repositories in namespace:
 ```bash
@@ -97,7 +112,6 @@ Example repsonse:
   ]
 }
 ```
-
 
 
 ## GET /apps/{namespace}/{repository}

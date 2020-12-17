@@ -37,6 +37,7 @@ class EcrDB():
         return
 
     # returns true if user has the permissions
+    # TODO if resourceType  = repository, also check namespace 
     def hasPermission(self, resourceType, resourceName, granteeType, grantee, permission):
 
         if not grantee:
@@ -76,7 +77,7 @@ class EcrDB():
             debug_stmt = debug_stmt.replace("%s", p, 1)
 
 
-        print(f'debug stmt: {debug_stmt}', file=sys.stderr)
+        print(f'(hasPermission) debug stmt: {debug_stmt}', file=sys.stderr)
 
 
         self.cur.execute(stmt, (resourceType, resourceName, granteeType, grantee,  *permissions ))
@@ -252,12 +253,19 @@ class EcrDB():
                 query_data.append(user)
 
 
+        # this line matches the correct app row with the correct permissions rows
+        sub_stmt =  '( Permissions.resourceType="repository" AND Permissions.resourceName=CONCAT(Apps.namespace , "/", Apps.name )  OR (Permissions.resourceType="namespace" AND Permissions.resourceName=Apps.namespace) )'
 
-        stmt = f'SELECT DISTINCT BIN_TO_UUID(id), namespace, name, version FROM Apps INNER JOIN Permissions  ON Permissions.resourceType="repository" AND Permissions.resourceName=CONCAT(Apps.namespace , "/", Apps.name ) {appID_condition} {repo_condition} {namespace_condition} AND ( ({user_condition}) OR (granteeType="GROUP" AND grantee="AllUsers")) AND (permission="READ" OR permission="FULL_CONTROL")'
+        stmt = f'SELECT DISTINCT BIN_TO_UUID(id), namespace, name, version FROM Apps INNER JOIN Permissions  ON {sub_stmt} {appID_condition} {repo_condition} {namespace_condition} AND ( ({user_condition}) OR (granteeType="GROUP" AND grantee="AllUsers")) AND (permission in ("READ", "WRITE", "FULL_CONTROL"))'
         
+        debug_stmt = ""
+        for key in query_data:
+            debug_stmt = debug_stmt.replace("%s", f'"{key}"', 1)
+
+        print(f'(listApps) debug stmt: {debug_stmt}', file=sys.stderr)
 
         
-        print(f'stmt: {stmt}', file=sys.stderr)
+        #print(f'stmt: {stmt}', file=sys.stderr)
         self.cur.execute(stmt , query_data)
 
         
@@ -284,7 +292,7 @@ class EcrDB():
 
 
 
-        stmt = f'SELECT DISTINCT id , owner_id FROM Namespaces INNER JOIN Permissions  ON Permissions.resourceType="namespace" AND Permissions.resourceName=Namespaces.id  AND ( ({user_condition}) OR (granteeType="GROUP" AND grantee="AllUsers")) AND (permission="READ" OR permission="FULL_CONTROL")'
+        stmt = f'SELECT DISTINCT id , owner_id FROM Namespaces INNER JOIN Permissions  ON Permissions.resourceType="namespace" AND Permissions.resourceName=Namespaces.id  AND ( ({user_condition}) OR (granteeType="GROUP" AND grantee="AllUsers")) AND (permission in ("READ", "WRITE", "FULL_CONTROL"))'
         
 
         print(f'stmt: {stmt}', file=sys.stderr)
@@ -292,7 +300,7 @@ class EcrDB():
         debug_stmt = stmt
         if user != "" :
             debug_stmt = debug_stmt.replace("%s", f'"{user}"', 1)
-        print(f'debug stmt: {debug_stmt}', file=sys.stderr)
+        print(f'(listNamespaces) debug stmt: {debug_stmt}', file=sys.stderr)
         
         self.cur.execute(stmt , query_data)
 
@@ -305,7 +313,7 @@ class EcrDB():
         for row in rows:
             print(f'row: {row}', file=sys.stderr)
 
-            app_list.append({"id": row[0], "owner_id": row[1]})
+            app_list.append({"id": row[0], "owner_id": row[1], "type": "namespace"})
         
         return app_list
 
@@ -327,19 +335,22 @@ class EcrDB():
             query_data.append(user)
            
 
-        stmt = f'''SELECT DISTINCT namespace , name , owner_id FROM Repositories INNER JOIN Permissions ON Permissions.resourceType="repository" {namespace_condition}  AND ( Permissions.resourceName LIKE CONCAT(Repositories.namespace, \"%%\") )  AND ( ({user_condition}) OR (granteeType="GROUP" AND grantee="AllUsers")) AND (permission="READ" OR permission="FULL_CONTROL")'''
+        sub_stmt =  '( Permissions.resourceType="repository" AND Permissions.resourceName=CONCAT(Repositories.namespace , "/", Repositories.name )  OR (Permissions.resourceType="namespace" AND Permissions.resourceName=Repositories.namespace) )'
+
+            # not needed ?  --->    AND ( Permissions.resourceName LIKE CONCAT(Repositories.namespace, \"%%\") )
+
+        stmt = f'''SELECT DISTINCT namespace , name , owner_id FROM Repositories INNER JOIN Permissions ON {sub_stmt} {namespace_condition}    AND ( ({user_condition}) OR (granteeType="GROUP" AND grantee="AllUsers")) AND (permission in ("READ", "WRITE", "FULL_CONTROL"))'''
         
         
         
         debug_stmt = stmt
-        if namespace:
-            debug_stmt = debug_stmt.replace("%s", namespace, 1)
-        if user != "" :
-            debug_stmt = debug_stmt.replace("%s", user, 1)
+        for key in query_data:
+            debug_stmt = debug_stmt.replace("%s", key, 1)
+        
         
 
 
-        print(f'debug stmt: {debug_stmt}', file=sys.stderr)
+        print(f'(listRepositories) debug stmt: {debug_stmt}', file=sys.stderr)
         #print(f'stmt: {stmt}', file=sys.stderr)
         #print(f'query_data: {query_data}', file=sys.stderr)
         self.cur.execute(stmt , query_data)
@@ -354,7 +365,7 @@ class EcrDB():
         for row in rows:
             print(f'row: {row}', file=sys.stderr)
 
-            rep_list.append({"namespace": row[0], "name": row[1], "owner_id": row[2]})
+            rep_list.append({"type": "repository", "namespace": row[0], "name": row[1], "owner_id": row[2]})
         
         return rep_list
 
@@ -388,7 +399,7 @@ class EcrDB():
         for key in [resourceType, resourceName, granteeType , grantee , permission]:
             debug_stmt = debug_stmt.replace("%s", f'"{key}"', 1)
 
-        print(f'debug stmt: {debug_stmt}', file=sys.stderr)
+        print(f'(addPermission) debug stmt: {debug_stmt}', file=sys.stderr)
 
 
         self.cur.execute(stmt, (resourceType, resourceName, granteeType, grantee , permission))

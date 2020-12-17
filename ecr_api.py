@@ -226,22 +226,23 @@ class Submit(MethodView):
 
         ### namespace
         # check if namespace exists (create if not) and check permissions
+        userHasNamespaceWritePermission = False
         namespace = postData.get("namespace", "")
         _, ok = ecr_db.getNamespace(namespace)
-        
-        
         if not ok: 
             # namespace does not exist. Unless sage assigns usernames, any available namespace can be used
             try:
                 ecr_db.addNamespace(namespace, requestUser, public=True)
             except Exception as e:
                 raise ErrorResponse(f'Could not create namespace {namespace}: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
+            userHasNamespaceWritePermission = True
 
         else: 
+            # Namespace exists. Check if User has permission to write.
+            # If not, user may still have permission to write to existing Repo.
 
-            if not ecr_db.hasPermission("namespace", namespace, "USER", requestUser, "WRITE"):
-                raise ErrorResponse(f'Not authorized to access namespace {namespace}', status_code=HTTPStatus.UNAUTHORIZED)
+            userHasNamespaceWritePermission = ecr_db.hasPermission("namespace", namespace, "USER", requestUser, "WRITE")
+            
 
         ### repository (app name, without version)
         repo_name = postData.get("name", "")
@@ -250,15 +251,19 @@ class Submit(MethodView):
         _, ok = ecr_db.getRepository(namespace, repo_name)
         if not ok: 
             # namespace does not exist. Unless sage assigns usernames, any available namespace can be used
-            try:
-                ecr_db.addRepository(namespace, repo_name, requestUser)
-            except Exception as e:
-                raise ErrorResponse(f'Could not create repository {namespace}/{repo_name}: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+            if userHasNamespaceWritePermission:
+                try:
+                    ecr_db.addRepository(namespace, repo_name, requestUser)
+                except Exception as e:
+                    raise ErrorResponse(f'Could not create repository {namespace}/{repo_name}: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+            else:
+               raise ErrorResponse(f'Not authorized to access namespace {namespace}', status_code=HTTPStatus.UNAUTHORIZED) 
 
 
         else: 
-
-            if not ecr_db.hasPermission("repository", f'{namespace}/{repo_name}', "USER", requestUser, "WRITE"):
+            # repo exists, check if user has namespace or repo permission
+            userHasRepoWritePermission = ecr_db.hasPermission("repository", f'{namespace}/{repo_name}', "USER", requestUser, "WRITE")
+            if (not userHasNamespaceWritePermission ) and (not userHasRepoWritePermission):
                 raise ErrorResponse(f'Not authorized to access repository {namespace}/{repo_name}', status_code=HTTPStatus.UNAUTHORIZED)
         
         ### check if versioned app already exists and if it can be overwritten
@@ -501,7 +506,7 @@ class Submit(MethodView):
 # /apps/<string:namespace>/<string:repository>/<string:version>
 class Apps(MethodView):
     @login_required
-    @has_repository_permission( "FULL_CONTROL" )
+    @has_resource_permission( "FULL_CONTROL" )
     def delete(self, namespace, repository, version):
         
         isAdmin = request.environ.get('admin', False)
@@ -515,7 +520,7 @@ class Apps(MethodView):
 
         return {"deleted": 1}
 
-    @has_repository_permission( "READ")
+    @has_resource_permission( "READ")
     def get(self, namespace, repository, version):
 
 
@@ -685,7 +690,7 @@ def build_app(namespace, repository, version):
 # /builds/<string:namespace>/<string:repository>/<version>
 class Builds(MethodView):
     @login_required
-    @has_repository_permission( "READ" )  
+    @has_resource_permission( "READ" )  
     #def get(self, app_id):
     def get(self, namespace, repository, version):
 
@@ -700,7 +705,7 @@ class Builds(MethodView):
         
     
     @login_required
-    @has_repository_permission( "FULL_CONTROL" )
+    @has_resource_permission( "FULL_CONTROL" )
     def post(self, namespace, repository, version):
 
        result = build_app(namespace, repository, version)
@@ -708,6 +713,7 @@ class Builds(MethodView):
 
 # /apps
 class NamespacesList(MethodView):
+
     def get(self):
 
 
@@ -720,10 +726,19 @@ class NamespacesList(MethodView):
         return jsonify(namespaces) 
 
     @login_required
-    def post(self):
+    def put(self):
 
         requestUser = request.environ.get('user', "")
-        requestNamespace = request.environ.get('namespace', "")
+        #requestNamespace = request.environ.get('namespace', "")
+
+        postData = request.get_json(force=True, silent=True)
+
+        if not "id"  in postData:
+            raise ErrorResponse(f'Field \"id\" missing in json', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        requestNamespace = postData["id"]
+
+        
 
         if not requestNamespace:
             raise ErrorResponse(f'Field \"namespace\" missing in request', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
@@ -747,7 +762,9 @@ class NamespacesList(MethodView):
 
 # /x/<namespace>
 class Namespace(MethodView):
-    def get(self, namespace):
+
+    @has_resource_permission( "READ" )
+    def get(self, namespace, repository = None):
         # list repositories
 
         requestUser = request.environ.get('user', "")
@@ -761,19 +778,25 @@ class Namespace(MethodView):
 
         repList = ecr_db.listRepositories(user=requestUser, namespace=namespace)
 
+        for rep in repList:
+            if rep["namespace"] != namespace:
+                raise ErrorResponse(f'Namespace does not match', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        nameObj["type"] = "namespace"
         nameObj["repositories"] = repList
         #app_list = ecr_db.listApps(user=requestUser)
         return jsonify(nameObj) 
 
-    def delete(self, namespace):
+    @has_resource_permission( "WRITE" )
+    def delete(self, namespace, repository = None):
 
         requestUser = request.environ.get('user', "")
         isAdmin = request.environ.get('admin', "")
 
         # check permission
         ecr_db = ecrdb.EcrDB()
-        if (not isAdmin) and (not ecr_db.hasPermission("namespace", namespace, "USER", requestUser, "FULL_CONTROL")):
-            raise ErrorResponse(f'Not authorized', status_code=HTTPStatus.UNAUTHORIZED)
+        #if (not isAdmin) and (not ecr_db.hasPermission("namespace", namespace, "USER", requestUser, "FULL_CONTROL")):
+        #    raise ErrorResponse(f'Not authorized', status_code=HTTPStatus.UNAUTHORIZED)
 
         # check if empty
         repo_list = ecr_db.listRepositories(namespace=namespace)
@@ -808,7 +831,7 @@ class Repository(MethodView):
 
     # delete repository (and permissions) if it is empty
     @login_required
-    @has_repository_permission( "FULL_CONTROL" )  
+    @has_resource_permission( "FULL_CONTROL" )  
     def delete(self, namespace, repository, version=None):
 
         #requestUser = request.environ.get('user', "")
@@ -832,19 +855,26 @@ class Repository(MethodView):
 # /apps/{app_id}/permissions
 class Permissions(MethodView):
     @login_required
-    @has_repository_permission( "ACL_READ" )
-    def get(self, namespace, repository, version=None):
+    @has_resource_permission( "READ_ACP" )
+    def get(self, namespace, repository=None, version=None):
         
-        repository_full = f'{namespace}/{repository}'
+
+        if repository:
+            repository_full = f'{namespace}/{repository}'
+
+            ecr_db = ecrdb.EcrDB()
+            result = ecr_db.getPermissions("repository", repository_full)
+            
+            return jsonify(result)
 
         ecr_db = ecrdb.EcrDB()
-        result = ecr_db.getPermissions("repository", repository_full)
-        
+        result = ecr_db.getPermissions("namespace", namespace)
+            
         return jsonify(result)
 
     @login_required
-    @has_repository_permission( "ACL_WRITE" )
-    def put(self, namespace, repository, version=None):
+    @has_resource_permission( "WRITE_ACP" )
+    def put(self, namespace, repository=None, version=None):
         # example to make app public:
         # curl -X PUT localhost:5000/permissions/{id} -H "Authorization: sage token1" -d '{"granteeType": "GROUP", "grantee": "AllUsers", "permission": "READ"}'
        
@@ -857,8 +887,15 @@ class Permissions(MethodView):
         
         ecr_db = ecrdb.EcrDB()
 
-        repo_name_full = f'{namespace}/{repository}'
-        result = ecr_db.addPermission("repository", repo_name_full, postData["granteeType"], postData["grantee"], postData["permission"])
+        resource_type = "namespace"
+        resource_name_full = namespace
+        
+        if repository:
+            resource_type = "repository"
+            resource_name_full = f'{namespace}/{repository}'
+         
+
+        result = ecr_db.addPermission(resource_type, resource_name_full, postData["granteeType"], postData["grantee"], postData["permission"])
 
         #result = ecr_db.addPermission(app_id, postData["granteeType"], postData["grantee"], postData["permission"])
         
@@ -870,7 +907,7 @@ class Permissions(MethodView):
 
 
     @login_required
-    @has_repository_permission( "ACL_WRITE" )
+    @has_resource_permission( "WRITE_ACP" )
     def delete(self, namespace, repository, version=None):
         
 
@@ -1068,6 +1105,7 @@ app.add_url_rule('/apps/<string:namespace>/<string:repository>/<string:version>'
 
 app.add_url_rule('/permissions/<string:namespace>/<string:repository>/<string:version>', view_func=Permissions.as_view('permissionsAPI'))
 app.add_url_rule('/permissions/<string:namespace>/<string:repository>', view_func=Permissions.as_view('permissionsAPI_2'))
+app.add_url_rule('/permissions/<string:namespace>', view_func=Permissions.as_view('permissionsAPI_3'))
 
 #app.add_url_rule('/apps/<string:namespace>/<string:repository>/<version>/build', view_func=Builds.as_view('buildAPI'))
 

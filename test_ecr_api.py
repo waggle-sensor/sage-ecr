@@ -224,21 +224,37 @@ def test_app_upload_and_download(client):
 
     
     # delete app in case app already exists and is frozen
-    rv = client.delete(f'/apps/{app_namespace}/{app_repository}/{app_version}', data = test_app_def, headers=admin_headers)
+    rv = client.delete(f'/apps/{app_namespace}/{app_repository}/{app_version}', headers=admin_headers)
     print(f'rv.data: {rv.data}' , file=sys.stderr)
     if not "App not found" in  str(rv.data):
         assert rv.status_code == 200
 
     # delete repository:
-    rv = client.delete(f'/apps/{app_namespace}/{app_repository}', data = test_app_def, headers=admin_headers)
+    rv = client.delete(f'/apps/{app_namespace}/{app_repository}', headers=admin_headers)
     print(f'rv.data: {rv.data}' , file=sys.stderr)
     assert rv.status_code == 200
 
-    # delete namespace:
-    rv = client.delete(f'/apps/{app_namespace}', data = test_app_def, headers=admin_headers)
-    print(f'rv.data: {rv.data}' , file=sys.stderr)
-    assert rv.status_code == 200
+    # delete namespace
+    rv = client.get(f'/apps/{app_namespace}', headers=admin_headers)
+    if rv.status_code == 200:
+        rv = client.delete(f'/apps/{app_namespace}', headers=admin_headers)
+        print(f'rv.data: {rv.data}' , file=sys.stderr)
+        assert rv.status_code == 200
+        result = rv.get_json()
+        assert result != None
+        assert "error"  not in result
 
+    # create namespace (not needed, but increases test coverage)
+    rv = client.put(f'/apps', data = json.dumps({"id":app_namespace}), headers=headers)    
+    print(f'(create namespace) rv.data: {rv.data}' , file=sys.stderr)
+    assert rv.data != ""
+    assert rv.status_code == 200
+    result = rv.get_json()
+    assert result != None
+    assert "error"  not in result
+
+
+    # submit
     rv = client.post('/submit', data = test_app_def, headers=headers)
     assert rv.data != ""
     print(f'rv.data: {rv.data}' , file=sys.stderr)
@@ -247,6 +263,7 @@ def test_app_upload_and_download(client):
     
     
     assert result != None
+    assert "error" not in result
     assert "name" in result
     assert result["name"] ==  test_app_def_obj["name"]
     
@@ -331,7 +348,7 @@ def test_listApps(client):
 
 def test_permissions(client):
     headers = {"Authorization" : "sage token1"}
-
+    headers_testuser2 = {"Authorization" : "sage token10"}
     # create app
     rv = client.post('/submit', data = test_app_def, headers=headers)
     assert rv.data != ""
@@ -421,7 +438,7 @@ def test_permissions(client):
 
     # share with other people
 
-    for user in ['other1', 'other2', 'other3']:
+    for user in ['other1', 'other2', 'other3', 'testuser2']:
         other = {"granteeType": "USER", "grantee":  user , "permission": "READ"}
         rv = client.put(f'/permissions/{app_namespace}/{app_repository}', data=json.dumps(other), headers=headers)
 
@@ -437,7 +454,7 @@ def test_permissions(client):
 
     print(json.dumps(result), file=sys.stderr)
 
-    assert len(result) ==4
+    assert len(result) ==5
 
     # remove all permissions (except owners FULL_CONTROLL)
     rv = client.delete(f'/permissions/{app_namespace}/{app_repository}', data=json.dumps({}), headers=headers)
@@ -446,7 +463,7 @@ def test_permissions(client):
     print(f'Deletion result: {json.dumps(result)}', file=sys.stderr)
     deleted = result.get("deleted", -1)
 
-    assert deleted == 3
+    assert deleted == 4
 
     # check app permissions
     rv = client.get(f'/permissions/{app_namespace}/{app_repository}', headers=headers)
@@ -466,7 +483,42 @@ def test_permissions(client):
 
     error_msg = result.get("error", "")
     assert "Not authorized" in  error_msg
+
+
+    # check namespace permission, give testuser2 WRITE permission for namespace
+
+   
+    acl = {"granteeType": "USER", "grantee":  "testuser2" , "permission": "WRITE"}
+    rv = client.put(f'/permissions/{app_namespace}', data=json.dumps(acl), headers=headers)
+
+    result = rv.get_json()
+
+    added = result.get("added", -1)
+    assert added == 1
+
     
+    # verify testuser2 can see repository inside of namespace
+    rv = client.get(f'/apps/{app_namespace}', headers=headers_testuser2)
+    result = rv.get_json()
+    repositories = result.get("repositories", -1)
+    print(f'result: {json.dumps(result)}', file=sys.stderr)
+    print(f'repositories: {json.dumps(repositories)}', file=sys.stderr)
+    assert len(repositories) == 1
+    assert repositories[0]["name"] == "simple"
+
+    # list all namespaces
+    rv = client.get(f'/apps', headers=headers)
+
+
+    result = rv.get_json()
+    print(f'result: {json.dumps(result)}', file=sys.stderr)
+    
+    
+    assert len(result) == 1
+    assert result[0]["id"] == app_namespace
+    assert result[0]["owner_id"] == "testuser"
+    assert result[0]["type"] == "namespace"
+
 
 def test_namespaces(client):
     headers = {"Authorization" : "sage token1"}
@@ -499,7 +551,7 @@ def test_authz(client):
     sample_request = { 
         "account": "testuser",
         "type": "repository",
-        "name": "sage/simple",
+        "name": f"{app_namespace}/{app_repository}",
         "service": "Docker registry",
         "actions": ["pull"]
     }
