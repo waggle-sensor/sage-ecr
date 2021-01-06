@@ -110,10 +110,8 @@ jenkinsfileTemplate = '''pipeline {
                 dir("$${env.WORKSPACE}/${directory}"){
                     sh "docker version"
                     sh "docker buildx version"
-                    sh "docker buildx build --pull --platform ${platforms} ${build_args_command_line} -t ${namespace}/${name}:${version} ."
-                    sh "docker tag ${namespace}/${name}:${version} ${docker_registry_url}/${namespace}/${name}:${version}"
                     ${docker_login} 
-                    sh "docker push ${docker_registry_url}/${namespace}/${name}:${version}"
+                    sh "docker buildx build --pull --platform ${platforms} ${build_args_command_line} --push -t ${docker_registry_url}/${namespace}/${name}:${version} ."
                 }
                 sleep 10
                 echo 'Building..'
