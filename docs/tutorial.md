@@ -7,14 +7,15 @@ cd sage-ecr
 ./run.sh -d
 ```
 
-## Define ECR_API variable
+## Define ECR_API and SAGE_USER_TOKEN variables
 ```bash
 export ECR_API="localhost:5000"
+export SAGE_USER_TOKEN="token1"
 ```
 
 ## upload "simple plugin"
 ```bash
-curl -X POST ${ECR_API}/submit -H "Authorization: sage token1" --data-binary  @./example_app.yaml
+curl -X POST ${ECR_API}/submit -H "Authorization: sage ${SAGE_USER_TOKEN}" --data-binary  @./example_app.yaml
 
 # Note: repeating this call will re-upload the app, as long as the field "frozen" is false
 
@@ -24,18 +25,18 @@ export APP_ID=<...>
 ```
 ## get app
 ```bash
-curl -X GET  ${ECR_API}/apps/sage/simple/1.0 -H "Authorization: sage token1"
+curl -X GET  ${ECR_API}/apps/sage/simple/1.0 -H "Authorization: sage ${SAGE_USER_TOKEN}"
 ```
 
 
 ## share sage/simple with testuser2
 ```bash
-curl -X PUT  ${ECR_API}/permissions/sage/simple -H "Authorization: sage token1" -d '{"granteeType": "USER", "grantee": "testuser2", "permission":"WRITE"}'
+curl -X PUT  ${ECR_API}/permissions/sage/simple -H "Authorization: sage ${SAGE_USER_TOKEN}" -d '{"granteeType": "USER", "grantee": "testuser2", "permission":"WRITE"}'
 ```
 
 verify (view permissions as testuser):
 ```bash
-curl ${ECR_API}/permissions/sage/simple -H "Authorization: sage token1"
+curl ${ECR_API}/permissions/sage/simple -H "Authorization: sage ${SAGE_USER_TOKEN}"
 ```
 
 verify (view app as testuser2)
@@ -45,36 +46,36 @@ curl ${ECR_API}/apps/sage/simple/1.0 -H "Authorization: sage token10"
 
 ## share namespace sage with testuser2
 ```bash
-curl -X PUT  ${ECR_API}/permissions/sage -H "Authorization: sage token1" -d '{"granteeType": "USER", "grantee": "testuser2", "permission":"WRITE"}'
+curl -X PUT  ${ECR_API}/permissions/sage -H "Authorization: sage ${SAGE_USER_TOKEN}" -d '{"granteeType": "USER", "grantee": "testuser2", "permission":"WRITE"}'
 ```
 
 verify
 ```bash
-curl ${ECR_API}/permissions/sage -H "Authorization: sage token1"
+curl ${ECR_API}/permissions/sage -H "Authorization: sage ${SAGE_USER_TOKEN}"
 ```
 
 ## list all namespaces
 
 ```bash
-curl ${ECR_API}/apps -H "Authorization: sage token1"
+curl ${ECR_API}/apps -H "Authorization: sage ${SAGE_USER_TOKEN}"
 ```
 
 ## list all repositories in a given namespace
 
 ```bash
-curl  ${ECR_API}/apps/sage -H "Authorization: sage token1"
+curl  ${ECR_API}/apps/sage -H "Authorization: sage ${SAGE_USER_TOKEN}"
 ```
 
 
 ## trigger build for specific app
 ```bash
-curl -X POST ${ECR_API}/builds/sage/simple/1.0 -H "Authorization: sage token1"
+curl -X POST ${ECR_API}/builds/sage/simple/1.0 -H "Authorization: sage ${SAGE_USER_TOKEN}"
 ```
 
 ## get build status
 
 ```bash
-curl -X GET ${ECR_API}/builds/sage/simple/1.0 -H "Authorization: sage token1"
+curl -X GET ${ECR_API}/builds/sage/simple/1.0 -H "Authorization: sage ${SAGE_USER_TOKEN}"
 ```
 
 

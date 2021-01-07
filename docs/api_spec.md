@@ -4,7 +4,7 @@ Please define these variables to be able to copy-and-paste the curl examples bel
 
 ```bash
 export ECR_API="localhost:5000"
-export SAGE_TOKEN="token1"
+export SAGE_USER_TOKEN="token1"
 export APP_NAMESPACE="sage"
 export APP_REPOSITORY="simple"
 ```
@@ -12,8 +12,8 @@ export APP_REPOSITORY="simple"
 
 ## POST /submit
 ```bash
-curl -X POST ${ECR_API}/submit -H "Authorization: sage ${SAGE_TOKEN}" --data-binary  @./example_app.yaml 
-curl -X POST ${ECR_API}/submit -H "Authorization: sage ${SAGE_TOKEN}" -d '{...}'
+curl -X POST ${ECR_API}/submit -H "Authorization: sage ${SAGE_USER_TOKEN}" --data-binary  @./example_app.yaml 
+curl -X POST ${ECR_API}/submit -H "Authorization: sage ${SAGE_USER_TOKEN}" -d '{...}'
 ```
 
 Input can be either JSON or YAML format.
@@ -64,7 +64,7 @@ Example repsonse:
 ## GET /apps
 List namespaces:
 ```bash
-curl ${ECR_API}/apps -H "Authorization: sage ${SAGE_TOKEN}"
+curl ${ECR_API}/apps -H "Authorization: sage ${SAGE_USER_TOKEN}"
 ```
 
 Example repsonse:
@@ -81,7 +81,7 @@ Example repsonse:
 ## PUT /apps/
 Create namespace:
 ```bash
-curl ${ECR_API}/apps -d "{\"id\":\"${APP_NAMESPACE}\"}" -H "Authorization: sage ${SAGE_TOKEN}"
+curl ${ECR_API}/apps -d "{\"id\":\"${APP_NAMESPACE}\"}" -H "Authorization: sage ${SAGE_USER_TOKEN}"
 ```
 
 Example repsonse:
@@ -95,7 +95,7 @@ Example repsonse:
 ## GET /apps/{namespace}
 List repositories in namespace:
 ```bash
-curl ${ECR_API}/apps/${APP_NAMESPACE} -H "Authorization: sage ${SAGE_TOKEN}"
+curl ${ECR_API}/apps/${APP_NAMESPACE} -H "Authorization: sage ${SAGE_USER_TOKEN}"
 ```
 
 Example repsonse:
@@ -117,7 +117,7 @@ Example repsonse:
 ## GET /apps/{namespace}/{repository}
 List all versions in repository:
 ```bash
-curl ${ECR_API}/apps/${APP_NAMESPACE}/${APP_REPOSITORY} -H "Authorization: sage ${SAGE_TOKEN}"
+curl ${ECR_API}/apps/${APP_NAMESPACE}/${APP_REPOSITORY} -H "Authorization: sage ${SAGE_USER_TOKEN}"
 ```
 
 Example repsonse:
@@ -135,7 +135,7 @@ Example repsonse:
 ## GET /permissions/{namespace}/{repository}
 Show permissions for repository
 ```bash
-curl ${ECR_API}/permissions/${APP_NAMESPACE}/${APP_REPOSITORY} -H "Authorization: sage ${SAGE_TOKEN}"
+curl ${ECR_API}/permissions/${APP_NAMESPACE}/${APP_REPOSITORY} -H "Authorization: sage ${SAGE_USER_TOKEN}"
 ```
 Example repsonse:
 ```json5
@@ -153,7 +153,7 @@ Example repsonse:
 ## PUT /permissions/{namespace}/{repository}
 Make repository public:
 ```bash
-curl -X PUT ${ECR_API}/permissions/${APP_NAMESPACE}/${APP_REPOSITORY} -H "Authorization: sage ${SAGE_TOKEN}" -d '{"granteeType": "GROUP", "grantee": "AllUsers", "permission": "READ"}'
+curl -X PUT ${ECR_API}/permissions/${APP_NAMESPACE}/${APP_REPOSITORY} -H "Authorization: sage ${SAGE_USER_TOKEN}" -d '{"granteeType": "GROUP", "grantee": "AllUsers", "permission": "READ"}'
 ```
 
 Example repsonse:
@@ -166,7 +166,7 @@ Example repsonse:
 
 Make repository public:
 ```bash
-curl -X PUT ${ECR_API}/permissions/${APP_NAMESPACE}/${APP_REPOSITORY} -H "Authorization: sage ${SAGE_TOKEN}" -d '{"granteeType": "USER", "grantee": "OtherUser", "permission": "READ"}'
+curl -X PUT ${ECR_API}/permissions/${APP_NAMESPACE}/${APP_REPOSITORY} -H "Authorization: sage ${SAGE_USER_TOKEN}" -d '{"granteeType": "USER", "grantee": "OtherUser", "permission": "READ"}'
 ```
 
 Example repsonse:
