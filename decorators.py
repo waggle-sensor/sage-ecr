@@ -93,9 +93,9 @@ def has_resource_permission(permission):
                     
                 raise ErrorResponse(f'Not authorized. (User {requestUser} does not have permission {permission} for {resourceType} {resourceName})', status_code=HTTPStatus.UNAUTHORIZED)
 
-
+            #
             # check repository permission and namespace-inherited permission
-            hasNamespaceAccess = ecr_db.hasPermission("namespace", resourceName, "USER", requestUser , permission)
+            hasNamespaceAccess = ecr_db.hasPermission("namespace", namespace, "USER", requestUser , permission)
 
             if (isAdmin or hasNamespaceAccess or ecr_db.hasPermission(resourceType, resourceName, "USER", requestUser ,permission)):
                 return func(self, namespace, repository, version)

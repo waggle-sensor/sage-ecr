@@ -520,6 +520,27 @@ def test_permissions(client):
     assert result[0]["type"] == "namespace"
 
 
+    # check namespace permission, give testuser2 FULL_CONTROL permission for namespace
+    acl = {"granteeType": "USER", "grantee":  "testuser2" , "permission": "FULL_CONTROL"}
+    rv = client.put(f'/permissions/{app_namespace}', data=json.dumps(acl), headers=headers)
+
+    result = rv.get_json()
+
+    added = result.get("added", -1)
+    assert added == 1
+    
+    assert "error" not in result
+    print(f'result: {json.dumps(result)}', file=sys.stderr)
+
+    # view permissions as testuser2
+    rv = client.get(f'/permissions/{app_namespace}/{app_repository}', headers=headers_testuser2)
+
+    result = rv.get_json()
+    print(f'result: {json.dumps(result)}', file=sys.stderr)
+    assert "error" not in result
+    
+
+
 def test_namespaces(client):
     headers = {"Authorization" : "sage token1"}
 

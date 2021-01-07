@@ -41,6 +41,8 @@ services:
       - sage-ecr-db:/var/lib/mysql
     networks:
       - sage-ecr
+    cap_add:
+      - SYS_NICE  # CAP_SYS_NICE
 
   registry.local:
     restart: always

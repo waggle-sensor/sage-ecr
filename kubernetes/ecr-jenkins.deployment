@@ -28,8 +28,8 @@ spec:
         #    memory: 2Gi
         #    cpu: 2
         volumeMounts:
-        #- mountPath: /var/jenkins_home
-        #  name: ecr-jenkins
+        - mountPath: /var/jenkins_home/
+          name: ecr-jenkins
         #- name: dockerbinary
         #  mountPath: "/usr/local/bin/docker"
         - name: dockersock
@@ -38,6 +38,11 @@ spec:
           name: ecr-jenkins-casc-secret
           readOnly: true
         env:
+          - name: DOCKER_REGISTRY_URL
+            valueFrom:
+                configMapKeyRef:
+                  name: ecr-jenkins-config
+                  key: DOCKER_REGISTRY_URL
           - name: JENKINS_OPTS
             valueFrom:
               configMapKeyRef:
@@ -60,9 +65,9 @@ spec:
             containerPort: 50000
       restartPolicy: Always
       volumes:
-      #- name: ecr-jenkins
-      #  persistentVolumeClaim:
-      #    claimName: ecr-jenkins-pvc
+      - name: ecr-jenkins
+        persistentVolumeClaim:
+          claimName: ecr-jenkins-pvc
       #- name: dockerbinary
       #  hostPath:
       #    path: /services/docker/rootfs/usr/local/bin/docker
