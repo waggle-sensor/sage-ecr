@@ -20,6 +20,8 @@ Add `registry.local` to `/etc/hosts`:
 sudo ./scripts/add_etc_hosts_entry.sh 
 ```
 
+Important: Note that pushing to the insecure registry using `docker buildx build --push` within the Jenkins container currently [does not work](https://github.com/docker/buildx/issues/218). A simple `docker push` does work, but is not used right now as it would not support multi-arch docker images. 
+
 
 The test environment uses docker-compose but has to be invoked by a wrapper script:
 
@@ -60,6 +62,15 @@ for an existing docker-compose enviornment:
 ```bash
 docker exec -ti sage-ecr_sage-ecr_1 /bin/ash -c 'coverage run -m pytest -v --runslow  &&  coverage report -m'
 ```
+
+# Building Multi-Architecture Docker Images With Buildx
+
+The ECR uses buildx to build multi-arch docker images. This requires not only that docker is installed on the host, but also:
+
+- Experimental mode for the docker CLI needs to be turned on (described above)
+- QEMU installed
+- binfmt, e.g. `docker run --privileged --rm tonistiigi/binfmt --install all`
+
 
 
 # debugging MySQL

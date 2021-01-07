@@ -75,9 +75,18 @@ echo "docker buildx inspect sage"
 docker buildx inspect sage
 if [[ ! $? -eq 0 ]] ; then  
   set +e # ignore error
-  set -x
-  /usr/local/bin/docker buildx create --name sage --use --buildkitd-flags '--allow-insecure-entitlement network.host'
-  set +x
+
+  if [ "${DOCKER_REGISTRY_INSECURE}_" == "1_" ] ; then
+    set -x
+    /usr/local/bin/docker buildx create --name sage --use --config /buildx.config
+    set +x
+  else
+    set -x
+    /usr/local/bin/docker buildx create --name sage --use --buildkitd-flags '--allow-insecure-entitlement network.host'
+    set +x
+  fi
+
+  
  
 fi
 

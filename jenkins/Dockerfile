@@ -23,6 +23,7 @@ RUN install-plugins.sh \
 
 
 COPY ./get_docker_binary.sh /
+COPY ./buildx.config /
 
 # Jenkins: Configuration as Code
 #COPY casc_jenkins.yaml /     # this config should better be mounted into container as is contains passwords
