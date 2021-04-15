@@ -6,11 +6,8 @@ resources:
 
   - ecr-api.yaml
 
-  - ecr-jenkins.ingress
-  - ecr-jenkins.config
-  - ecr-jenkins.deployment
-  - ecr-jenkins.service
-  - ecr-jenkins.pvc
+  - ecr-jenkins.yaml
+
 
 
 
