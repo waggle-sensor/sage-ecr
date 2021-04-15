@@ -8,7 +8,7 @@ WARNING: this is currently not working with a local docker registry. It will wor
 The following instructions are targeted at a local test deployment via [minikube](https://kubernetes.io/docs/tasks/tools/install-minikube/). Everything is already pre-configured and should run as is. For a production deployment the configuration should be overwritten with kubernetes kustomize overlays.
 
 
-## Preparation
+## Preparation (Minikube example)
 
 ```bash
 minikube start
@@ -17,16 +17,51 @@ minikube start --insecure-registry "10.0.0.0/24" --insecure-registry "ecr-regist
 
 kubectl config use-context minikube
 
-kubectl create namespace sage
+#kubectl create namespace sage
 
 # permanently save the namespace for all subsequent kubectl commands in that context.
-kubectl config set-context --current --namespace=sage
+#kubectl config set-context --current --namespace=sage
+
+minikube addons enable ingress
+
 ```
 
+## MySQL
+
+Install MySQL, e.g.
+```bash
+helm install mysql --set image.tag=8.0.23-debian-10-r30 --set primary.persistence.size=1Gi bitnami/mysql
+```
+
+load schema
+```bash
+MYSQL_ROOT_PASSWORD=$(kubectl get secret --namespace default mysql -o jsonpath="{.data.mysql-root-password}" | base64 --decode)
+echo "MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}"
+
+kubectl exec -i mysql-0 -- mysql -u root -p${MYSQL_ROOT_PASSWORD} < ../schema.sql
+```
+
+Create MySQL user
+```bash
+
+export MYSQL_PASSWORD=$(kubectl get secret beekeeper-api-secret -o jsonpath="{.data.MYSQL_PASSWORD}" | base64 --decode)
+echo "MYSQL_PASSWORD: ${MYSQL_PASSWORD}"
+
+kubectl exec -ti mysql-0 -- mysql -u root -p${MYSQL_ROOT_PASSWORD}
+```
+
+Inside of MySQL:
+```bash
+CREATE USER 'ecr-user'@'%' identified by '<NEW_USER_PASSWORD>';
+GRANT ALL PRIVILEGES ON Beekeeper.* TO 'ecr-user'@'%';
+#verify:
+SELECT User, Host  FROM mysql.user;
+exit
+```
+Save the `<NEW_USER_PASSWORD>` as an overlay in the ecr-api secret.
 
 ## Deploy
 ```
-minikube addons enable ingress
 
 kubectl create configmap ecr-db-initdb-config -n sage --from-file=../schema.sql
 
@@ -42,7 +77,7 @@ Note that the `sed` may be needed due to a bug where the automatic suffix-hash a
 
 ## Inject token
 
-To let `ecr-api` talk to Jenkins a token is needed. Because Jenkins does not let us inject a token on startup, it is automatically generated when Jenkins starts. After Jenkins has started and generated a token for user `ecrdb`, the token has to be extracted form the Jenkins pod (container) and stored as a secret.
+To let `ecr-api` talk to Jenkins a token is needed. Because Jenkins does not let us inject a token on startup, it is automatically generated when Jenkins starts. After Jenkins has started and generated a token for user `ecrdb`, the token has to be extracted from the Jenkins pod (container) and stored as a secret.
 
 ```bash
 
@@ -51,7 +86,7 @@ export JENKINS_TOKEN=$(kubectl exec -ti $(kubectl get pods -n sage | grep "^ecr-
 echo "JENKINS_TOKEN=${JENKINS_TOKEN}"
 
 
-sed -i -e 's/JENKINS_TOKEN: .*/JENKINS_TOKEN: "'${JENKINS_TOKEN}'"/' overlay/ecr-api.secret.yaml 
+sed -i -e 's/JENKINS_TOKEN: .*/JENKINS_TOKEN: "'${JENKINS_TOKEN}'"/' overlay/ecr-api.secret.yaml
 
 
 kubectl kustomize ./overlay/ | kubectl apply -f -

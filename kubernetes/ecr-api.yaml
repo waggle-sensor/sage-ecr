@@ -1,0 +1,199 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ecr-api-config
+  namespace: sage
+data:
+    DISABLE_AUTH: "1"
+    DOCKER_REGISTRY_URL: "ecr-registry:80"
+    tokenInfoEndpoint: ""
+    tokenInfoUser: ""
+
+    JENKINS_SERVER: "http://ecr-jenkins:8080/jenkins"
+    JENKINS_USER: ecrdb
+
+
+    DOCKER_BUILD_ARGS: ""
+    AUTH_METHOD: "static"
+
+    MYSQL_HOST: "ecr-db"
+    MYSQL_USER: "ecr-user"
+    MYSQL_DATABASE: "SageECR"
+
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ecr-api-secret
+  namespace: sage
+type: Opaque
+stringData:
+
+    tokenInfoPassword: "overwrite using overlay"
+    JENKINS_TOKEN: "overwrite using overlay"
+    MYSQL_PASSWORD: "test"
+
+---
+
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: ecr-api-ingress
+  namespace: sage
+  annotations:
+
+    kubernetes.io/ingress.class: nginx
+    #nginx.ingress.kubernetes.io/proxy-body-size: "0" # required for docker registry
+spec:
+  rules:
+  - host: ecr.localhost
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: ecr-api
+          servicePort: 5000
+
+  #- host: ecr-registry
+  #  http:
+  #    paths:
+  #    - path: /
+  #      backend:
+  #        serviceName: ecr-registry
+  #        servicePort: 5000
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ecr-api
+  namespace: sage
+  labels:
+    app: ecr-api
+spec:
+  selector:
+    k8s-app: ecr-api
+  type: ClusterIP
+  ports:
+  - name: ecr-api
+    port: 5000
+    protocol: TCP
+    targetPort: 5000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ecr-api
+  namespace: sage
+  labels:
+    app: ecr-api
+spec:
+  selector:
+    k8s-app: ecr-api
+  type: ClusterIP
+  ports:
+  - name: ecr-api
+    port: 5000
+    protocol: TCP
+    targetPort: 5000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    k8s-app: ecr-api
+  name: ecr-api
+  namespace: sage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: ecr-api
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        k8s-app: ecr-api
+    spec:
+      containers:
+      - image: sagecontinuum/sage-ecr:latest
+        name: ecr-api
+
+        env:
+        - name: DISABLE_AUTH
+          valueFrom:
+            configMapKeyRef:
+              name:  ecr-api-config
+              key: DISABLE_AUTH
+        - name: DOCKER_REGISTRY_URL
+          valueFrom:
+            configMapKeyRef:
+              name: ecr-api-config
+              key: DOCKER_REGISTRY_URL
+        - name: DOCKER_BUILD_ARGS
+          valueFrom:
+            configMapKeyRef:
+              name: ecr-api-config
+              key: DOCKER_BUILD_ARGS
+        - name: tokenInfoEndpoint
+          valueFrom:
+            configMapKeyRef:
+              name: ecr-api-config
+              key: tokenInfoEndpoint
+        - name: tokenInfoUser
+          valueFrom:
+            configMapKeyRef:
+              name: ecr-api-config
+              key: tokenInfoUser
+        - name: tokenInfoPassword
+          valueFrom:
+            secretKeyRef:
+              name: ecr-api-secret
+              key: tokenInfoPassword
+        - name: JENKINS_SERVER
+          valueFrom:
+            configMapKeyRef:
+              name: ecr-api-config
+              key: JENKINS_SERVER
+        - name: JENKINS_USER
+          valueFrom:
+            configMapKeyRef:
+              name: ecr-api-config
+              key: JENKINS_USER
+        - name: JENKINS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: ecr-api-secret
+              key: JENKINS_TOKEN
+        - name: MYSQL_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: ecr-api-config
+              key: MYSQL_HOST
+        - name: AUTH_METHOD
+          valueFrom:
+            configMapKeyRef:
+              name: ecr-api-config
+              key: AUTH_METHOD
+        - name: MYSQL_USER
+          valueFrom:
+            configMapKeyRef:
+              name: ecr-api-config
+              key: MYSQL_USER
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ecr-api-secret
+              key: MYSQL_PASSWORD
+        - name: MYSQL_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              name: ecr-api-config
+              key: MYSQL_DATABASE
+        ports:
+          - name: api
+            containerPort: 5000
+
+      restartPolicy: Always

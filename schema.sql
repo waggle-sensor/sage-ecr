@@ -1,5 +1,6 @@
 
 
+CREATE DATABASE IF NOT EXISTS SageECR;
 
 /* App Specification */
 /* TODO: save commit hash to prevent changes */
@@ -59,7 +60,7 @@ CREATE TABLE IF NOT EXISTS SageECR.Permissions ( # /* formerly SageECR.AppPermis
     resourceType        VARCHAR(64),  /* namespace or repository */
     resourceName        VARCHAR(64),  /* e.g. "username" in case of namespace, or "simple-plugin" in case of repository  */
     granteeType         ENUM('USER', 'GROUP'),
-    grantee             VARCHAR(64), 
+    grantee             VARCHAR(64),
     permission          ENUM('READ', 'WRITE', 'READ_ACP', 'WRITE_ACP', 'FULL_CONTROL'),
     PRIMARY KEY (resourceType, resourceName, granteeType, grantee, permission)
 );
