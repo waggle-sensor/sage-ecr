@@ -4,7 +4,6 @@ metadata:
   labels:
     k8s-app: ecr-docker-auth
   name: ecr-docker-auth
-  namespace: sage
 spec:
   replicas: 1
   selector:
@@ -54,5 +53,5 @@ spec:
         ports:
           - name: api
             containerPort: 5001
-          
+
       restartPolicy: Always

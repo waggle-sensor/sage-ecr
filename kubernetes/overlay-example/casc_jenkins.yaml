@@ -1,0 +1,26 @@
+jenkins:
+  systemMessage: "Jenkins configured automatically by Jenkins Configuration as Code plugin\n\n"
+
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "ecrdb"
+          password: "test"
+        - id: "admin"
+          password: "testtest"
+  authorizationStrategy: 
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: true
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+        - usernamePassword:
+              scope: GLOBAL
+              id: registry-user
+              username: sage-ecr
+              password: 123
+
+  

@@ -1,16 +1,17 @@
-apiVersion: extensions/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: ecr-docker-auth
-  namespace: sage
   #annotations:
   #  traefik.ingress.kubernetes.io/router.tls: ""
 spec:
   rules:
-  #- host: 
+  #- host:
   #  http:
   #    paths:
   #    - path: /
   #      backend:
-  #        serviceName: ecr-docker-auth
-  #        servicePort: 5001
+  #        service:
+  #          name: ecr-docker-auth
+  #         port:
+  #           number: 5001

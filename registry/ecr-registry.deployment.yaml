@@ -4,7 +4,6 @@ metadata:
   labels:
     k8s-app: ecr-registry
   name: ecr-registry
-  namespace: sage
 spec:
   replicas: 1
   selector:
@@ -29,10 +28,10 @@ spec:
             subPath: registry.conf
           - mountPath: /ssl/server.crt
             name: cfgmap
-            subPath: server.crt 
+            subPath: server.crt
           - mountPath: /var/lib/registry
             name: ecr-registry
-            
+
       restartPolicy: Always
       volumes:
       - name: ecr-registry
