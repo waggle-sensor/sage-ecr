@@ -13,11 +13,11 @@ export ECR_API="localhost:5000"
 export SAGE_USER_TOKEN="token1"
 ```
 
-Optional: Use `jq` for pretty formatting of json output. [installation instructions](https://stedolan.github.io/jq/download/)
+Optional: Use `jq` for pretty formatting of json output. [jq installation instructions](https://stedolan.github.io/jq/download/)
 
 ## upload "simple plugin"
 ```bash
-curl -X POST ${ECR_API}/submit -H "Authorization: sage ${SAGE_USER_TOKEN}" --data-binary  @./example_app.yaml
+curl -X POST ${ECR_API}/submit -H "Authorization: sage ${SAGE_USER_TOKEN}" --data-binary  @./example_app.yaml | jq .
 
 # Note: repeating this call will re-upload the app, as long as the field "frozen" is false
 
@@ -31,53 +31,53 @@ curl -X GET  ${ECR_API}/apps/sage/simple/1.0 -H "Authorization: sage ${SAGE_USER
 ```
 
 
-## share sage/simple with testuser2
+## share repository sage/simple with testuser2
 ```bash
-curl -X PUT  ${ECR_API}/permissions/sage/simple -H "Authorization: sage ${SAGE_USER_TOKEN}" -d '{"granteeType": "USER", "grantee": "testuser2", "permission":"WRITE"}'
+curl -X PUT  ${ECR_API}/permissions/sage/simple -H "Authorization: sage ${SAGE_USER_TOKEN}" -d '{"granteeType": "USER", "grantee": "testuser2", "permission":"WRITE"}' | jq .
 ```
 
 verify (view permissions as testuser):
 ```bash
-curl ${ECR_API}/permissions/sage/simple -H "Authorization: sage ${SAGE_USER_TOKEN}"
+curl ${ECR_API}/permissions/sage/simple -H "Authorization: sage ${SAGE_USER_TOKEN}"  | jq .
 ```
 
 verify (view app as testuser2)
 ```bash
-curl ${ECR_API}/apps/sage/simple/1.0 -H "Authorization: sage token10"
+curl ${ECR_API}/apps/sage/simple/1.0 -H "Authorization: sage token10"  | jq .
 ```
 
 ## share namespace sage with testuser2
 ```bash
-curl -X PUT  ${ECR_API}/permissions/sage -H "Authorization: sage ${SAGE_USER_TOKEN}" -d '{"granteeType": "USER", "grantee": "testuser2", "permission":"WRITE"}'
+curl -X PUT  ${ECR_API}/permissions/sage -H "Authorization: sage ${SAGE_USER_TOKEN}" -d '{"granteeType": "USER", "grantee": "testuser2", "permission":"WRITE"}' | jq .
 ```
 
 verify
 ```bash
-curl ${ECR_API}/permissions/sage -H "Authorization: sage ${SAGE_USER_TOKEN}"
+curl ${ECR_API}/permissions/sage -H "Authorization: sage ${SAGE_USER_TOKEN}" | jq .
 ```
 
 ## list all namespaces
 
 ```bash
-curl ${ECR_API}/apps -H "Authorization: sage ${SAGE_USER_TOKEN}"
+curl ${ECR_API}/namespaces -H "Authorization: sage ${SAGE_USER_TOKEN}" | jq .
 ```
 
 ## list all repositories in a given namespace
 
 ```bash
-curl  ${ECR_API}/apps/sage -H "Authorization: sage ${SAGE_USER_TOKEN}"
+curl  ${ECR_API}/repositories/sage -H "Authorization: sage ${SAGE_USER_TOKEN}" | jq .
 ```
 
 
 ## trigger build for specific app
 ```bash
-curl -X POST ${ECR_API}/builds/sage/simple/1.0 -H "Authorization: sage ${SAGE_USER_TOKEN}"
+curl -X POST ${ECR_API}/builds/sage/simple/1.0 -H "Authorization: sage ${SAGE_USER_TOKEN}" | jq .
 ```
 
 ## get build status
 
 ```bash
-curl -X GET ${ECR_API}/builds/sage/simple/1.0 -H "Authorization: sage ${SAGE_USER_TOKEN}"
+curl -X GET ${ECR_API}/builds/sage/simple/1.0 -H "Authorization: sage ${SAGE_USER_TOKEN}" | jq .
 ```
 
 
