@@ -17,7 +17,7 @@ class JenkinsServer():
     def __init__ ( self , host, username, password, retries=5) :
 
 
-        if not host: 
+        if not host:
             raise Exception("Jenkins host not defined")
 
         #self.host = host
@@ -40,11 +40,11 @@ class JenkinsServer():
                 continue
             break
 
-        
+
         return
-    
+
     def hasJenkinsJob(self, id):
-        
+
 
         try:
             job_exists = self.server.job_exists(id)
@@ -52,20 +52,20 @@ class JenkinsServer():
             raise
             #raise ErrorResponse(f'(server.get_job_config) got exception: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
-        return job_exists  
+        return job_exists
 
 
     def build_job(self, job_id):
-        
+
 
         # https://python-jenkins.readthedocs.io/en/latest/api.html#jenkins.Jenkins.build_job
         queue_item_number = self.server.build_job(job_id)
         return queue_item_number
 
-    
+
     def get_job_info(self, job_id):
-        
-    
+
+
         return self.server.get_job_info(job_id, depth=0, fetch_all_builds=False)
 
 
@@ -74,11 +74,11 @@ class JenkinsServer():
 
     def createJob(self, id, app_spec, overwrite=False):
 
-       
+
 
         # format https://github.com/user/repo.git#v1.0
 
-        
+
         version = app_spec["version"]
 
         source=app_spec.get("source", None)
@@ -115,25 +115,25 @@ class JenkinsServer():
             actual_namespace = namespace
         else:
             actual_namespace = app_spec.get("owner", "")
-        
 
-        
-      
-            
+
+
+
+        # The registry user credentials are defined in the casc_jenkins.yaml file.
         docker_login='''withCredentials([usernamePassword(credentialsId: 'registry-user', passwordVariable: 'REGISTRY_USER_PWD', usernameVariable: 'REGISTRY_USERNAME')]) {
-                sh "echo $REGISTRY_USER_PWD | docker login -u $REGISTRY_USERNAME --password-stdin ''' +docker_registry_url +'''"
+                sh 'echo $REGISTRY_USER_PWD | docker login -u $REGISTRY_USERNAME --password-stdin ''' +docker_registry_url +''''
             }
         '''
-        
-        
+
+
 
         name = app_spec["name"]
         template = Template(jenkinsfileTemplate)
         try:
-            jenkinsfile = template.substitute(  url=git_url, 
+            jenkinsfile = template.substitute(  url=git_url,
                                                 branch=git_branch,
                                                 directory=git_directory,
-                                                namespace=actual_namespace, 
+                                                namespace=actual_namespace,
                                                 name=name,
                                                 version=version,
                                                 platforms=platforms_str,
@@ -148,20 +148,20 @@ class JenkinsServer():
         #print(newJob)
 
 
-    
 
-        newJob_xml = xmltodict.unparse(newJob) #.decode("utf-8") 
+
+        newJob_xml = xmltodict.unparse(newJob) #.decode("utf-8")
         #print("------")
         #print(newJob_xml)
         #print("------")
         #print(jenkins.EMPTY_CONFIG_XML)
         #print("------")
-        
+
         if overwrite:
-            self.server.reconfig_job(id , newJob_xml) 
+            self.server.reconfig_job(id , newJob_xml)
         else:
             self.server.create_job(id, newJob_xml)
-        
+
 
         timeout = 10
 
@@ -174,7 +174,7 @@ class JenkinsServer():
                 pass
             except Exception as e: # pragma: no cover
                 raise
-           
+
             if True: # pragma: no cover
                 time.sleep(2)
                 timeout -= 2
@@ -187,7 +187,7 @@ class JenkinsServer():
         return 1
         #print("jobs: "+server.jobs_count())
 
-    
+
 def createPipelineJobConfig(jenkinsfile, displayName):
     jenkins_job_example_xml = '''<?xml version='1.1' encoding='UTF-8'?>
     <flow-definition plugin="workflow-job@2.39">

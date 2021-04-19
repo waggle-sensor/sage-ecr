@@ -56,7 +56,7 @@ kubectl exec -ti mysql-0 -- mysql -u root -p${MYSQL_ROOT_PASSWORD}
 Inside of MySQL create user with password: (In test environment use "test" as password)
 ```bash
 CREATE USER 'ecr-user'@'%' identified by '<NEW_USER_PASSWORD>';
-GRANT ALL PRIVILEGES ON Beekeeper.* TO 'ecr-user'@'%';
+GRANT ALL PRIVILEGES ON SageECR.* TO 'ecr-user'@'%';
 #verify:
 SELECT User, Host  FROM mysql.user;
 exit
