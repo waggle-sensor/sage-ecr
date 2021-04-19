@@ -13,6 +13,8 @@ export ECR_API="localhost:5000"
 export SAGE_USER_TOKEN="token1"
 ```
 
+Optional: Use `jq` for pretty formatting of json output. [installation instructions](https://stedolan.github.io/jq/download/)
+
 ## upload "simple plugin"
 ```bash
 curl -X POST ${ECR_API}/submit -H "Authorization: sage ${SAGE_USER_TOKEN}" --data-binary  @./example_app.yaml
@@ -25,7 +27,7 @@ export APP_ID=<...>
 ```
 ## get app
 ```bash
-curl -X GET  ${ECR_API}/apps/sage/simple/1.0 -H "Authorization: sage ${SAGE_USER_TOKEN}"
+curl -X GET  ${ECR_API}/apps/sage/simple/1.0 -H "Authorization: sage ${SAGE_USER_TOKEN}" | jq .
 ```
 
 

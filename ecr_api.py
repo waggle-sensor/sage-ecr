@@ -8,19 +8,19 @@
 
 import os
 import sys
-
+import logging
 
 from flask import Flask
 from flask_cors import CORS
 from flask.views import MethodView
-from flask import jsonify
+
 
 import MySQLdb
 from flask import request
 from flask import abort, jsonify
 
 import re
-import uuid
+#import uuid
 import json
 import time
 
@@ -35,10 +35,11 @@ import jenkins_server
 
 import xmltodict
 import sys
-from decorators import * 
+from decorators import *
 
 import config
 import yaml
+import base64
 
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from werkzeug.exceptions import HTTPException
@@ -104,8 +105,8 @@ class ecr_middleware():
         # example: curl -X POST -H 'Accept: application/json; indent=4' -H "Authorization: Basic c2FnZS1hcGktc2VydmVyOnRlc3Q=" -d 'token=<SAGE-USER-TOKEN>'  <sage-ui-hostname>:80/token_info/
         # https://github.com/sagecontinuum/sage-ui/#token-introspection-api
 
-        
-        
+
+
         USE_TOKEN_CACHE=False
         ecr_db = None
         user_id = ""
@@ -123,7 +124,7 @@ class ecr_middleware():
                 return self.app(environ, start_response)
 
             print(f'did not find cached token...', file=sys.stderr)
-        
+
 
         if config.auth_method == "static":
             # "user:"
@@ -140,8 +141,8 @@ class ecr_middleware():
                 res = Response(f'Token not found', mimetype= 'text/plain', status=401)
                 return res(environ, start_response)
 
-            
-           
+
+
 
 
            # self.authenticated
@@ -154,7 +155,7 @@ class ecr_middleware():
 
             is_admin = userObj.get("is_admin", False)
             scopes = userObj.get("scopes", "")
-            
+
 
         if config.auth_method == "sage":
 
@@ -163,7 +164,7 @@ class ecr_middleware():
             data=f"token={token}"
             r = requests.post(config.tokenInfoEndpoint, data = data, headers=headers, timeout=5)
 
-            
+
 
             result_obj = r.json()
             if not "active" in result_obj:
@@ -174,12 +175,12 @@ class ecr_middleware():
             if not is_active:
                 res = Response(f'Authorization failed (token not active)', mimetype= 'text/plain', status=401)
                 return res(environ, start_response)
-            
-            
-            
+
+
+
             user_id = result_obj.get("username")
-        
-        
+
+
         if USE_TOKEN_CACHE:
             ecr_db.setTokenInfo(token, user_id, scopes, is_admin)
 
@@ -189,13 +190,13 @@ class ecr_middleware():
 
         environ['authenticated'] = True
         environ['user'] = user_id
-        environ['scopes'] = scopes 
+        environ['scopes'] = scopes
         environ['admin'] = is_admin
         print(f'environ:{environ}', file=sys.stderr)
         return self.app(environ, start_response)
 
-            
-        
+
+
 
 
 
@@ -204,22 +205,22 @@ class ecr_middleware():
 
 # /apps
 class Submit(MethodView):
-    
+
     @login_required
     def post(self):
-        
-                
+
+
         requestUser = request.environ.get('user', "")
         isAdmin = request.environ.get('admin', False)
-        
-        
+
+
         postData = request.get_json(force=True, silent=True)
         if not postData:
             # try yaml
-            yaml_str = request.get_data().decode("utf-8") 
+            yaml_str = request.get_data().decode("utf-8")
             print(f"yaml_str: {yaml_str} ", file=sys.stderr)
             postData = yaml.load(yaml_str , Loader=yaml.FullLoader)
-        
+
         if not postData:
             raise ErrorResponse(f'Could not parse app spec', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
@@ -230,7 +231,7 @@ class Submit(MethodView):
         userHasNamespaceWritePermission = False
         namespace = postData.get("namespace", "")
         _, ok = ecr_db.getNamespace(namespace)
-        if not ok: 
+        if not ok:
             # namespace does not exist. Unless sage assigns usernames, any available namespace can be used
             try:
                 ecr_db.addNamespace(namespace, requestUser, public=True)
@@ -238,19 +239,19 @@ class Submit(MethodView):
                 raise ErrorResponse(f'Could not create namespace {namespace}: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
             userHasNamespaceWritePermission = True
 
-        else: 
+        else:
             # Namespace exists. Check if User has permission to write.
             # If not, user may still have permission to write to existing Repo.
 
             userHasNamespaceWritePermission = ecr_db.hasPermission("namespace", namespace, "USER", requestUser, "WRITE")
-            
+
 
         ### repository (app name, without version)
         repo_name = postData.get("name", "")
 
         # check if exists, create if needed
         _, ok = ecr_db.getRepository(namespace, repo_name)
-        if not ok: 
+        if not ok:
             # namespace does not exist. Unless sage assigns usernames, any available namespace can be used
             if userHasNamespaceWritePermission:
                 try:
@@ -258,21 +259,21 @@ class Submit(MethodView):
                 except Exception as e:
                     raise ErrorResponse(f'Could not create repository {namespace}/{repo_name}: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
             else:
-               raise ErrorResponse(f'Not authorized to access namespace {namespace}', status_code=HTTPStatus.UNAUTHORIZED) 
+               raise ErrorResponse(f'Not authorized to access namespace {namespace}', status_code=HTTPStatus.UNAUTHORIZED)
 
 
-        else: 
+        else:
             # repo exists, check if user has namespace or repo permission
             userHasRepoWritePermission = ecr_db.hasPermission("repository", f'{namespace}/{repo_name}', "USER", requestUser, "WRITE")
             if (not userHasNamespaceWritePermission ) and (not userHasRepoWritePermission):
                 raise ErrorResponse(f'Not authorized to access repository {namespace}/{repo_name}', status_code=HTTPStatus.UNAUTHORIZED)
-        
+
         ### check if versioned app already exists and if it can be overwritten
 
         version = postData.get("version", "")
-        
+
         existing_app, ok = ecr_db.getApp(namespace=namespace, name=repo_name, version=version)
-        
+
 
         existing_app_id = None
         if ok:
@@ -291,17 +292,22 @@ class Submit(MethodView):
             if not key in postData:
                 #return  {"error": f'Required field {key} is missing'}
                 raise ErrorResponse(f'Required field {key} is missing', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+            expected_type = config.required_fields[key]
+
             value  = postData[key]
+            if type(value).__name__ != expected_type :
+                raise ErrorResponse(f'Field {key} has to be of type {expected_type}, got {type(value).__name__}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
             if len(value) == 0:
                 #return  {"error": f'Required field {key} is missing'}
                 raise ErrorResponse(f'Required field {key} is missing', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
-        
-
-        
 
 
-    
+
+
+
+
 
         ##### source
         # source
@@ -309,7 +315,7 @@ class Submit(MethodView):
         # https://github.com/<user>/<repo>.git#<tag>
         # http://sagecontinuum.org/bucket/<bucket_id>
 
-        
+
         build_source = postData.get("source",None)
         #sourcesArray = postData.get("source",[])
         #if len(sourcesArray) == 0:
@@ -319,35 +325,35 @@ class Submit(MethodView):
 
 
         #source_public_git_pattern = re.compile(f'https://github.com/{vc}+/{vc}+.git#{vc}+')
-        #source_private_git_pattern = re.compile(f'git@github.com/{vc}+/{vc}+.git#{vc}+') 
-        #source_sage_store_pattern = re.compile(f'http://sagecontinuum.org/bucket/[0-9a-z.]+') 
+        #source_private_git_pattern = re.compile(f'git@github.com/{vc}+/{vc}+.git#{vc}+')
+        #source_sage_store_pattern = re.compile(f'http://sagecontinuum.org/bucket/[0-9a-z.]+')
         #source_matched = False
         #for p in [source_public_git_pattern, source_private_git_pattern , source_sage_store_pattern]:
         #    if p.match(appSource):
         #        source_matched = True
         #        break
-        
+
         #if not source_matched:
-        #    raise ErrorResponse('Could not parse source field', status_code=HTTPStatus.INTERNAL_SERVER_ERROR) 
+        #    raise ErrorResponse('Could not parse source field', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
         ##### inputs
-        
+
         # inputs validation
         appInputs = postData.get("inputs", [])
         if len(appInputs) > 0:
             for app_input in appInputs:
                 for field in app_input:
                     if not  field in  config.input_fields_valid:
-                        raise ErrorResponse(f'Input field {field} not supported', status_code=HTTPStatus.INTERNAL_SERVER_ERROR) 
+                        raise ErrorResponse(f'Input field {field} not supported', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
                 for expected in config.input_fields_valid:
                     if not  expected in  app_input:
-                        raise ErrorResponse(f'Expected field {expected} missing', status_code=HTTPStatus.INTERNAL_SERVER_ERROR) 
+                        raise ErrorResponse(f'Expected field {expected} missing', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
                     input_type = app_input["type"]
                     if not input_type in config.input_valid_types:
-                        raise ErrorResponse(f'Input type {input_type} not supported', status_code=HTTPStatus.INTERNAL_SERVER_ERROR) 
+                        raise ErrorResponse(f'Input type {input_type} not supported', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
-            appInputs_str = json.dumps(appInputs) 
+            appInputs_str = json.dumps(appInputs)
 
         ##### resources
 
@@ -360,35 +366,35 @@ class Submit(MethodView):
 
         ##### metadata
         appMetadata = postData.get("metadata", None)
-        
 
-        
+
+
 
         ##### create dbObject
         dbObject = {}
-        
+
         for key in config.valid_fields_set:
             dbObject[key] = ""
-        
+
         if appMetadata:
             #raise ErrorResponse(f'metadata is missing', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
             if not isinstance(appMetadata, dict):
                 raise ErrorResponse(f'Field metadata has to be an object, got {str(appMetadata)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-            dbObject["metadata"] = json.dumps(appMetadata) 
-            
- 
+            dbObject["metadata"] = json.dumps(appMetadata)
+
+
 
         dbObject["name"] = repo_name
-        
+
         dbObject["inputs"] = appInputs_str
-        
+
         #copy fields
         for key in ["description", "version", "namespace"]:
             dbObject[key] = postData.get(key, "")
 
         dbObject["frozen"] = postData.get("frozen", False)
         dbObject["owner"] = requestUser
-        
+
         # create INSERT statment dynamically
         values =[]
         variables = []
@@ -402,35 +408,35 @@ class Submit(MethodView):
         if existing_app_id:
             id_str = existing_app_id
         else:
-            newID = uuid.uuid4()
-            id_str = str(newID)
-        
-        
+            #newID = uuid.uuid4()
+            #id_str = str(newID)
+            id_str = f'{namespace}/{repo_name}:{version}'
+
         ecr_db = ecrdb.EcrDB()
-        
+
 
         #for build_source in sourcesArray:
 
 
         #source_name = build_source.get("name", "default")
-        
-        
+
+
         architectures_array = build_source.get("architectures", [])
 
         if len(architectures_array) == 0:
             raise ErrorResponse("architectures missing in source")
 
         ##### architecture
-    
-    
+
+
         for arch in architectures_array:
             if not arch in config.architecture_valid:
                 valid_arch_str = ",".join(config.architecture_valid)
                 raise ErrorResponse(f'Architecture {arch} not supported, valid values: {valid_arch_str}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-            
-        
 
-        architectures = json.dumps(architectures_array)    
+
+
+        architectures = json.dumps(architectures_array)
 
         url = build_source.get("url", "")
         if url == "":
@@ -450,50 +456,50 @@ class Submit(MethodView):
         if dockerfile == "":
             dockerfile = "Dockerfile"
 
-        
+
         build_args_dict = build_source.get("build_args", {})
         if not isinstance(build_args_dict, dict):
             raise ErrorResponse(f'build_args needs to be a dictonary', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-        
+
         for key in build_args_dict:
             value = build_args_dict[key]
             if not isinstance(value, str):
                 raise ErrorResponse(f'build_args values have to be strings', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
-        build_args_str = json.dumps(build_args_dict) 
-        
-        
-        stmt = f'REPLACE INTO Sources ( id, architectures , url, branch, directory, dockerfile, build_args ) VALUES (UUID_TO_BIN(%s) , %s, %s, %s, %s, %s, %s)'
+        build_args_str = json.dumps(build_args_dict)
+
+
+        stmt = f'REPLACE INTO Sources ( id, architectures , url, branch, directory, dockerfile, build_args ) VALUES (%s , %s, %s, %s, %s, %s, %s)'
         print(f"replace statement: {stmt}", file=sys.stderr)
         print(f"build_args_str: {build_args_str}", file=sys.stderr)
         ecr_db.cur.execute(stmt, (id_str, architectures , url, branch, directory, dockerfile, build_args_str))
 
-       
+
         for res in resourcesArray:
             res_str = json.dumps(res)
-            stmt = f'REPLACE INTO Resources ( id, resource) VALUES (UUID_TO_BIN(%s) , %s)'
+            stmt = f'REPLACE INTO Resources ( id, resource) VALUES (%s , %s)'
             ecr_db.cur.execute(stmt, (id_str, res_str,))
-        
+
 
         print(f'values: {values}', file=sys.stderr)
 
-        
-        stmt = f'REPLACE INTO Apps ( id, {config.dbFields_str}) VALUES (UUID_TO_BIN(%s) ,{variables_str})'
+
+        stmt = f'REPLACE INTO Apps ( id, {config.dbFields_str}) VALUES (%s ,{variables_str})'
         print(f'stmt: {stmt}', file=sys.stderr)
         ecr_db.cur.execute(stmt, (id_str, *values))
 
 
-        
+
 
         ecr_db.db.commit()
         #print(f'row: {row}', file=sys.stderr)
 
         #dbObject["id"] = newID
 
-        #content = {} 
+        #content = {}
         #content["data"] = dbObject
-        
+
         returnObj, ok=ecr_db.getApp(id_str)
         if not ok:
             raise ErrorResponse(f'app not found', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
@@ -502,14 +508,14 @@ class Submit(MethodView):
 
         #args = parser.parse_args()
         return returnObj
-    
+
 
 # /apps/<string:namespace>/<string:repository>/<string:version>
 class Apps(MethodView):
     @login_required
     @has_resource_permission( "FULL_CONTROL" )
     def delete(self, namespace, repository, version):
-        
+
         isAdmin = request.environ.get('admin', False)
         ecr_db = ecrdb.EcrDB()
 
@@ -522,7 +528,7 @@ class Apps(MethodView):
         return {"deleted": 1}
 
     @has_resource_permission( "READ")
-    def get(self, namespace, repository, version):
+    def get(self, namespace=None, repository=None, version=None):
 
 
         ecr_db = ecrdb.EcrDB()
@@ -532,8 +538,51 @@ class Apps(MethodView):
         if not ok:
             raise ErrorResponse(f'App not found', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
-        return returnObj
 
+        return jsonify(returnObj)
+
+
+# Lists all apps, the user has permission to see
+# /apps
+class AppsGlobal(MethodView):
+    # simulate many submissions
+    # for i in {1..10} ; do cat ./example_app.yaml | sed -e "s/version :.*/version: \"${i}.0\"/" | curl -X POST ${ECR_API}/submit -H "Authorization: sage ${SAGE_USER_TOKEN}" --data-binary  @- ; done
+
+    def get(self, namespace=None, repository=None, version=None):
+
+        requestUser = request.environ.get('user', "")
+        isAdmin = request.environ.get('admin', False)
+
+
+        limit = request.args.get('limit', 1000)
+        if limit:
+            limit = int(limit)
+            if limit > 1000:
+                limit = 1000
+
+        continueT = request.args.get('continue', None)
+
+        ecr_db = ecrdb.EcrDB()
+
+        try:
+            returnList=ecr_db.listApps(user=requestUser, namespace=namespace, repository=repository, isAdmin=isAdmin, limit=limit, continuationToken=continueT)
+        except Exception as e:
+            raise ErrorResponse(f'listApps returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        return_obj = {
+                'pagination': {},
+                'data': returnList
+                }
+
+
+        if len(returnList) == limit:
+            last = returnList[-1]
+            last_id = last["id"]
+
+            return_obj['pagination']['continuationToken'] = base64.b64encode(str.encode(last_id)).decode() # b64 is just to make it look cooler
+        else:
+            return_obj['pagination']['continuationToken'] = "N/A"
+        return jsonify(return_obj)
 
 
 def get_build(namespace, repository, version):
@@ -550,7 +599,7 @@ def get_build(namespace, repository, version):
     # 2. use global queue id to map to app-specific build number
     # 3. take whatever is reported as last build (IS MISLEADING, returns previous build)
 
-    
+
 
     ecr_db = ecrdb.EcrDB()
     app_spec, ok = ecr_db.getApp(namespace=namespace, name=repository, version=version)
@@ -561,7 +610,7 @@ def get_build(namespace, repository, version):
     if not app_id:
         return {"error":"app not found"}
 
-    
+
 
     app_human_id = createJenkinsName(app_spec)
 
@@ -582,7 +631,7 @@ def get_build(namespace, repository, version):
         except Exception as e:
             raise Exception(f'js.server.get_build_info returned: {str(e)}')
         return buildInfo
-            
+
 
     #return {"error": f"number is negative"}
 
@@ -595,7 +644,7 @@ def build_app(namespace, repository, version):
     password = config.jenkins_token
 
     try:
-        
+
         js = jenkins_server.JenkinsServer(host, username, password)
     except Exception as e:
         raise ErrorResponse(f'JenkinsServer({host}, {username}) returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
@@ -612,24 +661,24 @@ def build_app(namespace, repository, version):
     source = app_spec.get("source", None)
     if not source:
         return {"error":"source  not found"}
-    
 
-    
+
+
     app_human_id = createJenkinsName(app_spec)
-    
+
 
 
     overwrite=False
     if js.hasJenkinsJob(app_human_id):
         overwrite =  True
-    
-    
-    
-    
+
+
+
+
     try:
         js.createJob(app_human_id, app_spec, overwrite=overwrite)
     except Exception as e:
-        raise ErrorResponse(f'createJob() returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR) 
+        raise ErrorResponse(f'createJob() returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
 
@@ -645,15 +694,15 @@ def build_app(namespace, repository, version):
         time.sleep(2)
 
         try:
-            queue_item = js.server.get_queue_item(queue_item_number)   
+            queue_item = js.server.get_queue_item(queue_item_number)
         except Exception as e: # pragma: no cover
 
             if not "does not exist" in str(e):
                 raise ErrorResponse(f'get_queue_item() returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-        
+
         if not queue_item:
             continue
-        
+
         executable=queue_item.get("executable", None)
         if not executable:
             continue
@@ -664,7 +713,7 @@ def build_app(namespace, repository, version):
 
         break
 
-        
+
     build_name = "some name"
     architectures = source.get("architectures", None)
     if not architectures:
@@ -672,10 +721,10 @@ def build_app(namespace, repository, version):
 
     try:
         ecr_db.SaveBuildInfo(app_id, build_name, number, architectures)
-    
+
     except Exception as e:
         raise ErrorResponse(f'error inserting build info for {app_id}, {build_name}, {number} , SaveBuildInfo: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-    
+
     #time.sleep(6)
 
     #queued_item = js.server.get_queue_item(queue_item_number)
@@ -691,7 +740,7 @@ def build_app(namespace, repository, version):
 # /builds/<string:namespace>/<string:repository>/<version>
 class Builds(MethodView):
     @login_required
-    @has_resource_permission( "READ" )  
+    @has_resource_permission( "READ" )
     #def get(self, app_id):
     def get(self, namespace, repository, version):
 
@@ -703,8 +752,8 @@ class Builds(MethodView):
         return result
 
 
-        
-    
+
+
     @login_required
     @has_resource_permission( "FULL_CONTROL" )
     def post(self, namespace, repository, version):
@@ -712,7 +761,8 @@ class Builds(MethodView):
        result = build_app(namespace, repository, version)
        return result
 
-# /apps
+
+# /namespaces
 class NamespacesList(MethodView):
 
     def get(self):
@@ -724,7 +774,8 @@ class NamespacesList(MethodView):
         ecr_db = ecrdb.EcrDB()
         namespaces = ecr_db.listNamespaces(user=requestUser)
 
-        return jsonify(namespaces) 
+        returnObj = {"data":namespaces}
+        return jsonify(returnObj)
 
     @login_required
     def put(self):
@@ -739,13 +790,13 @@ class NamespacesList(MethodView):
 
         requestNamespace = postData["id"]
 
-        
+
 
         if not requestNamespace:
             raise ErrorResponse(f'Field \"namespace\" missing in request', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
         ecr_db = ecrdb.EcrDB()
-        
+
         _, ok = ecr_db.getNamespace(requestNamespace)
 
         if ok:
@@ -757,7 +808,7 @@ class NamespacesList(MethodView):
         except Exception as e:
             raise ErrorResponse(f'Could not create namespace {requestNamespace}: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
-        return jsonify(result) 
+        return jsonify(result)
 
 
 
@@ -770,6 +821,8 @@ class Namespace(MethodView):
 
         requestUser = request.environ.get('user', "")
 
+        if not namespace:
+            raise ErrorResponse(f'Namespace not found', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
         ecr_db = ecrdb.EcrDB()
 
@@ -786,7 +839,7 @@ class Namespace(MethodView):
         nameObj["type"] = "namespace"
         nameObj["repositories"] = repList
         #app_list = ecr_db.listApps(user=requestUser)
-        return jsonify(nameObj) 
+        return jsonify(nameObj)
 
     @has_resource_permission( "WRITE" )
     def delete(self, namespace, repository = None):
@@ -807,14 +860,29 @@ class Namespace(MethodView):
         # delete namespace
         ecr_db.deleteNamespace(namespace)
 
-        return jsonify({"deleted": 1}) 
+        return jsonify({"deleted": 1})
+
+class RepositoriesList(MethodView):
+
+    def get(self, namespace=None):
+
+        requestUser = request.environ.get('user', "")
+
+        if not namespace:
+            namespace = request.args.get('namespace', None)
+
+        ecr_db = ecrdb.EcrDB()
+        repList = ecr_db.listRepositories(user=requestUser, namespace=namespace)
+        obj = {"data":repList}
+        return jsonify(obj)
+
 
 
 
 class Repository(MethodView):
     def get(self, namespace, repository):
 
-       
+
         requestUser = request.environ.get('user', "")
         isAdmin = request.environ.get('admin', "")
 
@@ -828,11 +896,11 @@ class Repository(MethodView):
 
 
         repo_obj["versions"] = app_list
-        return jsonify(repo_obj) 
+        return jsonify(repo_obj)
 
     # delete repository (and permissions) if it is empty
     @login_required
-    @has_resource_permission( "FULL_CONTROL" )  
+    @has_resource_permission( "FULL_CONTROL" )
     def delete(self, namespace, repository, version=None):
 
         #requestUser = request.environ.get('user', "")
@@ -858,19 +926,19 @@ class Permissions(MethodView):
     @login_required
     @has_resource_permission( "READ_ACP" )
     def get(self, namespace, repository=None, version=None):
-        
+
 
         if repository:
             repository_full = f'{namespace}/{repository}'
 
             ecr_db = ecrdb.EcrDB()
             result = ecr_db.getPermissions("repository", repository_full)
-            
+
             return jsonify(result)
 
         ecr_db = ecrdb.EcrDB()
         result = ecr_db.getPermissions("namespace", namespace)
-            
+
         return jsonify(result)
 
     @login_required
@@ -878,43 +946,43 @@ class Permissions(MethodView):
     def put(self, namespace, repository=None, version=None):
         # example to make app public:
         # curl -X PUT localhost:5000/permissions/{id} -H "Authorization: sage token1" -d '{"granteeType": "GROUP", "grantee": "AllUsers", "permission": "READ"}'
-       
+
 
         postData = request.get_json(force=True)
         for key in ["granteeType", "grantee", "permission"]:
             if not key in postData:
                 raise ErrorResponse(f'Field {key} missing', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-        
-        
+
+
         ecr_db = ecrdb.EcrDB()
 
         resource_type = "namespace"
         resource_name_full = namespace
-        
+
         if repository:
             resource_type = "repository"
             resource_name_full = f'{namespace}/{repository}'
-         
+
 
         result = ecr_db.addPermission(resource_type, resource_name_full, postData["granteeType"], postData["grantee"], postData["permission"])
 
         #result = ecr_db.addPermission(app_id, postData["granteeType"], postData["grantee"], postData["permission"])
-        
+
         obj= {"added": result }
 
         return jsonify(obj)
 
-        
+
 
 
     @login_required
     @has_resource_permission( "WRITE_ACP" )
     def delete(self, namespace, repository, version=None):
-        
+
 
 
         ecr_db = ecrdb.EcrDB()
-        
+
         postData = request.get_json(force=True)
 
         #requestUser = request.environ.get('user', "")
@@ -922,7 +990,7 @@ class Permissions(MethodView):
 
         repo_obj , ok = ecr_db.getRepository(namespace, repository)
         if not ok:
-            raise ErrorResponse(f'No owner found for repository {namespace}/{repository}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)    
+            raise ErrorResponse(f'No owner found for repository {namespace}/{repository}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
         owner = repo_obj["owner_id"]
 
@@ -930,10 +998,10 @@ class Permissions(MethodView):
         granteeType = postData.get("granteeType", None)
         grantee = postData.get("grantee", None)
         permission = postData.get("permission", None)
-        
+
         repository_full = f'{namespace}/{repository}'
         result = ecr_db.deletePermissions(owner, "repository", repository_full, granteeType=granteeType, grantee=grantee, permission=permission)
-        
+
         obj= {"deleted": result }
 
         return jsonify(obj)
@@ -945,6 +1013,12 @@ class Base(MethodView):
     def get(self):
 
         # example:  curl localhost:5000/
+        app.logger.debug('this is a DEBUG message')
+        app.logger.info('this is an INFO message')
+        app.logger.warning('this is a WARNING message')
+        app.logger.error('this is an ERROR message')
+        app.logger.critical('this is a CRITICAL message')
+
 
         return "SAGE Edge Code Repository"
 
@@ -991,7 +1065,7 @@ class AuthZ(MethodView):
     def post(self):
 
         print(f"AuthZ request received", file=sys.stderr)
-        
+
         user_scopes = request.environ.get('scopes', "")
         user_scopes_array = user_scopes.split()
         if not "ecr_authz_introspection" in user_scopes_array:
@@ -999,7 +1073,7 @@ class AuthZ(MethodView):
             raise ErrorResponse("User does not have permission to access the introspection", status_code=HTTPStatus.UNAUTHORIZED)
 
         postData = request.get_json(force=True)
-        
+
         if postData.get("type", "") != "repository":
             print(f"AuthZ rejected, type not supported", file=sys.stderr)
             raise ErrorResponse("This type is not supported", status_code=HTTPStatus.UNAUTHORIZED)
@@ -1010,7 +1084,7 @@ class AuthZ(MethodView):
         request_user_id = postData.get("account", "")
         registry_repository_name = postData.get("name", "")
 
-        
+
         ecr_db = ecrdb.EcrDB()
 
         perm_table = {
@@ -1020,7 +1094,7 @@ class AuthZ(MethodView):
 
         approved_permissions = []
 
-        
+
         for act in actions:
 
             if act == "push" and (not config.docker_registry_push_allowed):
@@ -1035,18 +1109,18 @@ class AuthZ(MethodView):
                 print(f"AuthZ {act} request approved", file=sys.stderr)
                 approved_permissions.append(act)
                 continue
-            
+
             print(f"AuthZ {act} request NOT approved", file=sys.stderr)
-            
+
         if len(approved_permissions) == 0:
             raise ErrorResponse(f"No actions approved", status_code=HTTPStatus.UNAUTHORIZED)
-        
+
         response_str = ",".join(approved_permissions)
         print(f"response_str: {response_str}", file=sys.stderr)
 
 
         return response_str
-        
+
 
 
 def createJenkinsName(app_spec):
@@ -1057,7 +1131,7 @@ def createJenkinsName(app_spec):
         namespace = app_spec["namespace"]
     else:
         namespace = app_spec["owner"]
-       
+
 
     return f'{namespace}.{app_spec["name"]}'
 
@@ -1077,7 +1151,7 @@ def handle_invalid_usage(error):
     return response
 
 
-    
+
 #@app.errorhandler(ErrorResponse)
 #@app.errorhandler(Exception)
 #def handle_invalid_usage(error):
@@ -1096,14 +1170,23 @@ def handle_invalid_usage(error):
 
 
 app.add_url_rule('/', view_func=Base.as_view('appsBase'))
-app.add_url_rule('/healthy', view_func=Healthy.as_view('healthy'))
-app.add_url_rule('/submit', view_func=Submit.as_view('submitAPI'))   #  this is a shortcut, replacing POST to /apps/<string:namespace>/<string:repository>
+app.add_url_rule('/healthy', view_func=Healthy.as_view('healthy'), strict_slashes=False)
+app.add_url_rule('/submit', view_func=Submit.as_view('submitAPI'), strict_slashes=False)   #  this is a shortcut, replacing POST to /apps/<string:namespace>/<string:repository>
 #app.add_url_rule('/apps/<string:app_id>', view_func=Apps.as_view('appsAPI'))
 
-app.add_url_rule('/apps', view_func=NamespacesList.as_view('namespacesListAPI'))
-app.add_url_rule('/apps/<string:namespace>', view_func=Namespace.as_view('namespacesAPI'))
-app.add_url_rule('/apps/<string:namespace>/<string:repository>', view_func=Repository.as_view('repositoryAPI'))
+#app.add_url_rule('/apps', view_func=NamespacesList.as_view('namespacesListAPI'))
+app.add_url_rule('/apps', view_func=AppsGlobal.as_view('appsGlobal'), strict_slashes=False)
+
+app.add_url_rule('/apps/<string:namespace>', view_func=AppsGlobal.as_view('AppsGlobal_namespaces'), strict_slashes=False)
+app.add_url_rule('/apps/<string:namespace>/<string:repository>', view_func=AppsGlobal.as_view('AppsGlobal_repo'), strict_slashes=False)
 app.add_url_rule('/apps/<string:namespace>/<string:repository>/<string:version>', view_func=Apps.as_view('appsAPI'))
+
+app.add_url_rule('/namespaces', view_func=NamespacesList.as_view('namespacesListAPI'), strict_slashes=False)
+app.add_url_rule('/namespaces/<string:namespace>', view_func=Namespace.as_view('namespacesAPI'))
+
+app.add_url_rule('/repositories', view_func=RepositoriesList.as_view('repositoriesListAPI'), strict_slashes=False)
+app.add_url_rule('/repositories/<string:namespace>', view_func=RepositoriesList.as_view('repositoryAPI_namespaced'))
+app.add_url_rule('/repositories/<string:namespace>/<string:repository>', view_func=Repository.as_view('repositoryAPI'))
 
 app.add_url_rule('/permissions/<string:namespace>/<string:repository>/<string:version>', view_func=Permissions.as_view('permissionsAPI'))
 app.add_url_rule('/permissions/<string:namespace>/<string:repository>', view_func=Permissions.as_view('permissionsAPI_2'))
@@ -1126,7 +1209,15 @@ app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
 })
 
 
+gunicorn_logger = logging.getLogger('gunicorn.error')
+app.logger.handlers = gunicorn_logger.handlers
+app.logger.setLevel(gunicorn_logger.level)
+ecrdb.logger= logging.getLogger('gunicorn.error')
 
 
 if __name__ == '__main__':
+    #gunicorn_logger = logging.getLogger('gunicorn.error')
+    #app.logger.handlers = gunicorn_logger.handlers
+    #app.logger.setLevel(gunicorn_logger.level)
+
     app.run(debug=True, host='0.0.0.0')

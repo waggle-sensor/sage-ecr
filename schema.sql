@@ -5,7 +5,7 @@ CREATE DATABASE IF NOT EXISTS SageECR;
 /* App Specification */
 /* TODO: save commit hash to prevent changes */
 CREATE TABLE IF NOT EXISTS SageECR.Apps (
-    id                  BINARY(16) NOT NULL PRIMARY KEY,
+    id                  VARCHAR(194),
     namespace           VARCHAR(64),
     name                VARCHAR(64),
     version             VARCHAR(64),
@@ -19,11 +19,12 @@ CREATE TABLE IF NOT EXISTS SageECR.Apps (
     schema_version      VARCHAR(64),
     time_created        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     time_last_updated   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    owner               VARCHAR(64) NOT NULL
+    owner               VARCHAR(64) NOT NULL,
+    INDEX(id, namespace, name, version)
 );
 
 CREATE TABLE IF NOT EXISTS SageECR.Sources (
-    id                  BINARY(16) NOT NULL,
+    id                  VARCHAR(194) NOT NULL,
     architectures       VARCHAR(256),
     url                 VARCHAR(256) NOT NULL,
     branch              VARCHAR(64),
@@ -68,7 +69,7 @@ CREATE TABLE IF NOT EXISTS SageECR.Permissions ( # /* formerly SageECR.AppPermis
 
 /* Continous Integration related */
 CREATE TABLE IF NOT EXISTS SageECR.Builds (
-    id                  BINARY(16) NOT NULL,
+    id                  VARCHAR(194) NOT NULL,
     build_name          VARCHAR(64),
     build_number        INT NOT NULL,
     architectures       VARCHAR(256),
@@ -78,14 +79,14 @@ CREATE TABLE IF NOT EXISTS SageECR.Builds (
 );
 
 CREATE TABLE IF NOT EXISTS SageECR.Certifications (
-    id                  BINARY(16) NOT NULL PRIMARY KEY,
+    id                  VARCHAR(194) NOT NULL PRIMARY KEY,
     profile             VARCHAR(64),
     certifiedBy         VARCHAR(64),
     certifiedDate       TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS SageECR.Profiles (
-    id                  BINARY(16) NOT NULL PRIMARY KEY,
+    id                  VARCHAR(194) NOT NULL PRIMARY KEY,
     number              INT DEFAULT '-1',
     profile             VARCHAR(64),
     certifiedBy         VARCHAR(64),
@@ -101,7 +102,7 @@ CREATE TABLE IF NOT EXISTS SageECR.Profiles (
     GPU , sensor,  etc..
 */
 CREATE TABLE IF NOT EXISTS SageECR.Resources (
-   id                  BINARY(16) NOT NULL,
+   id                  VARCHAR(194) NOT NULL,
     resource            VARCHAR(256),
     PRIMARY KEY(`id`, `resource`)
 );
