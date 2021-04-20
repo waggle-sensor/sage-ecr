@@ -33,7 +33,7 @@ curl -X GET  ${ECR_API}/apps/sage/simple/1.0 -H "Authorization: sage ${SAGE_USER
 
 ## share repository sage/simple with testuser2
 ```bash
-curl -X PUT  ${ECR_API}/permissions/sage/simple -H "Authorization: sage ${SAGE_USER_TOKEN}" -d '{"granteeType": "USER", "grantee": "testuser2", "permission":"WRITE"}' | jq .
+curl -X PUT  ${ECR_API}/permissions/sage/simple -H "Authorization: sage ${SAGE_USER_TOKEN}" -d '{"operation":"add", "granteeType": "USER", "grantee": "testuser2", "permission":"WRITE"}' | jq .
 ```
 
 verify (view permissions as testuser):
@@ -48,7 +48,7 @@ curl ${ECR_API}/apps/sage/simple/1.0 -H "Authorization: sage token10"  | jq .
 
 ## share namespace sage with testuser2
 ```bash
-curl -X PUT  ${ECR_API}/permissions/sage -H "Authorization: sage ${SAGE_USER_TOKEN}" -d '{"granteeType": "USER", "grantee": "testuser2", "permission":"WRITE"}' | jq .
+curl -X PUT  ${ECR_API}/permissions/sage -H "Authorization: sage ${SAGE_USER_TOKEN}" -d '{"operation":"add", "granteeType": "USER", "grantee": "testuser2", "permission":"WRITE"}' | jq .
 ```
 
 verify

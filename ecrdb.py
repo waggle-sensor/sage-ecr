@@ -414,7 +414,7 @@ class EcrDB():
         if granteeType=="GROUP" and grantee=="AllUsers" and permission != "READ":
             raise ErrorResponse(f'AllUsers can only get READ permission.', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
-        stmt = f'REPLACE INTO Permissions ( resourceType, resourceName, granteeType , grantee, permission) VALUES (%s , %s , %s,  %s, %s)'
+        stmt = f'INSERT IGNORE INTO Permissions ( resourceType, resourceName, granteeType , grantee, permission) VALUES (%s , %s , %s,  %s, %s)'
 
         debug_stmt = stmt
 
@@ -428,7 +428,7 @@ class EcrDB():
 
         self.db.commit()
 
-        return 1
+        return int(self.cur.rowcount)
 
     # deletes all permissions unless limited by any of optional parameters
     # permissions for owner will be excluded
@@ -438,8 +438,6 @@ class EcrDB():
 
         if not owner:
             raise ErrorResponse('Owner not found', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-
 
         stmt_delete_permissions = f'DELETE FROM Permissions WHERE resourceType = %s AND resourceName =%s'
         params = [resourceType, resourceName]
@@ -456,9 +454,9 @@ class EcrDB():
             params.append(permission)
 
         # make sure owner does not take his own permissions away
-        if owner:
-            stmt_delete_permissions +=  ' AND NOT (granteeType="USER" AND grantee=%s AND permission="FULL_CONTROL")'
-            params.append(owner)
+
+        stmt_delete_permissions +=  ' AND NOT (granteeType="USER" AND grantee=%s AND permission="FULL_CONTROL")'
+        params.append(owner)
 
         print(f'delete stmt: {stmt_delete_permissions} params='+json.dumps(params), file=sys.stderr)
         self.cur.execute(stmt_delete_permissions, params)

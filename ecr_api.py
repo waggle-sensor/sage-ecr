@@ -921,7 +921,8 @@ class Repository(MethodView):
 
 
 
-# /apps/{app_id}/permissions
+# /permissions/{namespace}
+# /permissions/{namespace}/{repository}
 class Permissions(MethodView):
     @login_required
     @has_resource_permission( "READ_ACP" )
@@ -948,59 +949,134 @@ class Permissions(MethodView):
         # curl -X PUT localhost:5000/permissions/{id} -H "Authorization: sage token1" -d '{"granteeType": "GROUP", "grantee": "AllUsers", "permission": "READ"}'
 
 
-        postData = request.get_json(force=True)
-        for key in ["granteeType", "grantee", "permission"]:
-            if not key in postData:
-                raise ErrorResponse(f'Field {key} missing', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+        try:
+            postData = request.get_json(force=True)
+        except Exception as e:
+            raise ErrorResponse(f'request.get_json returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
+        for key in postData:
+            if key not in ["granteeType", "grantee", "permission", "operation"]:
+                raise ErrorResponse(f'Key {key} not supported', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+
+        if not "operation" in postData:
+            raise ErrorResponse(f'Field operation missing', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+
+
+        operation = postData.get("operation", None)
+        granteeType = postData.get("granteeType", None)
+        grantee = postData.get("grantee", None)
+        permission = postData.get("permission", None)
 
         ecr_db = ecrdb.EcrDB()
 
         resource_type = "namespace"
-        resource_name_full = namespace
+        resource_name = namespace
 
         if repository:
             resource_type = "repository"
-            resource_name_full = f'{namespace}/{repository}'
+            resource_name = f'{namespace}/{repository}'
+
+        if operation == "add":
+            for key in ["granteeType", "grantee", "permission", "operation"]:
+                if not key in postData:
+                    raise ErrorResponse(f'Field {key} missing', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+            try:
+                result = ecr_db.addPermission(resource_type, resource_name, granteeType, grantee, permission)
+            except Exception as e:
+                raise ErrorResponse(f'ecr_db.addPermissionreturned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+            #result = ecr_db.addPermission(app_id, postData["granteeType"], postData["grantee"], postData["permission"])
+
+            obj= {"added": result }
+
+        elif operation == "delete":
+            if repository:
+
+                # repository
+                repo_obj , ok = ecr_db.getRepository(namespace, repository)
+                if not ok:
+                    raise ErrorResponse(f'No owner found for repository {namespace}/{repository}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+                owner = repo_obj["owner_id"]
+
+            else:
+                # namespace
+                app.logger.debug("namespace")
+                n_obj, found = ecr_db.getNamespace(namespace)
+                if not found:
+                    raise ErrorResponse(f'Namespace {namespace} not found', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+                owner = n_obj["owner_id"]
+
+            try:
+                result = ecr_db.deletePermissions(owner, resource_type, resource_name, granteeType=granteeType, grantee=grantee, permission=permission)
+            except Exception as e:
+                raise ErrorResponse(f'ecr_db.deletePermissions: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+            obj= {"deleted": result }
+
+        else:
+            raise ErrorResponse(f'Operation can only be add or delete.', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
-        result = ecr_db.addPermission(resource_type, resource_name_full, postData["granteeType"], postData["grantee"], postData["permission"])
-
-        #result = ecr_db.addPermission(app_id, postData["granteeType"], postData["grantee"], postData["permission"])
-
-        obj= {"added": result }
 
         return jsonify(obj)
 
 
 
-
+## DO NOT USE ##
     @login_required
     @has_resource_permission( "WRITE_ACP" )
-    def delete(self, namespace, repository, version=None):
+    def delete(self, namespace, repository=None, version=None):
 
 
+        try:
+            #return jsonify({"grantee":"hello"})
+            ecr_db = ecrdb.EcrDB()
+        except Exception as e:
+            raise ErrorResponse(f'EcrDB returned{str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
-        ecr_db = ecrdb.EcrDB()
+        try:
+            postData = request.get_json(force=True)
 
-        postData = request.get_json(force=True)
+        except Exception as e:
+            raise ErrorResponse(f'request.get_json returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
-        #requestUser = request.environ.get('user', "")
+        try:
+            #requestUser = request.environ.get('user', "")
+            granteeType = postData.get("granteeType", None)
+            grantee = postData.get("grantee", None)
+            permission = postData.get("permission", None)
+        except Exception as e:
+            raise ErrorResponse(f'postData.get returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        return jsonify({"grantee":"x"})
+        if repository:
+            app.logger.debug("repository")
+            # repository
+            repo_obj , ok = ecr_db.getRepository(namespace, repository)
+            if not ok:
+                raise ErrorResponse(f'No owner found for repository {namespace}/{repository}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+            owner = repo_obj["owner_id"]
+            repository_full = f'{namespace}/{repository}'
+            resource_name = repository_full
+            resource_type = "repository"
+
+        else:
+            # namespace
+            app.logger.debug("namespace")
+            n_obj = ecr_db.getNamespace(namespace)
+            owner = n_obj["owner_id"]
+            resource_name = namespace
+            resource_type = "namespace"
 
 
-        repo_obj , ok = ecr_db.getRepository(namespace, repository)
-        if not ok:
-            raise ErrorResponse(f'No owner found for repository {namespace}/{repository}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+        result = ecr_db.deletePermissions(owner, resource_type, resource_name, granteeType=granteeType, grantee=grantee, permission=permission)
 
-        owner = repo_obj["owner_id"]
-
-
-        granteeType = postData.get("granteeType", None)
-        grantee = postData.get("grantee", None)
-        permission = postData.get("permission", None)
-
-        repository_full = f'{namespace}/{repository}'
-        result = ecr_db.deletePermissions(owner, "repository", repository_full, granteeType=granteeType, grantee=grantee, permission=permission)
 
         obj= {"deleted": result }
 
@@ -1188,9 +1264,8 @@ app.add_url_rule('/repositories', view_func=RepositoriesList.as_view('repositori
 app.add_url_rule('/repositories/<string:namespace>', view_func=RepositoriesList.as_view('repositoryAPI_namespaced'))
 app.add_url_rule('/repositories/<string:namespace>/<string:repository>', view_func=Repository.as_view('repositoryAPI'))
 
-app.add_url_rule('/permissions/<string:namespace>/<string:repository>/<string:version>', view_func=Permissions.as_view('permissionsAPI'))
-app.add_url_rule('/permissions/<string:namespace>/<string:repository>', view_func=Permissions.as_view('permissionsAPI_2'))
-app.add_url_rule('/permissions/<string:namespace>', view_func=Permissions.as_view('permissionsAPI_3'))
+app.add_url_rule('/permissions/<string:namespace>/<string:repository>', view_func=Permissions.as_view('permissionsAPI_2'), methods=['GET', 'PUT', 'DELETE'], strict_slashes=False)
+app.add_url_rule('/permissions/<string:namespace>', view_func=Permissions.as_view('permissionsAPI_3'), methods=['GET', 'PUT', 'DELETE'], strict_slashes=False)
 
 #app.add_url_rule('/apps/<string:namespace>/<string:repository>/<version>/build', view_func=Builds.as_view('buildAPI'))
 

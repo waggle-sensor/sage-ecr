@@ -23,6 +23,9 @@ app_namespace = test_app_def_obj["namespace"]
 app_repository = test_app_def_obj["name"]
 app_version = test_app_def_obj["version"]
 
+grimm_namespace = "brothers-grimm"
+test_app_def_obj["namespace"] = grimm_namespace
+grimm_app_def = json.dumps(test_app_def_obj)
 
 # from https://flask.palletsprojects.com/en/1.1.x/testing/
 @pytest.fixture
@@ -350,8 +353,18 @@ def test_listApps(client):
 def test_permissions(client):
     headers = {"Authorization" : "sage token1"}
     headers_testuser2 = {"Authorization" : "sage token10"}
+
+    # clean-up repo permissions
+    data = {"operation":"delete"}
+    rv = client.put(f'/permissions/{grimm_namespace}/{app_repository}', data=json.dumps(data), headers=headers)
+
+    # clean-up namespace permissions
+    rv = client.put(f'/permissions/{grimm_namespace}', data=json.dumps(data), headers=headers)
+
+
+
     # create app
-    rv = client.post('/submit', data = test_app_def, headers=headers)
+    rv = client.post('/submit', data = grimm_app_def, headers=headers)
     assert rv.data != ""
     #print(f'rv.data: {rv.data}' , file=sys.stderr)
 
@@ -363,7 +376,7 @@ def test_permissions(client):
     app_id = result["id"]
 
     # verify app
-    rv = client.get(f'/apps/{app_namespace}/{app_repository}/{app_version}', headers=headers)
+    rv = client.get(f'/apps/{grimm_namespace}/{app_repository}/{app_version}', headers=headers)
 
     result = rv.get_json()
 
@@ -372,14 +385,34 @@ def test_permissions(client):
 
     assert result["id"] == app_id
 
+    # verify that app is private
+    rv = client.get(f'/apps/{grimm_namespace}/{app_repository}/{app_version}', headers=headers_testuser2)
+
+    result = rv.get_json()
+
+    assert "error" in result
+
+    #verify that testuser2 cannot yet see the app in the listing
+    rv = client.get(f'/apps/', headers=headers_testuser2)
+
+    result = rv.get_json()
+
+    assert "data" in result
+
+    for app in result["data"]:
+        assert "id" in app
+        assert app["id"] != f"{grimm_namespace}/{app_repository}:{app_version}"
+
+
+
 
     # remove all permissions from repo
-    data = '{}'
-    rv = client.delete(f'/permissions/{app_namespace}/{app_repository}', data=data, headers=headers)
+    data ={"operation":"delete"}
+    rv = client.put(f'/permissions/{grimm_namespace}/{app_repository}', data=json.dumps(data), headers=headers)
 
 
     # check repo permissions: only owner should have permission
-    rv = client.get(f'/permissions/{app_namespace}/{app_repository}', headers=headers)
+    rv = client.get(f'/permissions/{grimm_namespace}/{app_repository}', headers=headers)
 
     result = rv.get_json()
 
@@ -390,9 +423,9 @@ def test_permissions(client):
 
     # make repo public
 
-    data = '{"granteeType": "GROUP", "grantee": "AllUsers", "permission": "READ"}'
+    data = {"operation":"add", "granteeType": "GROUP", "grantee": "AllUsers", "permission": "READ"}
 
-    rv = client.put(f'/permissions/{app_namespace}/{app_repository}', data=data, headers=headers)
+    rv = client.put(f'/permissions/{grimm_namespace}/{app_repository}', data=json.dumps(data), headers=headers)
     print(f'make repo public, resut: {rv.data}', file=sys.stderr)
     result = rv.get_json()
 
@@ -404,7 +437,7 @@ def test_permissions(client):
     assert "added" in result
 
     # check repo permissions
-    rv = client.get(f'/permissions/{app_namespace}/{app_repository}', headers=headers)
+    rv = client.get(f'/permissions/{grimm_namespace}/{app_repository}', headers=headers)
 
     result = rv.get_json()
     print(f'check repo permissions: {json.dumps(result)}', file=sys.stderr)
@@ -412,7 +445,7 @@ def test_permissions(client):
     assert len(result) ==2
 
     # get public app as authenticated user
-    rv = client.get(f'/apps/{app_namespace}/{app_repository}/{app_version}', headers=headers)
+    rv = client.get(f'/apps/{grimm_namespace}/{app_repository}/{app_version}', headers=headers)
 
     result = rv.get_json()
 
@@ -420,7 +453,7 @@ def test_permissions(client):
 
 
     # get public app anonymously
-    rv = client.get(f'/apps/{app_namespace}/{app_repository}/{app_version}')
+    rv = client.get(f'/apps/{grimm_namespace}/{app_repository}/{app_version}')
 
     result = rv.get_json()
 
@@ -428,7 +461,8 @@ def test_permissions(client):
     assert "id" in result
 
     # remove public permission
-    rv = client.delete(f'/permissions/{app_namespace}/{app_repository}', data=data, headers=headers)
+    data["operation"] = "delete"
+    rv = client.put(f'/permissions/{grimm_namespace}/{app_repository}', data=json.dumps(data), headers=headers)
 
     result = rv.get_json()
 
@@ -440,16 +474,16 @@ def test_permissions(client):
     # share with other people
 
     for user in ['other1', 'other2', 'other3', 'testuser2']:
-        other = {"granteeType": "USER", "grantee":  user , "permission": "READ"}
-        rv = client.put(f'/permissions/{app_namespace}/{app_repository}', data=json.dumps(other), headers=headers)
+        other = {"operation":"add", "granteeType": "USER", "grantee":  user , "permission": "READ"}
+        rv = client.put(f'/permissions/{grimm_namespace}/{app_repository}', data=json.dumps(other), headers=headers)
 
         result = rv.get_json()
-
-        added = result.get("added", -1)
-        assert added == 1
+        assert "error" not in result
+        assert "added" in result
+        assert result["added"] == 1
 
     # check app permissions
-    rv = client.get(f'/permissions/{app_namespace}/{app_repository}', headers=headers)
+    rv = client.get(f'/permissions/{grimm_namespace}/{app_repository}', headers=headers)
 
     result = rv.get_json()
 
@@ -458,7 +492,8 @@ def test_permissions(client):
     assert len(result) ==5
 
     # remove all permissions (except owners FULL_CONTROLL)
-    rv = client.delete(f'/permissions/{app_namespace}/{app_repository}', data=json.dumps({}), headers=headers)
+
+    rv = client.put(f'/permissions/{grimm_namespace}/{app_repository}', data=json.dumps({"operation":"delete"}), headers=headers)
 
     result = rv.get_json()
     print(f'Deletion result: {json.dumps(result)}', file=sys.stderr)
@@ -467,7 +502,7 @@ def test_permissions(client):
     assert deleted == 4
 
     # check app permissions
-    rv = client.get(f'/permissions/{app_namespace}/{app_repository}', headers=headers)
+    rv = client.get(f'/permissions/{grimm_namespace}/{app_repository}', headers=headers)
 
     result = rv.get_json()
 
@@ -478,7 +513,7 @@ def test_permissions(client):
 
 
     # check app without auth
-    rv = client.get(f'/apps/{app_namespace}/{app_repository}/{app_version}')
+    rv = client.get(f'/apps/{grimm_namespace}/{app_repository}/{app_version}')
 
     result = rv.get_json()
 
@@ -489,8 +524,8 @@ def test_permissions(client):
     # check namespace permission, give testuser2 WRITE permission for namespace
 
 
-    acl = {"granteeType": "USER", "grantee":  "testuser2" , "permission": "WRITE"}
-    rv = client.put(f'/permissions/{app_namespace}', data=json.dumps(acl), headers=headers)
+    acl = {"operation":"add", "granteeType": "USER", "grantee":  "testuser2" , "permission": "WRITE"}
+    rv = client.put(f'/permissions/{grimm_namespace}', data=json.dumps(acl), headers=headers)
 
     result = rv.get_json()
 
@@ -499,7 +534,7 @@ def test_permissions(client):
 
 
     # verify testuser2 can see repository inside of namespace
-    rv = client.get(f'/repositories/{app_namespace}', headers=headers_testuser2)
+    rv = client.get(f'/repositories/{grimm_namespace}', headers=headers_testuser2)
     result = rv.get_json()
 
 
@@ -516,15 +551,17 @@ def test_permissions(client):
     print(f'result: {json.dumps(result)}', file=sys.stderr)
 
     assert "data" in result
-    assert len(result["data"]) == 1
-    assert result["data"][0]["id"] == app_namespace
-    assert result["data"][0]["owner_id"] == "testuser"
-    assert result["data"][0]["type"] == "namespace"
+    assert len(result["data"]) >= 1
+    found_namespace = False
+    for n in result["data"]:
+        if n["id"] == grimm_namespace and n["owner_id"] == "testuser" and n["type"] == "namespace":
+            found_namespace = True
 
+    assert found_namespace
 
     # check namespace permission, give testuser2 FULL_CONTROL permission for namespace
-    acl = {"granteeType": "USER", "grantee":  "testuser2" , "permission": "FULL_CONTROL"}
-    rv = client.put(f'/permissions/{app_namespace}', data=json.dumps(acl), headers=headers)
+    acl = {"operation": "add", "granteeType": "USER", "grantee":  "testuser2" , "permission": "FULL_CONTROL"}
+    rv = client.put(f'/permissions/{grimm_namespace}', data=json.dumps(acl), headers=headers)
 
     result = rv.get_json()
 
@@ -535,7 +572,7 @@ def test_permissions(client):
     print(f'result: {json.dumps(result)}', file=sys.stderr)
 
     # view permissions as testuser2
-    rv = client.get(f'/permissions/{app_namespace}/{app_repository}', headers=headers_testuser2)
+    rv = client.get(f'/permissions/{grimm_namespace}/{app_repository}', headers=headers_testuser2)
 
     result = rv.get_json()
     print(f'result: {json.dumps(result)}', file=sys.stderr)
