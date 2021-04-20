@@ -569,7 +569,7 @@ class EcrDB():
 
         return 1
 
-    def addNamespace(self, name, owner_id, public=False):
+    def addNamespace(self, name, owner_id):
 
         # name restriction from https://docs.docker.com/docker-id/
         # "... can only contain numbers and lowercase letters."
@@ -592,8 +592,6 @@ class EcrDB():
 
         self.cur.execute(stmt, ("namespace", name, "USER", owner_id, "FULL_CONTROL"))
 
-        if public:
-            self.cur.execute(stmt, ("namespace", name, "GROUP", "AllUsers", "READ"))
 
         self.db.commit()
 

@@ -157,6 +157,9 @@ def upload_and_build(client, test_failure=False):
     rv = client.delete(f'/builds/{app_namespace}/{app_repository}/{app_version}', headers=headers)
 
 
+
+
+
     return
     # build "armv7"
 
@@ -385,7 +388,7 @@ def test_permissions(client):
 
     assert result["id"] == app_id
 
-    # verify that app is private
+    # verify that the app (repository to be precise) is private
     rv = client.get(f'/apps/{grimm_namespace}/{app_repository}/{app_version}', headers=headers_testuser2)
 
     result = rv.get_json()
@@ -578,6 +581,14 @@ def test_permissions(client):
     print(f'result: {json.dumps(result)}', file=sys.stderr)
     assert "error" not in result
 
+
+
+    # delete app
+
+    rv = client.delete(f'/apps/{grimm_namespace}/{app_repository}/{app_version}', headers=headers_testuser2)
+    result = rv.get_json()
+
+    assert "deleted" in result
 
 
 def test_namespaces(client):

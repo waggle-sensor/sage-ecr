@@ -234,7 +234,7 @@ class Submit(MethodView):
         if not ok:
             # namespace does not exist. Unless sage assigns usernames, any available namespace can be used
             try:
-                ecr_db.addNamespace(namespace, requestUser, public=True)
+                ecr_db.addNamespace(namespace, requestUser)
             except Exception as e:
                 raise ErrorResponse(f'Could not create namespace {namespace}: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
             userHasNamespaceWritePermission = True
@@ -804,7 +804,7 @@ class NamespacesList(MethodView):
 
         #result = None
         try:
-            result = ecr_db.addNamespace(requestNamespace, requestUser, public=True)
+            result = ecr_db.addNamespace(requestNamespace, requestUser)
         except Exception as e:
             raise ErrorResponse(f'Could not create namespace {requestNamespace}: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 

@@ -7,6 +7,7 @@ export ECR_API="localhost:5000"
 export SAGE_USER_TOKEN="token1"
 export APP_NAMESPACE="sage"
 export APP_REPOSITORY="simple"
+export APP_VERSION="1.0"
 ```
 
 
@@ -60,6 +61,18 @@ Example repsonse:
   "version": "1.0"
 }
 ```
+
+## GET /apps/{namespace}/{repository}/{version}
+```bash
+curl ${ECR_API}/${APP_NAMESPACE}/${APP_REPOSITORY}/${APP_VERSION} -H "Authorization: sage ${SAGE_USER_TOKEN}"
+```
+
+## DELETE /apps/{namespace}/{repository}/{version}
+Note: You cannot delete a frozen app, even if you are owner. This requires admin permissions.
+```bash
+curl -X DELETE ${ECR_API}/${APP_NAMESPACE}/${APP_REPOSITORY}/${APP_VERSION} -H "Authorization: sage ${SAGE_USER_TOKEN}"
+```
+
 
 ## GET /namespaces
 List namespaces:

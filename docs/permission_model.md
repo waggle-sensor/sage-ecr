@@ -3,7 +3,7 @@
 
 - namespace (permission-controlled)
 - repository (permission-controlled)
-- app/version (controlled via repository)
+- app/version (controlled via repository permissions)
 
 
 # repository permissions
