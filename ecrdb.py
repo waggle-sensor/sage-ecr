@@ -94,6 +94,30 @@ class EcrDB():
 
         return False
 
+    def insertApp(self, values, variables_str, id_str, architectures , url, branch, directory, dockerfile, build_args_str, resourcesArray):
+
+        stmt = f'REPLACE INTO Sources ( id, architectures , url, branch, directory, dockerfile, build_args ) VALUES (%s , %s, %s, %s, %s, %s, %s)'
+        print(f"replace statement: {stmt}", file=sys.stderr)
+        print(f"build_args_str: {build_args_str}", file=sys.stderr)
+        self.cur.execute(stmt, (id_str, architectures , url, branch, directory, dockerfile, build_args_str))
+
+
+        for res in resourcesArray:
+            res_str = json.dumps(res)
+            stmt = f'REPLACE INTO Resources ( id, resource) VALUES (%s , %s)'
+            self.cur.execute(stmt, (id_str, res_str,))
+
+
+        print(f'values: {values}', file=sys.stderr)
+
+
+        stmt = f'REPLACE INTO Apps ( id, {config.dbFields_str}) VALUES (%s ,{variables_str})'
+        print(f'stmt: {stmt}', file=sys.stderr)
+        self.cur.execute(stmt, (id_str, *values))
+
+        self.db.commit()
+
+        return
 
 
     def deleteApp(self, namespace, repository, version, force=False):

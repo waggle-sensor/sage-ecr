@@ -17,7 +17,7 @@ curl -X POST ${ECR_API}/submit -H "Authorization: sage ${SAGE_USER_TOKEN}" --dat
 curl -X POST ${ECR_API}/submit -H "Authorization: sage ${SAGE_USER_TOKEN}" -d '{...}'
 ```
 
-Input can be either JSON or YAML format.
+Input can be either JSON or YAML format. As long as apps are not frozen, they can be overwritten with query `?force=true`.
 
 
 Example repsonse:

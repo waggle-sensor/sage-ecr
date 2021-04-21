@@ -50,7 +50,7 @@ Create MySQL user
 MYSQL_ROOT_PASSWORD=$(kubectl get secret --namespace default mysql -o jsonpath="{.data.mysql-root-password}" | base64 --decode)
 echo "MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}"
 
-kubectl exec -ti mysql-0 -- mysql -u root -p${MYSQL_ROOT_PASSWORD}
+kubectl exec -ti mysql-0 -- mysql -u root -p${MYSQL_ROOT_PASSWORD} -D SageECR
 ```
 
 Inside of MySQL create user with password: (In test environment use "test" as password)

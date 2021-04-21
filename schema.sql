@@ -5,7 +5,7 @@ CREATE DATABASE IF NOT EXISTS SageECR;
 /* App Specification */
 /* TODO: save commit hash to prevent changes */
 CREATE TABLE IF NOT EXISTS SageECR.Apps (
-    id                  VARCHAR(194),
+    id                  VARCHAR(194) UNIQUE,
     namespace           VARCHAR(64),
     name                VARCHAR(64),
     version             VARCHAR(64),
@@ -110,15 +110,6 @@ CREATE TABLE IF NOT EXISTS SageECR.Resources (
 
 /* Token Cache */
 
-CREATE EVENT IF NOT EXISTS `SageECR`.`AuthNCacheEvent`
-ON SCHEDULE
-EVERY 1 HOUR
-COMMENT 'Description'
-DO
-DELETE FROM `SageECR`.`TokenCache` WHERE `expires` < NOW();
-
-
-
 
 CREATE TABLE IF NOT EXISTS SageECR.TokenCache (
     token               VARCHAR(256) NOT NULL,
@@ -128,3 +119,13 @@ CREATE TABLE IF NOT EXISTS SageECR.TokenCache (
     expires             TIMESTAMP,
     PRIMARY KEY (token)
 );
+
+
+CREATE EVENT IF NOT EXISTS `SageECR`.`AuthNCacheEvent`
+ON SCHEDULE
+EVERY 1 HOUR
+COMMENT 'Description'
+DO
+DELETE FROM `SageECR`.`TokenCache` WHERE `expires` < NOW();
+
+

@@ -29,7 +29,7 @@ from werkzeug.wrappers import Request, Response, ResponseStream
 from middleware import middleware
 import requests
 
-from error_response import ErrorResponse
+from error_response import ErrorResponse, ErrorWResponse
 
 import jenkins_server
 
@@ -90,16 +90,19 @@ class ecr_middleware():
 
         authHeaderArray = authHeader.split(" ", 2)
         if len(authHeaderArray) != 2:
-            res = Response(f'Authorization failed (could not parse Authorization header)', mimetype= 'text/plain', status=401)
+            #res = Response(f'Authorization failed (could not parse Authorization header)', mimetype= 'text/plain', status=401)
+            res= ErrorWResponse(f'Authorization failed (could not parse Authorization header)', status_code=HTTPStatus.UNAUTHORIZED)
             return res(environ, start_response)
 
         if authHeaderArray[0].lower() != "sage" and authHeaderArray[0].lower() != "static":
-            res = Response(f'Authorization failed (Authorization bearer not supported)', mimetype= 'text/plain', status=401)
+            #res = Response(f'Authorization failed (Authorization bearer not supported)', mimetype= 'text/plain', status=401)
+            res= ErrorWResponse(f'Authorization failed (Authorization bearer not supported)', status_code=HTTPStatus.UNAUTHORIZED)
             return res(environ, start_response)
 
         token = authHeaderArray[1]
         if token == "":
-            res = Response(f'Authorization failed (token empty)', mimetype= 'text/plain', status=401)
+            #res = Response(f'Authorization failed (token empty)', mimetype= 'text/plain', status=401)
+            res= ErrorWResponse(f'Authorization failed (token empty)', status_code=HTTPStatus.UNAUTHORIZED)
             return res(environ, start_response)
 
         # example: curl -X POST -H 'Accept: application/json; indent=4' -H "Authorization: Basic c2FnZS1hcGktc2VydmVyOnRlc3Q=" -d 'token=<SAGE-USER-TOKEN>'  <sage-ui-hostname>:80/token_info/
@@ -138,7 +141,8 @@ class ecr_middleware():
             #         environ['admin'] = True
             userObj = config.static_tokens.get(token)
             if not userObj:
-                res = Response(f'Token not found', mimetype= 'text/plain', status=401)
+                #res = Response(f'Token not found', mimetype= 'text/plain', status=401)
+                res= ErrorWResponse(f'Token not found', status_code=HTTPStatus.UNAUTHORIZED)
                 return res(environ, start_response)
 
 
@@ -148,7 +152,7 @@ class ecr_middleware():
            # self.authenticated
             user_id = userObj.get("id", "")
             if not user_id:
-                res = Response(f'id missing in user object', mimetype= 'text/plain', status=401)
+                res= ErrorWResponse(f'id missing in user object', status_code=HTTPStatus.UNAUTHORIZED)
                 return res(environ, start_response)
 
 
@@ -168,12 +172,14 @@ class ecr_middleware():
 
             result_obj = r.json()
             if not "active" in result_obj:
-                res = Response(f'Authorization failed (broken response) {result_obj}', mimetype= 'text/plain', status=500)
+                #res = Response(f'Authorization failed (broken response) {result_obj}', mimetype= 'text/plain', status=500)
+                res= ErrorWResponse(f'Authorization failed (broken response) {result_obj}', status_code=HTTPStatus.UNAUTHORIZED)
                 return res(environ, start_response)
 
             is_active = result_obj.get("active", False)
             if not is_active:
-                res = Response(f'Authorization failed (token not active)', mimetype= 'text/plain', status=401)
+                #res = Response(f'Authorization failed (token not active)', mimetype= 'text/plain', status=401)
+                res= ErrorWResponse(f'Authorization failed (token not active)', status_code=HTTPStatus.UNAUTHORIZED)
                 return res(environ, start_response)
 
 
@@ -185,7 +191,8 @@ class ecr_middleware():
             ecr_db.setTokenInfo(token, user_id, scopes, is_admin)
 
         if not user_id:
-            res= Response("something went wrong, user_id is missing", status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            #res= Response("something went wrong, user_id is missing", status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            res= ErrorWResponse(f'something went wrong, user_id is missing', status_code=HTTPStatus.UNAUTHORIZED)
             return res(environ, start_response)
 
         environ['authenticated'] = True
@@ -200,8 +207,273 @@ class ecr_middleware():
 
 
 
+def submit_app(requestUser, isAdmin, force_overwrite, postData):
+
+    ecr_db = ecrdb.EcrDB()
+
+    ### namespace
+    # check if namespace exists (create if not) and check permissions
+    userHasNamespaceWritePermission = False
+    namespace = postData.get("namespace", "")
+    _, ok = ecr_db.getNamespace(namespace)
+    if not ok:
+        # namespace does not exist. Unless sage assigns usernames, any available namespace can be used
+        try:
+            ecr_db.addNamespace(namespace, requestUser)
+        except Exception as e:
+            raise Exception(f'Could not create namespace {namespace}: {str(e)}')
+        userHasNamespaceWritePermission = True
+
+    else:
+        # Namespace exists. Check if User has permission to write.
+        # If not, user may still have permission to write to existing Repo.
+
+        userHasNamespaceWritePermission = ecr_db.hasPermission("namespace", namespace, "USER", requestUser, "WRITE")
 
 
+    ### repository (app name, without version)
+    repo_name = postData.get("name", "")
+
+    # check if exists, create if needed
+    _, ok = ecr_db.getRepository(namespace, repo_name)
+    if not ok:
+        # namespace does not exist. Unless sage assigns usernames, any available namespace can be used
+        if userHasNamespaceWritePermission:
+            try:
+                ecr_db.addRepository(namespace, repo_name, requestUser)
+            except Exception as e:
+                raise Exception(f'Could not create repository {namespace}/{repo_name}: {str(e)}')
+        else:
+            raise ErrorResponse(f'Not authorized to access namespace {namespace}', status_code=HTTPStatus.UNAUTHORIZED)
+
+
+    else:
+        # repo exists, check if user has namespace or repo permission
+        userHasRepoWritePermission = ecr_db.hasPermission("repository", f'{namespace}/{repo_name}', "USER", requestUser, "WRITE")
+        if (not userHasNamespaceWritePermission ) and (not userHasRepoWritePermission):
+            raise ErrorResponse(f'Not authorized to access repository {namespace}/{repo_name}', status_code=HTTPStatus.UNAUTHORIZED)
+
+    ### check if versioned app already exists and if it can be overwritten
+
+    version = postData.get("version", "")
+
+    existing_app, found_app = ecr_db.getApp(namespace=namespace, name=repo_name, version=version)
+
+
+    existing_app_id = None
+    if found_app:
+        if (existing_app.get("frozen", False) and (not isAdmin)):
+            raise Exception(f'App {namespace}/{repo_name}:{version} already exists and is frozen.')
+
+        if not force_overwrite:
+            raise Exception(f'App {namespace}/{repo_name}:{version} already exists but is not frozen. Use query force=true to overwrite.')
+
+        existing_app_id = existing_app.get("id")
+
+    for key in postData:
+        if not key in config.valid_fields_set:
+            #return  {"error": f'Field {key} not supported'}
+            raise Exception(f'Field {key} not supported')
+
+    # if required
+    for key in config.required_fields:
+        if not key in postData:
+            #return  {"error": f'Required field {key} is missing'}
+            raise Exception(f'Required field {key} is missing')
+        expected_type = config.required_fields[key]
+
+        value  = postData[key]
+        if type(value).__name__ != expected_type :
+            raise Exception(f'Field {key} has to be of type {expected_type}, got {type(value).__name__}')
+
+        if len(value) == 0:
+            #return  {"error": f'Required field {key} is missing'}
+            raise Exception(f'Required field {key} is missing')
+
+
+
+
+
+
+
+
+    ##### source
+    # source
+    # git@github.com:<user>/<repo>.git#<tag>
+    # https://github.com/<user>/<repo>.git#<tag>
+    # http://sagecontinuum.org/bucket/<bucket_id>
+
+
+    build_source = postData.get("source",None)
+    #sourcesArray = postData.get("source",[])
+    #if len(sourcesArray) == 0:
+    if not build_source:
+        raise Exception("Field source is missing")
+
+
+
+    #source_public_git_pattern = re.compile(f'https://github.com/{vc}+/{vc}+.git#{vc}+')
+    #source_private_git_pattern = re.compile(f'git@github.com/{vc}+/{vc}+.git#{vc}+')
+    #source_sage_store_pattern = re.compile(f'http://sagecontinuum.org/bucket/[0-9a-z.]+')
+    #source_matched = False
+    #for p in [source_public_git_pattern, source_private_git_pattern , source_sage_store_pattern]:
+    #    if p.match(appSource):
+    #        source_matched = True
+    #        break
+
+    #if not source_matched:
+    #    raise ErrorResponse('Could not parse source field', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+    ##### inputs
+
+    # inputs validation
+    appInputs = postData.get("inputs", [])
+    if len(appInputs) > 0:
+        for app_input in appInputs:
+            for field in app_input:
+                if not  field in  config.input_fields_valid:
+                    raise Exception(f'Input field {field} not supported')
+
+            for expected in config.input_fields_valid:
+                if not  expected in  app_input:
+                    raise Exception(f'Expected field {expected} missing')
+                input_type = app_input["type"]
+                if not input_type in config.input_valid_types:
+                    raise Exception(f'Input type {input_type} not supported')
+
+        appInputs_str = json.dumps(appInputs)
+
+    ##### resources
+
+    #resources_str = None
+    resourcesArray = postData.get("resources", [])
+    if not isinstance(resourcesArray, list):
+        raise Exception(f'Field resources has to be an array')
+
+        #resources_str = json.dumps(resourcesArray)
+
+    ##### metadata
+    appMetadata = postData.get("metadata", None)
+
+
+
+
+    ##### create dbObject
+    dbObject = {}
+
+    for key in config.valid_fields_set:
+        dbObject[key] = ""
+
+    if appMetadata:
+        #raise ErrorResponse(f'metadata is missing', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+        if not isinstance(appMetadata, dict):
+            raise Exception(f'Field metadata has to be an object, got {str(appMetadata)}')
+        dbObject["metadata"] = json.dumps(appMetadata)
+
+
+
+    dbObject["name"] = repo_name
+
+    dbObject["inputs"] = appInputs_str
+
+    #copy fields
+    for key in ["description", "version", "namespace"]:
+        dbObject[key] = postData.get(key, "")
+
+    dbObject["frozen"] = postData.get("frozen", False)
+    dbObject["owner"] = requestUser
+
+    # create INSERT statment dynamically
+    values =[]
+    variables = []
+    for key in config.dbFields:
+        print(f"key: {key} value: {dbObject[key]}", file=sys.stderr)
+        values.append(dbObject[key])
+        variables.append("%s")
+
+    variables_str = ",".join(variables)
+    id_str = ""
+    if existing_app_id:
+        id_str = existing_app_id
+    else:
+        #newID = uuid.uuid4()
+        #id_str = str(newID)
+        id_str = f'{namespace}/{repo_name}:{version}'
+
+    ecr_db = ecrdb.EcrDB()
+
+
+    #for build_source in sourcesArray:
+
+
+    #source_name = build_source.get("name", "default")
+
+
+    architectures_array = build_source.get("architectures", [])
+
+    if len(architectures_array) == 0:
+        raise Exception("architectures missing in source")
+
+    ##### architecture
+
+
+    for arch in architectures_array:
+        if not arch in config.architecture_valid:
+            valid_arch_str = ",".join(config.architecture_valid)
+            raise Exception(f'Architecture {arch} not supported, valid values: {valid_arch_str}')
+
+
+
+    architectures = json.dumps(architectures_array)
+
+    url = build_source.get("url", "")
+    if url == "":
+        raise Exception("url missing in source")
+
+
+    branch = build_source.get("branch", "master")
+    if branch == "":
+        raise Exception("branch missing in source")
+
+
+    directory = build_source.get("directory", ".")
+    if directory == "":
+        directory = "."
+
+    dockerfile = build_source.get("dockerfile", "Dockerfile")
+    if dockerfile == "":
+        dockerfile = "Dockerfile"
+
+
+    build_args_dict = build_source.get("build_args", {})
+    if not isinstance(build_args_dict, dict):
+        raise Exception(f'build_args needs to be a dictonary')
+
+    for key in build_args_dict:
+        value = build_args_dict[key]
+        if not isinstance(value, str):
+            raise Exception(f'build_args values have to be strings')
+
+
+    build_args_str = json.dumps(build_args_dict)
+
+
+    ecr_db.insertApp(values, variables_str, id_str, architectures , url, branch, directory, dockerfile, build_args_str, resourcesArray)
+    #print(f'row: {row}', file=sys.stderr)
+
+    #dbObject["id"] = newID
+
+    #content = {}
+    #content["data"] = dbObject
+
+    returnObj, ok=ecr_db.getApp(id_str)
+    if not ok:
+        raise Exception(f'app not found')
+
+    app_submission_counter.inc(1)
+
+    #args = parser.parse_args()
+    return returnObj
 
 # /apps
 class Submit(MethodView):
@@ -213,6 +485,7 @@ class Submit(MethodView):
         requestUser = request.environ.get('user', "")
         isAdmin = request.environ.get('admin', False)
 
+        force_overwrite = request.args.get("force", "").lower() in ["true", "1"]
 
         postData = request.get_json(force=True, silent=True)
         if not postData:
@@ -224,290 +497,17 @@ class Submit(MethodView):
         if not postData:
             raise ErrorResponse(f'Could not parse app spec', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
-        ecr_db = ecrdb.EcrDB()
 
-        ### namespace
-        # check if namespace exists (create if not) and check permissions
-        userHasNamespaceWritePermission = False
-        namespace = postData.get("namespace", "")
-        _, ok = ecr_db.getNamespace(namespace)
-        if not ok:
-            # namespace does not exist. Unless sage assigns usernames, any available namespace can be used
-            try:
-                ecr_db.addNamespace(namespace, requestUser)
-            except Exception as e:
-                raise ErrorResponse(f'Could not create namespace {namespace}: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-            userHasNamespaceWritePermission = True
+        try:
+            return_obj = submit_app(requestUser, isAdmin, force_overwrite, postData)
+        except ErrorResponse as e:
+            raise e
+        except Exception as e:
+            raise ErrorResponse(f'submit_app returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
-        else:
-            # Namespace exists. Check if User has permission to write.
-            # If not, user may still have permission to write to existing Repo.
+        return jsonify(return_obj)
 
-            userHasNamespaceWritePermission = ecr_db.hasPermission("namespace", namespace, "USER", requestUser, "WRITE")
 
-
-        ### repository (app name, without version)
-        repo_name = postData.get("name", "")
-
-        # check if exists, create if needed
-        _, ok = ecr_db.getRepository(namespace, repo_name)
-        if not ok:
-            # namespace does not exist. Unless sage assigns usernames, any available namespace can be used
-            if userHasNamespaceWritePermission:
-                try:
-                    ecr_db.addRepository(namespace, repo_name, requestUser)
-                except Exception as e:
-                    raise ErrorResponse(f'Could not create repository {namespace}/{repo_name}: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-            else:
-               raise ErrorResponse(f'Not authorized to access namespace {namespace}', status_code=HTTPStatus.UNAUTHORIZED)
-
-
-        else:
-            # repo exists, check if user has namespace or repo permission
-            userHasRepoWritePermission = ecr_db.hasPermission("repository", f'{namespace}/{repo_name}', "USER", requestUser, "WRITE")
-            if (not userHasNamespaceWritePermission ) and (not userHasRepoWritePermission):
-                raise ErrorResponse(f'Not authorized to access repository {namespace}/{repo_name}', status_code=HTTPStatus.UNAUTHORIZED)
-
-        ### check if versioned app already exists and if it can be overwritten
-
-        version = postData.get("version", "")
-
-        existing_app, ok = ecr_db.getApp(namespace=namespace, name=repo_name, version=version)
-
-
-        existing_app_id = None
-        if ok:
-            if existing_app.get("frozen", False) and (not isAdmin):
-                raise ErrorResponse(f'App {namespace}/{repo_name}:{version} already exists and is frozen.', status_code=HTTPStatus.UNAUTHORIZED)
-
-            existing_app_id = existing_app.get("id")
-
-        for key in postData:
-            if not key in config.valid_fields_set:
-                #return  {"error": f'Field {key} not supported'}
-                raise ErrorResponse(f'Field {key} not supported', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-        # if required
-        for key in config.required_fields:
-            if not key in postData:
-                #return  {"error": f'Required field {key} is missing'}
-                raise ErrorResponse(f'Required field {key} is missing', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-            expected_type = config.required_fields[key]
-
-            value  = postData[key]
-            if type(value).__name__ != expected_type :
-                raise ErrorResponse(f'Field {key} has to be of type {expected_type}, got {type(value).__name__}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-            if len(value) == 0:
-                #return  {"error": f'Required field {key} is missing'}
-                raise ErrorResponse(f'Required field {key} is missing', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-
-
-
-
-
-
-
-        ##### source
-        # source
-        # git@github.com:<user>/<repo>.git#<tag>
-        # https://github.com/<user>/<repo>.git#<tag>
-        # http://sagecontinuum.org/bucket/<bucket_id>
-
-
-        build_source = postData.get("source",None)
-        #sourcesArray = postData.get("source",[])
-        #if len(sourcesArray) == 0:
-        if not build_source:
-            raise ErrorResponse("Field source is missing")
-
-
-
-        #source_public_git_pattern = re.compile(f'https://github.com/{vc}+/{vc}+.git#{vc}+')
-        #source_private_git_pattern = re.compile(f'git@github.com/{vc}+/{vc}+.git#{vc}+')
-        #source_sage_store_pattern = re.compile(f'http://sagecontinuum.org/bucket/[0-9a-z.]+')
-        #source_matched = False
-        #for p in [source_public_git_pattern, source_private_git_pattern , source_sage_store_pattern]:
-        #    if p.match(appSource):
-        #        source_matched = True
-        #        break
-
-        #if not source_matched:
-        #    raise ErrorResponse('Could not parse source field', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-        ##### inputs
-
-        # inputs validation
-        appInputs = postData.get("inputs", [])
-        if len(appInputs) > 0:
-            for app_input in appInputs:
-                for field in app_input:
-                    if not  field in  config.input_fields_valid:
-                        raise ErrorResponse(f'Input field {field} not supported', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-                for expected in config.input_fields_valid:
-                    if not  expected in  app_input:
-                        raise ErrorResponse(f'Expected field {expected} missing', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-                    input_type = app_input["type"]
-                    if not input_type in config.input_valid_types:
-                        raise ErrorResponse(f'Input type {input_type} not supported', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-            appInputs_str = json.dumps(appInputs)
-
-        ##### resources
-
-        #resources_str = None
-        resourcesArray = postData.get("resources", [])
-        if not isinstance(resourcesArray, list):
-            raise ErrorResponse(f'Field resources has to be an array', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-            #resources_str = json.dumps(resourcesArray)
-
-        ##### metadata
-        appMetadata = postData.get("metadata", None)
-
-
-
-
-        ##### create dbObject
-        dbObject = {}
-
-        for key in config.valid_fields_set:
-            dbObject[key] = ""
-
-        if appMetadata:
-            #raise ErrorResponse(f'metadata is missing', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-            if not isinstance(appMetadata, dict):
-                raise ErrorResponse(f'Field metadata has to be an object, got {str(appMetadata)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-            dbObject["metadata"] = json.dumps(appMetadata)
-
-
-
-        dbObject["name"] = repo_name
-
-        dbObject["inputs"] = appInputs_str
-
-        #copy fields
-        for key in ["description", "version", "namespace"]:
-            dbObject[key] = postData.get(key, "")
-
-        dbObject["frozen"] = postData.get("frozen", False)
-        dbObject["owner"] = requestUser
-
-        # create INSERT statment dynamically
-        values =[]
-        variables = []
-        for key in config.dbFields:
-            print(f"key: {key} value: {dbObject[key]}", file=sys.stderr)
-            values.append(dbObject[key])
-            variables.append("%s")
-
-        variables_str = ",".join(variables)
-        id_str = ""
-        if existing_app_id:
-            id_str = existing_app_id
-        else:
-            #newID = uuid.uuid4()
-            #id_str = str(newID)
-            id_str = f'{namespace}/{repo_name}:{version}'
-
-        ecr_db = ecrdb.EcrDB()
-
-
-        #for build_source in sourcesArray:
-
-
-        #source_name = build_source.get("name", "default")
-
-
-        architectures_array = build_source.get("architectures", [])
-
-        if len(architectures_array) == 0:
-            raise ErrorResponse("architectures missing in source")
-
-        ##### architecture
-
-
-        for arch in architectures_array:
-            if not arch in config.architecture_valid:
-                valid_arch_str = ",".join(config.architecture_valid)
-                raise ErrorResponse(f'Architecture {arch} not supported, valid values: {valid_arch_str}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-
-
-        architectures = json.dumps(architectures_array)
-
-        url = build_source.get("url", "")
-        if url == "":
-            raise ErrorResponse("url missing in source")
-
-
-        branch = build_source.get("branch", "master")
-        if branch == "":
-            raise ErrorResponse("branch missing in source")
-
-
-        directory = build_source.get("directory", ".")
-        if directory == "":
-            directory = "."
-
-        dockerfile = build_source.get("dockerfile", "Dockerfile")
-        if dockerfile == "":
-            dockerfile = "Dockerfile"
-
-
-        build_args_dict = build_source.get("build_args", {})
-        if not isinstance(build_args_dict, dict):
-            raise ErrorResponse(f'build_args needs to be a dictonary', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-        for key in build_args_dict:
-            value = build_args_dict[key]
-            if not isinstance(value, str):
-                raise ErrorResponse(f'build_args values have to be strings', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-
-        build_args_str = json.dumps(build_args_dict)
-
-
-        stmt = f'REPLACE INTO Sources ( id, architectures , url, branch, directory, dockerfile, build_args ) VALUES (%s , %s, %s, %s, %s, %s, %s)'
-        print(f"replace statement: {stmt}", file=sys.stderr)
-        print(f"build_args_str: {build_args_str}", file=sys.stderr)
-        ecr_db.cur.execute(stmt, (id_str, architectures , url, branch, directory, dockerfile, build_args_str))
-
-
-        for res in resourcesArray:
-            res_str = json.dumps(res)
-            stmt = f'REPLACE INTO Resources ( id, resource) VALUES (%s , %s)'
-            ecr_db.cur.execute(stmt, (id_str, res_str,))
-
-
-        print(f'values: {values}', file=sys.stderr)
-
-
-        stmt = f'REPLACE INTO Apps ( id, {config.dbFields_str}) VALUES (%s ,{variables_str})'
-        print(f'stmt: {stmt}', file=sys.stderr)
-        ecr_db.cur.execute(stmt, (id_str, *values))
-
-
-
-
-        ecr_db.db.commit()
-        #print(f'row: {row}', file=sys.stderr)
-
-        #dbObject["id"] = newID
-
-        #content = {}
-        #content["data"] = dbObject
-
-        returnObj, ok=ecr_db.getApp(id_str)
-        if not ok:
-            raise ErrorResponse(f'app not found', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-        app_submission_counter.inc(1)
-
-        #args = parser.parse_args()
-        return returnObj
 
 
 # /apps/<string:namespace>/<string:repository>/<string:version>
@@ -525,7 +525,7 @@ class Apps(MethodView):
         except Exception as e:
             raise ErrorResponse(f'Error deleting app: {e}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
-        return {"deleted": 1}
+        return jsonify({"deleted": 1})
 
     @has_resource_permission( "READ")
     def get(self, namespace=None, repository=None, version=None):
@@ -1224,6 +1224,8 @@ app.wsgi_app = ecr_middleware(app.wsgi_app)
 def handle_invalid_usage(error):
     response = jsonify(error.to_dict())
     response.status_code = error.status_code
+    response.headers.add("Access-Control-Allow-Origin", "*")
+    response.content_type = "application/json"
     return response
 
 
