@@ -177,7 +177,7 @@ Example repsonse:
 ```
 
 
-Make repository public:
+Share repository with another user:
 ```bash
 curl -X PUT ${ECR_API}/permissions/${APP_NAMESPACE}/${APP_REPOSITORY} -H "Authorization: sage ${SAGE_USER_TOKEN}" -d '{"operation":"add", "granteeType": "USER", "grantee": "OtherUser", "permission": "READ"}'
 ```
