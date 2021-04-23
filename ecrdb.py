@@ -306,7 +306,7 @@ class EcrDB():
                 if not field in ref_hash:
                     raise Exception(f"Type not found for field {field} in table {table}")
                 if ref_hash[field] == "datetime":
-                    target[field] = row[pos].isoformat()
+                    target[field] = row[pos].isoformat() + 'Z'
                 elif ref_hash[field] == "json":
                     target[field] = json.loads(row[pos])
                 elif ref_hash[field] == "bool":
@@ -315,7 +315,7 @@ class EcrDB():
                     target[field] = row[pos]
 
             app_list.append(app_obj)
-            #app_list.append({"id": row[0], "namespace": row[1], "name": row[2], "version":row[3], "time_created":row[4].isoformat()})
+            #app_list.append({"id": row[0], "namespace": row[1], "name": row[2], "version":row[3], "time_created":row[4].isoformat() + 'Z'})
 
         if app_id or (namespace and repository and version):
             # only single app was requested, return object, not list
