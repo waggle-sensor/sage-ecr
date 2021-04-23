@@ -64,13 +64,13 @@ Example repsonse:
 
 ## GET /apps/{namespace}/{repository}/{version}
 ```bash
-curl ${ECR_API}/${APP_NAMESPACE}/${APP_REPOSITORY}/${APP_VERSION} -H "Authorization: sage ${SAGE_USER_TOKEN}"
+curl ${ECR_API}/apps/${APP_NAMESPACE}/${APP_REPOSITORY}/${APP_VERSION} -H "Authorization: sage ${SAGE_USER_TOKEN}"
 ```
 
 ## DELETE /apps/{namespace}/{repository}/{version}
 Note: You cannot delete a frozen app, even if you are owner. This requires admin permissions.
 ```bash
-curl -X DELETE ${ECR_API}/${APP_NAMESPACE}/${APP_REPOSITORY}/${APP_VERSION} -H "Authorization: sage ${SAGE_USER_TOKEN}"
+curl -X DELETE ${ECR_API}/apps/${APP_NAMESPACE}/${APP_REPOSITORY}/${APP_VERSION} -H "Authorization: sage ${SAGE_USER_TOKEN}"
 ```
 
 

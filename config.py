@@ -13,17 +13,42 @@ mysql_password =  os.getenv('MYSQL_PASSWORD')
 
 
 
-
-# app definition
-valid_fields =["name", "description", "version", "namespace", "source", "depends_on", "baseCommand", "arguments", "inputs", "resources", "metadata", "frozen"]
+# app definition , these are the app fields (as seen by user) that are stored in the tables Apps
+valid_fields =["namespace", "name", "version", "description" , "source", "depends_on", "baseCommand", "arguments", "inputs", "resources", "metadata", "frozen"]
 valid_fields_set = set(valid_fields)
 required_fields = { "name" : "str",
                     "description" : "str",
                     "version" : "str",
                     "source" : "dict"}
 
-mysql_fields = ["name", "description", "version", "namespace", "depends_on", "baseCommand", "arguments", "inputs", "metadata", "frozen"]
-mysql_fields_det = set(valid_fields)
+
+mysql_Apps_fields = {
+                "id"            : "str",
+                "namespace"     : "str",
+                "name"          : "str",
+                "version"       : "str",
+                "description"   : "str",
+                "depends_on"    : "str",
+                "baseCommand"   : "str",
+                "arguments"     : "str",
+                "inputs"        : "json",
+                "metadata"      : "json",
+                "frozen"        : "bool",
+                "owner"         : "str",
+                "time_created"  : "datetime",
+                "time_last_updated"        : "datetime",
+                }
+
+
+mysql_Sources_fields = {
+                "architectures": "json",
+                "url":"str",
+                "branch":"str",
+                "directory":"str",
+                "dockerfile":"str",
+                "build_args":"str"
+            }
+#mysql_Apps_fields_set = set(valid_fields)
 
 # architecture https://github.com/docker-library/official-images#architectures-other-than-amd64
 architecture_valid = ["linux/amd64", "linux/arm64", "linux/arm/v6", "linux/arm/v7", "linux/arm/v8"]
@@ -35,9 +60,10 @@ input_fields_valid = ["id", "type"]
 input_valid_types = ["boolean", "int", "long", "float", "double", "string", "File"]
 
 
-# database fields
-dbFields = mysql_fields + ["owner"]
-dbFields_str  = ",".join(dbFields)
+# Apps table fields
+#dbAppsFields = mysql_Apps_fields.keys()
+dbAppsFields_str  = ",".join(mysql_Apps_fields.keys())
+dbSourcesFields_str  = ",".join(mysql_Sources_fields.keys())
 
 
 

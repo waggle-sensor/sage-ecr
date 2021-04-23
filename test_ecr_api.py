@@ -6,7 +6,7 @@ import tempfile
 import pytest
 import sys
 from ecr_api import app
-from config import dbFields
+#from config import dbFields
 import json
 import time
 
@@ -231,8 +231,11 @@ def test_app_upload_and_download(client):
 
     # delete app in case app already exists and is frozen
     rv = client.delete(f'/apps/{app_namespace}/{app_repository}/{app_version}', headers=admin_headers)
-    print(f'rv.data: {rv.data}' , file=sys.stderr)
-    if not "App not found" in  str(rv.data):
+    result = rv.get_json()
+
+    if "error" in result:
+        assert "App not found" in result["error"]
+    else:
         assert rv.status_code == 200
 
     # delete repository:
@@ -296,8 +299,8 @@ def test_app_upload_and_download(client):
     assert app_id == app_get_id
 
 
-    for key in dbFields:
-        assert key in result
+    #for key in dbFields:
+    #    assert key in result
 
     assert len(result["inputs"]) == 1
     assert len(result["inputs"][0]) == 2
@@ -310,8 +313,10 @@ def test_app_upload_and_download(client):
     rv = client.delete(f'/apps/{app_namespace}/{app_repository}/{app_version}', headers=headers)
     result = rv.get_json()
     print(f'rv.data: {rv.data}' , file=sys.stderr)
-    assert "deleted" in result
-    assert result["deleted"] == 1
+    if "error" in result:
+        assert "App not found" in result["error"]
+    else:
+        assert result["deleted"] == 1
 
 
 
@@ -322,6 +327,11 @@ def test_listApps(client):
 
     # delete in case app already exists and is frozen
     rv = client.delete(f'/apps/{app_namespace}/{app_repository}/{app_version}', data = test_app_def, headers=admin_headers)
+    result = rv.get_json()
+    if "error" in result:
+        assert "App not found" in result["error"]
+    else:
+        assert result["deleted"] == 1
 
     rv = client.post('/submit', data = test_app_def, headers=headers)
     assert rv.data != ""

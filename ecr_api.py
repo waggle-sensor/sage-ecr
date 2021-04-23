@@ -257,8 +257,10 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData):
 
     version = postData.get("version", "")
 
-    existing_app, found_app = ecr_db.getApp(namespace=namespace, name=repo_name, version=version)
-
+    try:
+        existing_app, found_app = ecr_db.listApps(user=requestUser, namespace=namespace, repository=repo_name, version=version)
+    except Exception as e:
+        raise Exception(f"ecr_db.listApps failed: {str(e)}")
 
     existing_app_id = None
     if found_app:
@@ -281,6 +283,9 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData):
             #return  {"error": f'Required field {key} is missing'}
             raise Exception(f'Required field {key} is missing')
         expected_type = config.required_fields[key]
+
+        if not key in postData:
+            raise Exception(f"key {key} is missing")
 
         value  = postData[key]
         if type(value).__name__ != expected_type :
@@ -383,15 +388,6 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData):
     dbObject["frozen"] = postData.get("frozen", False)
     dbObject["owner"] = requestUser
 
-    # create INSERT statment dynamically
-    values =[]
-    variables = []
-    for key in config.dbFields:
-        print(f"key: {key} value: {dbObject[key]}", file=sys.stderr)
-        values.append(dbObject[key])
-        variables.append("%s")
-
-    variables_str = ",".join(variables)
     id_str = ""
     if existing_app_id:
         id_str = existing_app_id
@@ -399,6 +395,26 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData):
         #newID = uuid.uuid4()
         #id_str = str(newID)
         id_str = f'{namespace}/{repo_name}:{version}'
+
+    dbObject["id"] = id_str
+
+    # create INSERT statment dynamically
+    values =[]
+    col_names = []
+    variables = []
+    #for key in config.mysql_Apps_fields.keys():
+    for key in config.valid_fields + ["id", "owner"]:
+        #print(f"key: {key} value: {dbObject[key]}", file=sys.stderr)
+        if not key in config.mysql_Apps_fields:
+            continue
+        if not key in dbObject:
+            raise Exception(f"key {key} not in dbObject")
+        values.append(dbObject[key])
+        col_names.append(key)
+        variables.append("%s")
+
+    variables_str = ",".join(variables)
+    col_names_str = ",".join(col_names)
 
     ecr_db = ecrdb.EcrDB()
 
@@ -457,8 +473,12 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData):
 
     build_args_str = json.dumps(build_args_dict)
 
+    sources_values = [id_str, architectures , url, branch, directory, dockerfile, build_args_str]
 
-    ecr_db.insertApp(values, variables_str, id_str, architectures , url, branch, directory, dockerfile, build_args_str, resourcesArray)
+    try:
+        ecr_db.insertApp(col_names_str, values, variables_str, sources_values, resourcesArray)
+    except Exception as e:
+        raise Exception(f"insertApp returned: {type(e).__name__},{str(e)}")
     #print(f'row: {row}', file=sys.stderr)
 
     #dbObject["id"] = newID
@@ -466,9 +486,10 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData):
     #content = {}
     #content["data"] = dbObject
 
-    returnObj, ok=ecr_db.getApp(id_str)
+    returnObj, ok=ecr_db.listApps(user=requestUser, namespace=namespace, repository=repo_name, version=version, isAdmin=isAdmin)
+    #returnObj, ok=ecr_db.getApp(id_str)
     if not ok:
-        raise Exception(f'app not found')
+        raise Exception(f'app not found after inserting, something went wrong')
 
     app_submission_counter.inc(1)
 
@@ -503,7 +524,7 @@ class Submit(MethodView):
         except ErrorResponse as e:
             raise e
         except Exception as e:
-            raise ErrorResponse(f'submit_app returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+            raise ErrorResponse(f'{str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
         return jsonify(return_obj)
 
@@ -517,29 +538,54 @@ class Apps(MethodView):
     def delete(self, namespace, repository, version):
 
         isAdmin = request.environ.get('admin', False)
+        requestUser = request.environ.get('user', "")
+
         ecr_db = ecrdb.EcrDB()
 
 
         try:
-            ecr_db.deleteApp(namespace=namespace, repository=repository, version=version, force = isAdmin)
+            ecr_db.deleteApp(user=requestUser, isAdmin=isAdmin, namespace=namespace, repository=repository, version=version, force = isAdmin)
         except Exception as e:
             raise ErrorResponse(f'Error deleting app: {e}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
         return jsonify({"deleted": 1})
 
     @has_resource_permission( "READ")
-    def get(self, namespace=None, repository=None, version=None):
+    def get(self, namespace, repository, version):
+
+        requestUser = request.environ.get('user', "")
+        isAdmin = request.environ.get('admin', False)
 
 
         ecr_db = ecrdb.EcrDB()
 
-        returnObj, ok=ecr_db.getApp(namespace=namespace, name=repository, version=version)
+        #returnObj, ok=ecr_db.getApp(namespace=namespace, name=repository, version=version)
 
+        returnObj, ok =ecr_db.listApps(user=requestUser, namespace=namespace, repository=repository, version=version, isAdmin=isAdmin)
         if not ok:
             raise ErrorResponse(f'App not found', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
         return jsonify(returnObj)
+
+
+    @has_resource_permission( "WRITE")
+    def put(self, namespace, repository, version):
+        ecr_db = ecrdb.EcrDB()
+
+        if "frozen" in request.args:
+            frozen = (request.args.get("frozen", "") in ["true", "1"])
+
+            if not isinstance(frozen, bool):
+                raise ErrorResponse(f'frozen is not bool', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+            result = ecr_db.setAppField(namespace, repository, version, "frozen", frozen)
+            result_obj = {"modified": result}
+        else:
+            raise ErrorResponse(f'Not sure what to do', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        return jsonify(result_obj)
+
 
 
 # Lists all apps, the user has permission to see
@@ -574,18 +620,19 @@ class AppsGlobal(MethodView):
                 'data': returnList
                 }
 
+        if len(returnList) > 0:
+            if len(returnList) == limit:
+                last = returnList[-1]
+                last_id = last["id"]
 
-        if len(returnList) == limit:
-            last = returnList[-1]
-            last_id = last["id"]
+                return_obj['pagination']['continuationToken'] = base64.b64encode(str.encode(last_id)).decode() # b64 is just to make it look cooler
+            else:
+                return_obj['pagination']['continuationToken'] = "N/A"
 
-            return_obj['pagination']['continuationToken'] = base64.b64encode(str.encode(last_id)).decode() # b64 is just to make it look cooler
-        else:
-            return_obj['pagination']['continuationToken'] = "N/A"
         return jsonify(return_obj)
 
 
-def get_build(namespace, repository, version):
+def get_build(requestUser, isAdmin, namespace, repository, version):
     try:
         js = jenkins_server.JenkinsServer(host=config.jenkins_server, username=config.jenkins_user, password=config.jenkins_token)
     except Exception as e:
@@ -602,7 +649,8 @@ def get_build(namespace, repository, version):
 
 
     ecr_db = ecrdb.EcrDB()
-    app_spec, ok = ecr_db.getApp(namespace=namespace, name=repository, version=version)
+    #app_spec, ok = ecr_db.getApp(namespace=namespace, name=repository, version=version)
+    app_spec, ok = ecr_db.listApps(user=requestUser , isAdmin=isAdmin, namespace=namespace, name=repository, version=version)
     if not ok:
         return {"error":f"app_spec not found {namespace}/{repository}:{version}"}
 
@@ -637,7 +685,7 @@ def get_build(namespace, repository, version):
 
 
 
-def build_app(namespace, repository, version):
+def build_app(requestUser, isAdmin, namespace, repository, version):
 
     host = config.jenkins_server
     username = config.jenkins_user
@@ -650,7 +698,7 @@ def build_app(namespace, repository, version):
         raise ErrorResponse(f'JenkinsServer({host}, {username}) returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
     ecr_db = ecrdb.EcrDB()
-    app_spec, ok = ecr_db.getApp(namespace=namespace, name=repository, version=version)
+    app_spec, ok = ecr_db.listApps(user=requestUser , namespace=namespace, name=repository, version=version, isAdmin=isAdmin)
     if not ok:
         return {"error":f"app_spec not found {namespace}/{repository}:{version}"}
 
@@ -745,9 +793,10 @@ class Builds(MethodView):
     def get(self, namespace, repository, version):
 
         #namespace, repository, version
+        requestUser = request.environ.get('user', "")
+        isAdmin = request.environ.get('admin', False)
 
-
-        result = get_build(namespace, repository, version)
+        result = get_build(requestUser,isAdmin, namespace, repository, version)
 
         return result
 
@@ -758,8 +807,11 @@ class Builds(MethodView):
     @has_resource_permission( "FULL_CONTROL" )
     def post(self, namespace, repository, version):
 
-       result = build_app(namespace, repository, version)
-       return result
+        requestUser = request.environ.get('user', "")
+        isAdmin = request.environ.get('admin', False)
+
+        result = build_app(requestUser, isAdmin, namespace, repository, version)
+        return result
 
 
 # /namespaces
