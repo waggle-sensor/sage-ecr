@@ -610,8 +610,11 @@ class AppsGlobal(MethodView):
 
         ecr_db = ecrdb.EcrDB()
 
+        filter = {}
+        filter["public"] = request.args.get('public', "") in ["true", "1"]
+
         try:
-            returnList=ecr_db.listApps(user=requestUser, namespace=namespace, repository=repository, isAdmin=isAdmin, limit=limit, continuationToken=continueT)
+            returnList=ecr_db.listApps(user=requestUser, namespace=namespace, repository=repository, isAdmin=isAdmin, limit=limit, continuationToken=continueT, filter=filter)
         except Exception as e:
             raise ErrorResponse(f'listApps returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 

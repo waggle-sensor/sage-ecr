@@ -199,9 +199,24 @@ class EcrDB():
         return int(self.cur.rowcount)
 
     # in case of a single app (namespace, repository and version specified), this does not return a list
-    def listApps(self, user="", app_id="", namespace="", repository="", version="", limit=None, continuationToken=None, isAdmin=False):
+    # filter supports "public" , "owner", "shared" (owner and shared have no overlap)
+    def listApps(self, user="", app_id="", namespace="", repository="", version="", limit=None, continuationToken=None, isAdmin=False, filter={}):
 
         query_data = []
+
+        include_public = True
+
+        if filter.get("shared", False):
+            # only show apps shared with user + exclude own apps
+            include_public = False
+            owner_condition = ' AND Apps.owner != %s '
+            query_data.append(user)
+
+        owner_condition = ''
+        if filter.get("owner", False):
+            include_public = False
+            owner_condition = ' AND Apps.owner = %s '
+            query_data.append(user)
 
         appID_condition = ''
         if app_id != "":
@@ -238,7 +253,8 @@ class EcrDB():
         if isAdmin:
             user_condition = 'TRUE'
         else:
-            if user != "" :
+            if user != "" and (not filter.get("public", False)) :
+                # without this, api returns only public apps
                 user_condition = '(granteeType="USER" AND grantee=%s)'
                 query_data.append(user)
 
@@ -266,8 +282,23 @@ class EcrDB():
         dbSourcesFields_str = ",".join(["s."+item for item in config.mysql_Sources_fields.keys()])
 
 
+        if include_public:
+            public_stmt = '(granteeType="GROUP" AND grantee="AllUsers")'
+        else:
+            public_stmt = 'FALSE'
+
+        # a) all apps
+        # b) only public
+        # c) user is owner
+        # d) shared with user
+
+        # this makes sure only apps for which user has permission are returned
+        permissions_stmt=f'( ({user_condition}) OR {public_stmt} ) AND ( permission in ("READ", "WRITE", "FULL_CONTROL") )'
+
+
+
         #stmt = f'SELECT DISTINCT Apps.id, namespace, name, version, time_created FROM Apps INNER JOIN Sources s ON s.id = Apps.id INNER JOIN Permissions  ON {sub_stmt} {appID_condition} {repo_condition} {namespace_condition} AND ( ({user_condition}) OR (granteeType="GROUP" AND grantee="AllUsers")) AND (permission in ("READ", "WRITE", "FULL_CONTROL")) {token_stmt}  ORDER BY `namespace`, `name`, `version` ASC  {limit_stmt}'
-        stmt = f'SELECT DISTINCT {dbAppsFields_str},{dbSourcesFields_str} FROM Apps INNER JOIN Sources s ON s.id = Apps.id INNER JOIN Permissions  ON {sub_stmt} {appID_condition} {namespace_condition} {repo_condition} {version_condition} AND ( ({user_condition}) OR (granteeType="GROUP" AND grantee="AllUsers")) AND (permission in ("READ", "WRITE", "FULL_CONTROL")) {token_stmt}  ORDER BY `namespace`, `name`, `version` ASC  {limit_stmt}'
+        stmt = f'SELECT DISTINCT {dbAppsFields_str},{dbSourcesFields_str} FROM Apps INNER JOIN Sources s ON s.id = Apps.id INNER JOIN Permissions  ON {sub_stmt} {owner_condition} {appID_condition} {namespace_condition} {repo_condition} {version_condition} AND {permissions_stmt} {token_stmt}  ORDER BY `namespace`, `name`, `version` ASC  {limit_stmt}'
 
 
         debug_stmt = stmt
