@@ -687,6 +687,12 @@ def test_permissions(client):
     print(f'result: {json.dumps(result)}', file=sys.stderr)
     assert "error" not in result
 
+    # test repository permissions view
+    rv = client.get(f'/repositories?view=permissions', headers=headers_testuser2)
+
+    result = rv.get_json()
+    print(f'result: {json.dumps(result)}', file=sys.stderr)
+    assert "error" not in result
 
 
     # delete app
@@ -723,6 +729,9 @@ def test_repositories(client):
     print(f'Repositories list: {json.dumps(result)}', file=sys.stderr)
 
     assert rv.status_code == 200
+
+
+
 
 
 def test_authz(client):

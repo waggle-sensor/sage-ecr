@@ -984,10 +984,50 @@ class RepositoriesList(MethodView):
         filter["shared"] = request.args.get('shared', "") in ["true", "1"]
         filter["owner"] = request.args.get('owner', "") in ["true", "1"]
 
-
+        view = request.args.get('view', "")
 
         ecr_db = ecrdb.EcrDB()
         repList = ecr_db.listRepositories(user=requestUser, namespace=namespace, isAdmin=isAdmin, filter=filter)
+
+
+        if view == "permissions":
+
+            perms = ecr_db.getRepoPermissionsByOwner(requestUser)
+            perms_dict = {}
+            for p in perms:
+
+                r_namespace = p["namespace"]
+                r_name = p["name"]
+
+                new_p = {}
+                new_p["grantee"] = p.get("Permissions.grantee", "")
+                new_p["granteeType"] = p.get("Permissions.granteeType", "")
+                new_p["permission"] = p.get("Permissions.permission", "")
+                new_p["resourceName"] = p.get("Permissions.resourceName", "")
+                new_p["resourceType"] = p.get("Permissions.resourceType", "")
+
+                if r_namespace not in perms_dict:
+                    perms_dict[r_namespace] = {}
+                if r_name not in perms_dict[r_namespace]:
+                    perms_dict[r_namespace][r_name] = []
+
+                perms_dict[r_namespace][r_name].append(new_p)
+
+            for rep in repList:
+                r_namespace = rep["namespace"]
+                if not r_namespace in perms_dict:
+                    continue
+                r_name = rep["name"]
+                if not r_name in perms_dict[r_namespace]:
+                    continue
+
+                rep["permissions"] = perms_dict[r_namespace][r_name]
+
+            #obj = {"data":perms}
+            #return jsonify(obj)
+
+
+
         obj = {"data":repList}
         return jsonify(obj)
 

@@ -460,7 +460,9 @@ class EcrDB():
 
             # not needed ?  --->    AND ( Permissions.resourceName LIKE CONCAT(Repositories.namespace, \"%%\") )
 
-        stmt = f'''SELECT DISTINCT namespace , name , owner_id FROM Repositories INNER JOIN Permissions ON {sub_stmt} {owner_condition} {namespace_condition}    AND {permissions_stmt}'''
+        fields = ["namespace" , "name" , "owner_id", "description","external_link"]
+        fields_str = ",".join(fields)
+        stmt = f'''SELECT DISTINCT {fields_str} FROM Repositories INNER JOIN Permissions ON {sub_stmt} {owner_condition} {namespace_condition}    AND {permissions_stmt}'''
 
 
 
@@ -485,8 +487,17 @@ class EcrDB():
         logger.debug(f'len(rows): {len(rows)}')
         for row in rows:
             #print(f'row: {row}', file=sys.stderr)
+            obj = {}
 
-            rep_list.append({"type": "repository", "namespace": row[0], "name": row[1], "owner_id": row[2]})
+            #obj = dict(zip(fields, row))
+            obj["type"]="repository"
+            for pos, field in enumerate(fields):
+                if row[pos]:
+                    obj[field] = row[pos]
+                else:
+                    obj[field] = ""
+            rep_list.append(obj)
+            #rep_list.append({"type": "repository", "namespace": row[0], "name": row[1], "owner_id": row[2]})
 
         return rep_list
 
@@ -507,6 +518,39 @@ class EcrDB():
 
         return perm_list
 
+    # this will return all permissions of repos that are owned by owner_id
+    # permissions grnated to owner_id itself are ignored
+    def getRepoPermissionsByOwner(self, owner_id ):
+
+
+        fields_str = 'namespace, name, owner_id, Permissions.resourceType,Permissions.resourceName,Permissions.granteeType,Permissions.grantee,Permissions.permission'
+        fields =  [x.strip() for x in fields_str.split(',')]
+
+        #TODO this is risky, ignoring grantee works, but may ignore a group of same name (did not find a nice solution. maybe use CONCAT)
+
+        stmt = f'SELECT {fields_str}  FROM Repositories INNER JOIN Permissions ON ( Permissions.resourceType="repository" AND Permissions.resourceName=CONCAT(Repositories.namespace , "/", Repositories.name )  OR (Permissions.resourceType="namespace" AND Permissions.resourceName=Repositories.namespace) )  WHERE (owner_id = %s OR (granteeType="GROUP" and grantee="AllUsers")) AND grantee != %s  ORDER BY namespace, name, resourceType, resourceName;'
+        debug_stmt = stmt
+        for key in [owner_id, owner_id]:
+            debug_stmt = debug_stmt.replace("%s", f'"{key}"', 1)
+
+        logger.debug(f'getRepoPermissionsByOwner: {debug_stmt}')
+
+
+        self.cur.execute(stmt, (owner_id, owner_id, ))
+
+        rows = self.cur.fetchall()
+
+        perm_list = []
+
+        for row in rows:
+            #print(f'row: {row}', file=sys.stderr)
+            obj = {}
+            for pos, field in enumerate(fields):
+                obj[field] = row[pos]
+
+            perm_list.append(obj)
+
+        return perm_list
 
     def addPermission(self, resourceType, resourceName, granteeType , grantee , permission):
 

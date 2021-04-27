@@ -49,7 +49,9 @@ CREATE TABLE IF NOT EXISTS SageECR.Namespaces (
 CREATE TABLE IF NOT EXISTS SageECR.Repositories (
     namespace             VARCHAR(32) NOT NULL,
     name                  VARCHAR(256) NOT NULL,
-    owner_id            VARCHAR(64) NOT NULL,
+    owner_id              VARCHAR(64) NOT NULL,
+    description           TEXT,
+    external_link         VARCHAR(256),
     PRIMARY KEY (namespace,name)
 );
 
