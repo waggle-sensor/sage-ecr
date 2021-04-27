@@ -1142,62 +1142,6 @@ class Permissions(MethodView):
 
 
 
-## DO NOT USE ##
-    @login_required
-    @has_resource_permission( "WRITE_ACP" )
-    def delete(self, namespace, repository=None, version=None):
-
-
-        try:
-            #return jsonify({"grantee":"hello"})
-            ecr_db = ecrdb.EcrDB()
-        except Exception as e:
-            raise ErrorResponse(f'EcrDB returned{str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-        try:
-            postData = request.get_json(force=True)
-
-        except Exception as e:
-            raise ErrorResponse(f'request.get_json returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-        try:
-            #requestUser = request.environ.get('user', "")
-            granteeType = postData.get("granteeType", None)
-            grantee = postData.get("grantee", None)
-            permission = postData.get("permission", None)
-        except Exception as e:
-            raise ErrorResponse(f'postData.get returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-        return jsonify({"grantee":"x"})
-        if repository:
-            app.logger.debug("repository")
-            # repository
-            repo_obj , ok = ecr_db.getRepository(namespace, repository)
-            if not ok:
-                raise ErrorResponse(f'No owner found for repository {namespace}/{repository}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-            owner = repo_obj["owner_id"]
-            repository_full = f'{namespace}/{repository}'
-            resource_name = repository_full
-            resource_type = "repository"
-
-        else:
-            # namespace
-            app.logger.debug("namespace")
-            n_obj = ecr_db.getNamespace(namespace)
-            owner = n_obj["owner_id"]
-            resource_name = namespace
-            resource_type = "namespace"
-
-
-        result = ecr_db.deletePermissions(owner, resource_type, resource_name, granteeType=granteeType, grantee=grantee, permission=permission)
-
-
-        obj= {"deleted": result }
-
-        return jsonify(obj)
-
-
 
 # /
 class Base(MethodView):
