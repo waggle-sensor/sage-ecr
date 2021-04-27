@@ -207,14 +207,19 @@ class ecr_middleware():
 
 
 
-def submit_app(requestUser, isAdmin, force_overwrite, postData):
+def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, repository=None, version=None):
 
     ecr_db = ecrdb.EcrDB()
 
     ### namespace
     # check if namespace exists (create if not) and check permissions
     userHasNamespaceWritePermission = False
-    namespace = postData.get("namespace", "")
+    if not namespace:
+        namespace = postData.get("namespace", "")
+
+    if not namespace:
+        raise Exception("namespace missing")
+
     _, ok = ecr_db.getNamespace(namespace)
     if not ok:
         # namespace does not exist. Unless sage assigns usernames, any available namespace can be used
@@ -232,43 +237,49 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData):
 
 
     ### repository (app name, without version)
-    repo_name = postData.get("name", "")
+    if not repository:
+        repository = postData.get("name", "")
+    if not repository:
+        raise Exception("repository name missing")
 
     # check if exists, create if needed
-    _, ok = ecr_db.getRepository(namespace, repo_name)
+    _, ok = ecr_db.getRepository(namespace, repository)
     if not ok:
         # namespace does not exist. Unless sage assigns usernames, any available namespace can be used
         if userHasNamespaceWritePermission:
             try:
-                ecr_db.addRepository(namespace, repo_name, requestUser)
+                ecr_db.addRepository(namespace, repository, requestUser)
             except Exception as e:
-                raise Exception(f'Could not create repository {namespace}/{repo_name}: {str(e)}')
+                raise Exception(f'Could not create repository {namespace}/{repository}: {str(e)}')
         else:
             raise ErrorResponse(f'Not authorized to access namespace {namespace}', status_code=HTTPStatus.UNAUTHORIZED)
 
 
     else:
         # repo exists, check if user has namespace or repo permission
-        userHasRepoWritePermission = ecr_db.hasPermission("repository", f'{namespace}/{repo_name}', "USER", requestUser, "WRITE")
+        userHasRepoWritePermission = ecr_db.hasPermission("repository", f'{namespace}/{repository}', "USER", requestUser, "WRITE")
         if (not userHasNamespaceWritePermission ) and (not userHasRepoWritePermission):
-            raise ErrorResponse(f'Not authorized to access repository {namespace}/{repo_name}', status_code=HTTPStatus.UNAUTHORIZED)
+            raise ErrorResponse(f'Not authorized to access repository {namespace}/{repository}', status_code=HTTPStatus.UNAUTHORIZED)
 
     ### check if versioned app already exists and if it can be overwritten
 
-    version = postData.get("version", "")
+    if not version:
+        version = postData.get("version", "")
+    if not version:
+        raise Exception("version not specified")
 
     try:
-        existing_app, found_app = ecr_db.listApps(user=requestUser, namespace=namespace, repository=repo_name, version=version)
+        existing_app, found_app = ecr_db.listApps(user=requestUser, namespace=namespace, repository=repository, version=version)
     except Exception as e:
         raise Exception(f"ecr_db.listApps failed: {str(e)}")
 
     existing_app_id = None
     if found_app:
         if (existing_app.get("frozen", False) and (not isAdmin)):
-            raise Exception(f'App {namespace}/{repo_name}:{version} already exists and is frozen.')
+            raise Exception(f'App {namespace}/{repository}:{version} already exists and is frozen.')
 
         if not force_overwrite:
-            raise Exception(f'App {namespace}/{repo_name}:{version} already exists but is not frozen. Use query force=true to overwrite.')
+            raise Exception(f'App {namespace}/{repository}:{version} already exists but is not frozen. Use query force=true to overwrite.')
 
         existing_app_id = existing_app.get("id")
 
@@ -278,6 +289,7 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData):
             raise Exception(f'Field {key} not supported')
 
     # if required
+
     for key in config.required_fields:
         if not key in postData:
             #return  {"error": f'Required field {key} is missing'}
@@ -377,13 +389,17 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData):
 
 
 
-    dbObject["name"] = repo_name
+    dbObject["namespace"] = namespace
+    dbObject["name"] = repository
+    dbObject["version"] = version
 
     dbObject["inputs"] = appInputs_str
 
     #copy fields
-    for key in ["description", "version", "namespace"]:
+    for key in ["description"]:
         dbObject[key] = postData.get(key, "")
+
+
 
     dbObject["frozen"] = postData.get("frozen", False)
     dbObject["owner"] = requestUser
@@ -394,7 +410,7 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData):
     else:
         #newID = uuid.uuid4()
         #id_str = str(newID)
-        id_str = f'{namespace}/{repo_name}:{version}'
+        id_str = f'{namespace}/{repository}:{version}'
 
     dbObject["id"] = id_str
 
@@ -486,7 +502,7 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData):
     #content = {}
     #content["data"] = dbObject
 
-    returnObj, ok=ecr_db.listApps(user=requestUser, namespace=namespace, repository=repo_name, version=version, isAdmin=isAdmin)
+    returnObj, ok=ecr_db.listApps(user=requestUser, namespace=namespace, repository=repository, version=version, isAdmin=isAdmin)
     #returnObj, ok=ecr_db.getApp(id_str)
     if not ok:
         raise Exception(f'app not found after inserting, something went wrong')
@@ -556,12 +572,14 @@ class Apps(MethodView):
         requestUser = request.environ.get('user', "")
         isAdmin = request.environ.get('admin', False)
 
+        view = request.args.get('view', "")
+
 
         ecr_db = ecrdb.EcrDB()
 
         #returnObj, ok=ecr_db.getApp(namespace=namespace, name=repository, version=version)
 
-        returnObj, ok =ecr_db.listApps(user=requestUser, namespace=namespace, repository=repository, version=version, isAdmin=isAdmin)
+        returnObj, ok =ecr_db.listApps(user=requestUser, namespace=namespace, repository=repository, version=version, isAdmin=isAdmin, view=view)
         if not ok:
             raise ErrorResponse(f'App not found', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
@@ -586,7 +604,35 @@ class Apps(MethodView):
 
         return jsonify(result_obj)
 
+    # auth disabled because user can create namespace
+    # @has_resource_permission( "WRITE")
+    def post(self, namespace, repository, version):
 
+
+        requestUser = request.environ.get('user', "")
+        isAdmin = request.environ.get('admin', False)
+
+        force_overwrite = request.args.get("force", "").lower() in ["true", "1"]
+
+        postData = request.get_json(force=True, silent=True)
+        if not postData:
+            # try yaml
+            yaml_str = request.get_data().decode("utf-8")
+            print(f"yaml_str: {yaml_str} ", file=sys.stderr)
+            postData = yaml.load(yaml_str , Loader=yaml.FullLoader)
+
+        if not postData:
+            raise ErrorResponse(f'Could not parse app spec', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+
+        try:
+            return_obj = submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=namespace, repository=repository, version=version)
+        except ErrorResponse as e:
+            raise e
+        except Exception as e:
+            raise ErrorResponse(f'{str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        return jsonify(return_obj)
 
 # Lists all apps, the user has permission to see
 # /apps
@@ -612,9 +658,13 @@ class AppsGlobal(MethodView):
 
         filter = {}
         filter["public"] = request.args.get('public', "") in ["true", "1"]
+        filter["shared"] = request.args.get('shared', "") in ["true", "1"]
+        filter["owner"] = request.args.get('owner', "") in ["true", "1"]
+
+        view = request.args.get('view', "")
 
         try:
-            returnList=ecr_db.listApps(user=requestUser, namespace=namespace, repository=repository, isAdmin=isAdmin, limit=limit, continuationToken=continueT, filter=filter)
+            returnList=ecr_db.listApps(user=requestUser, namespace=namespace, repository=repository, isAdmin=isAdmin, limit=limit, continuationToken=continueT, filter=filter, view=view)
         except Exception as e:
             raise ErrorResponse(f'listApps returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
@@ -633,6 +683,7 @@ class AppsGlobal(MethodView):
                 return_obj['pagination']['continuationToken'] = "N/A"
 
         return jsonify(return_obj)
+
 
 
 def get_build(requestUser, isAdmin, namespace, repository, version):
@@ -926,8 +977,17 @@ class RepositoriesList(MethodView):
         if not namespace:
             namespace = request.args.get('namespace', None)
 
+        isAdmin = request.environ.get('admin', "")
+
+        filter = {}
+        filter["public"] = request.args.get('public', "") in ["true", "1"]
+        filter["shared"] = request.args.get('shared', "") in ["true", "1"]
+        filter["owner"] = request.args.get('owner', "") in ["true", "1"]
+
+
+
         ecr_db = ecrdb.EcrDB()
-        repList = ecr_db.listRepositories(user=requestUser, namespace=namespace)
+        repList = ecr_db.listRepositories(user=requestUser, namespace=namespace, isAdmin=isAdmin, filter=filter)
         obj = {"data":repList}
         return jsonify(obj)
 

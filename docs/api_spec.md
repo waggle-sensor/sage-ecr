@@ -11,7 +11,15 @@ export APP_VERSION="1.0"
 ```
 
 
-## POST /submit
+## POST /apps/{namespace}/{repository}/{version} OR  /submit
+
+```bash
+curl -X POST ${ECR_API}/apps/${APP_NAMESPACE}/${APP_REPOSITORY}/${APP_VERSION} -H "Authorization: sage ${SAGE_USER_TOKEN}" --data-binary  @./example_app.yaml
+```
+
+
+Alternatively, if namespace, repository("name"), and version are specified in the app:
+
 ```bash
 curl -X POST ${ECR_API}/submit -H "Authorization: sage ${SAGE_USER_TOKEN}" --data-binary  @./example_app.yaml
 curl -X POST ${ECR_API}/submit -H "Authorization: sage ${SAGE_USER_TOKEN}" -d '{...}'

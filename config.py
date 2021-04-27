@@ -16,9 +16,10 @@ mysql_password =  os.getenv('MYSQL_PASSWORD')
 # app definition , these are the app fields (as seen by user) that are stored in the tables Apps
 valid_fields =["namespace", "name", "version", "description" , "source", "depends_on", "baseCommand", "arguments", "inputs", "resources", "metadata", "frozen"]
 valid_fields_set = set(valid_fields)
-required_fields = { "name" : "str",
-                    "description" : "str",
-                    "version" : "str",
+
+app_view_fields = ["namespace", "name", "version", "description" , "source", "depends_on", "baseCommand", "arguments", "inputs", "resources", "metadata"]
+
+required_fields = { "description" : "str",
                     "source" : "dict"}
 
 
@@ -46,7 +47,7 @@ mysql_Sources_fields = {
                 "branch":"str",
                 "directory":"str",
                 "dockerfile":"str",
-                "build_args":"str"
+                "build_args":"json"
             }
 #mysql_Apps_fields_set = set(valid_fields)
 

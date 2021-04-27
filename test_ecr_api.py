@@ -19,13 +19,12 @@ test_app_def_obj = yaml.load(open('example_app.yaml', 'r').read(), Loader=yaml.F
 
 test_app_def = json.dumps(test_app_def_obj)
 
-app_namespace = test_app_def_obj["namespace"]
-app_repository = test_app_def_obj["name"]
-app_version = test_app_def_obj["version"]
+#app_namespace = test_app_def_obj["namespace"]
+#app_repository = test_app_def_obj["name"]
+#app_version = test_app_def_obj["version"]
 
-grimm_namespace = "brothers-grimm"
-test_app_def_obj["namespace"] = grimm_namespace
-grimm_app_def = json.dumps(test_app_def_obj)
+
+
 
 # from https://flask.palletsprojects.com/en/1.1.x/testing/
 @pytest.fixture
@@ -74,7 +73,7 @@ def upload_and_build(client, test_failure=False):
 
     print(f'local_test_app_def rv.data: {local_test_app_def}' , file=sys.stderr)
 
-    rv = client.post('/submit', data = local_test_app_def, headers=headers)
+    rv = client.post(f'/apps/{app_namespace}/{app_repository}/{app_version}', data = local_test_app_def, headers=headers)
     assert rv.data != ""
     print(f'upload_and_build rv.data: {rv.data}' , file=sys.stderr)
 
@@ -228,6 +227,10 @@ def test_app_upload_and_download(client):
     headers = {"Authorization" : "sage token1"}
     admin_headers = {"Authorization" : "sage token2"}
 
+    app_namespace = "sage"
+    app_repository = "simple"
+    app_version = "1.0"
+
 
     # delete app in case app already exists and is frozen
     rv = client.delete(f'/apps/{app_namespace}/{app_repository}/{app_version}', headers=admin_headers)
@@ -264,7 +267,7 @@ def test_app_upload_and_download(client):
 
 
     # submit
-    rv = client.post('/submit', data = test_app_def, headers=headers)
+    rv = client.post(f'/apps/{app_namespace}/{app_repository}/{app_version}', data = test_app_def, headers=headers)
     assert rv.data != ""
     print(f'rv.data: {rv.data}' , file=sys.stderr)
 
@@ -274,7 +277,7 @@ def test_app_upload_and_download(client):
     assert result != None
     assert "error" not in result
     assert "name" in result
-    assert result["name"] ==  test_app_def_obj["name"]
+    assert result["name"] ==  app_repository
 
 
     assert "id" in result
@@ -290,7 +293,7 @@ def test_app_upload_and_download(client):
     assert "error"  not in result
 
     assert "name" in result
-    assert result["name"] ==  test_app_def_obj["name"]
+    assert result["name"] == app_repository
 
     assert "owner" in result
     assert result["owner"] ==  "testuser"
@@ -324,26 +327,45 @@ def test_app_upload_and_download(client):
 def test_listApps(client):
     headers = {"Authorization" : "sage token1"}
     admin_headers = {"Authorization" : "sage token2"}
+    headers_testuser2 = {"Authorization" : "sage token10"}
+
+
+    mars_namespace = "planetmars"
+
+    app_repository = "simple"
+    app_version = "1.0"
+
+    #test_app_def_obj["namespace"] = mars_namespace
+    #mars_app_def = json.dumps(test_app_def_obj)
 
     # delete in case app already exists and is frozen
-    rv = client.delete(f'/apps/{app_namespace}/{app_repository}/{app_version}', data = test_app_def, headers=admin_headers)
+    rv = client.delete(f'/apps/{mars_namespace}/{app_repository}/{app_version}', headers=admin_headers)
     result = rv.get_json()
     if "error" in result:
         assert "App not found" in result["error"]
     else:
         assert result["deleted"] == 1
 
-    rv = client.post('/submit', data = test_app_def, headers=headers)
+
+     # clean-up repo permissions
+    data = {"operation":"delete"}
+    rv = client.put(f'/permissions/{mars_namespace}/{app_repository}', data=json.dumps(data), headers=admin_headers)
+
+    # clean-up namespace permissions
+    rv = client.put(f'/permissions/{mars_namespace}', data=json.dumps(data), headers=admin_headers)
+
+
+    rv = client.post(f'/apps/{mars_namespace}/{app_repository}/{app_version}', data = test_app_def, headers=headers)
     assert rv.data != ""
     print(f'rv.data: {rv.data}' , file=sys.stderr)
 
     result = rv.get_json()
-
+    assert "error" not in result
     assert "id" in result
     app_id = result["id"]
 
 
-    rv = client.get(f'/apps/{app_namespace}/{app_repository}', data = test_app_def, headers=headers)
+    rv = client.get(f'/apps/{mars_namespace}/{app_repository}', headers=headers)
     print(f'get list rv.data: {rv.data}' , file=sys.stderr)
     result = rv.get_json()
 
@@ -360,24 +382,98 @@ def test_listApps(client):
 
     assert found_app
 
+    # List public repositories (in planetmars)
+    # query as public user
+    rv = client.get(f'/repositories/{mars_namespace}')
+    print(f'get list rv.data: {rv.data}' , file=sys.stderr)
+    result = rv.get_json()
 
+    assert "data" in result
+    assert len(result["data"]) == 0
+
+    # query as user/owner
+    rv = client.get(f'/repositories/{mars_namespace}', headers=headers)
+    result = rv.get_json()
+
+    assert "data" in result
+    assert len(result["data"]) == 1
+
+
+    # query as user/owner , ask for public repos
+    rv = client.get(f'/repositories/{mars_namespace}?public=1', headers=headers)
+    result = rv.get_json()
+
+    assert "data" in result
+    assert len(result["data"]) == 0
+
+    # query as user/owner , ask for public apps
+    rv = client.get(f'/apps/{mars_namespace}?public=1', headers=headers)
+    result = rv.get_json()
+
+    assert "data" in result
+    assert len(result["data"]) == 0
+
+    ## shared feature
+
+    # check as testuser2 if repo has been shared (via /repositories)
+    rv = client.get(f'/repositories/{mars_namespace}?shared=1', headers=headers_testuser2)
+    result = rv.get_json()
+
+    assert "data" in result
+    assert len(result["data"]) == 0
+
+    # check as testuser2 if repo has been shared (via /app)
+    rv = client.get(f'/apps/{mars_namespace}?shared=1', headers=headers_testuser2)
+    result = rv.get_json()
+
+    assert "data" in result
+    assert len(result["data"]) == 0
+
+    #share with testuser2
+
+    rv = client.put(f'/permissions/{mars_namespace}', data=json.dumps({"operation":"add", "granteeType": "USER", "grantee": "testuser2", "permission":"READ"}), headers=headers)
+    result = rv.get_json()
+    assert "error" not in result
+
+    # check again if testuser2 has access
+    rv = client.get(f'/repositories/{mars_namespace}?shared=1', headers=headers_testuser2)
+    result = rv.get_json()
+
+    assert "data" in result
+    assert len(result["data"]) == 1
+
+    # check as testuser2 if repo has been shared (via /app)
+    rv = client.get(f'/apps/{mars_namespace}?shared=1', headers=headers_testuser2)
+    result = rv.get_json()
+
+    assert "data" in result
+    assert len(result["data"]) == 1
 
 
 def test_permissions(client):
     headers = {"Authorization" : "sage token1"}
     headers_testuser2 = {"Authorization" : "sage token10"}
+    admin_headers = {"Authorization" : "sage token2"}
+
+    grimm_namespace = "brothers-grimm"
+    grimm_repo = "hansel_and_gretel"
+    grimm_v = "1.0"
+    #test_app_def_obj["namespace"] = grimm_namespace
+    #grimm_app_def = json.dumps(test_app_def_obj)
 
     # clean-up repo permissions
     data = {"operation":"delete"}
-    rv = client.put(f'/permissions/{grimm_namespace}/{app_repository}', data=json.dumps(data), headers=headers)
+    rv = client.put(f'/permissions/{grimm_namespace}/{grimm_repo}', data=json.dumps(data), headers=admin_headers)
 
     # clean-up namespace permissions
-    rv = client.put(f'/permissions/{grimm_namespace}', data=json.dumps(data), headers=headers)
+    rv = client.put(f'/permissions/{grimm_namespace}', data=json.dumps(data), headers=admin_headers)
 
+    rv = client.delete(f'/apps/{grimm_namespace}/{grimm_repo}/{grimm_v}', headers=admin_headers)
+    result = rv.get_json()
 
 
     # create app
-    rv = client.post('/submit', data = grimm_app_def, headers=headers)
+    rv = client.post(f'/apps/{grimm_namespace}/{grimm_repo}/{grimm_v}', data = test_app_def, headers=headers)
     assert rv.data != ""
     #print(f'rv.data: {rv.data}' , file=sys.stderr)
 
@@ -389,7 +485,7 @@ def test_permissions(client):
     app_id = result["id"]
 
     # verify app
-    rv = client.get(f'/apps/{grimm_namespace}/{app_repository}/{app_version}', headers=headers)
+    rv = client.get(f'/apps/{grimm_namespace}/{grimm_repo}/{grimm_v}', headers=headers)
 
     result = rv.get_json()
 
@@ -399,7 +495,7 @@ def test_permissions(client):
     assert result["id"] == app_id
 
     # verify that the app (repository to be precise) is private
-    rv = client.get(f'/apps/{grimm_namespace}/{app_repository}/{app_version}', headers=headers_testuser2)
+    rv = client.get(f'/apps/{grimm_namespace}/{grimm_repo}/{grimm_v}', headers=headers_testuser2)
 
     result = rv.get_json()
 
@@ -414,18 +510,18 @@ def test_permissions(client):
 
     for app in result["data"]:
         assert "id" in app
-        assert app["id"] != f"{grimm_namespace}/{app_repository}:{app_version}"
+        assert app["id"] != f"{grimm_namespace}/{grimm_repo}:{grimm_v}"
 
 
 
 
     # remove all permissions from repo
     data ={"operation":"delete"}
-    rv = client.put(f'/permissions/{grimm_namespace}/{app_repository}', data=json.dumps(data), headers=headers)
+    rv = client.put(f'/permissions/{grimm_namespace}/{grimm_repo}', data=json.dumps(data), headers=headers)
 
 
     # check repo permissions: only owner should have permission
-    rv = client.get(f'/permissions/{grimm_namespace}/{app_repository}', headers=headers)
+    rv = client.get(f'/permissions/{grimm_namespace}/{grimm_repo}', headers=headers)
 
     result = rv.get_json()
 
@@ -438,7 +534,7 @@ def test_permissions(client):
 
     data = {"operation":"add", "granteeType": "GROUP", "grantee": "AllUsers", "permission": "READ"}
 
-    rv = client.put(f'/permissions/{grimm_namespace}/{app_repository}', data=json.dumps(data), headers=headers)
+    rv = client.put(f'/permissions/{grimm_namespace}/{grimm_repo}', data=json.dumps(data), headers=headers)
     print(f'make repo public, resut: {rv.data}', file=sys.stderr)
     result = rv.get_json()
 
@@ -450,7 +546,7 @@ def test_permissions(client):
     assert "added" in result
 
     # check repo permissions
-    rv = client.get(f'/permissions/{grimm_namespace}/{app_repository}', headers=headers)
+    rv = client.get(f'/permissions/{grimm_namespace}/{grimm_repo}', headers=headers)
 
     result = rv.get_json()
     print(f'check repo permissions: {json.dumps(result)}', file=sys.stderr)
@@ -458,7 +554,7 @@ def test_permissions(client):
     assert len(result) ==2
 
     # get public app as authenticated user
-    rv = client.get(f'/apps/{grimm_namespace}/{app_repository}/{app_version}', headers=headers)
+    rv = client.get(f'/apps/{grimm_namespace}/{grimm_repo}/1.0', headers=headers)
 
     result = rv.get_json()
 
@@ -466,7 +562,7 @@ def test_permissions(client):
 
 
     # get public app anonymously
-    rv = client.get(f'/apps/{grimm_namespace}/{app_repository}/{app_version}')
+    rv = client.get(f'/apps/{grimm_namespace}/{grimm_repo}/{grimm_v}')
 
     result = rv.get_json()
 
@@ -475,7 +571,7 @@ def test_permissions(client):
 
     # remove public permission
     data["operation"] = "delete"
-    rv = client.put(f'/permissions/{grimm_namespace}/{app_repository}', data=json.dumps(data), headers=headers)
+    rv = client.put(f'/permissions/{grimm_namespace}/{grimm_repo}', data=json.dumps(data), headers=headers)
 
     result = rv.get_json()
 
@@ -488,7 +584,7 @@ def test_permissions(client):
 
     for user in ['other1', 'other2', 'other3', 'testuser2']:
         other = {"operation":"add", "granteeType": "USER", "grantee":  user , "permission": "READ"}
-        rv = client.put(f'/permissions/{grimm_namespace}/{app_repository}', data=json.dumps(other), headers=headers)
+        rv = client.put(f'/permissions/{grimm_namespace}/{grimm_repo}', data=json.dumps(other), headers=headers)
 
         result = rv.get_json()
         assert "error" not in result
@@ -496,7 +592,7 @@ def test_permissions(client):
         assert result["added"] == 1
 
     # check app permissions
-    rv = client.get(f'/permissions/{grimm_namespace}/{app_repository}', headers=headers)
+    rv = client.get(f'/permissions/{grimm_namespace}/{grimm_repo}', headers=headers)
 
     result = rv.get_json()
 
@@ -506,7 +602,7 @@ def test_permissions(client):
 
     # remove all permissions (except owners FULL_CONTROLL)
 
-    rv = client.put(f'/permissions/{grimm_namespace}/{app_repository}', data=json.dumps({"operation":"delete"}), headers=headers)
+    rv = client.put(f'/permissions/{grimm_namespace}/{grimm_repo}', data=json.dumps({"operation":"delete"}), headers=headers)
 
     result = rv.get_json()
     print(f'Deletion result: {json.dumps(result)}', file=sys.stderr)
@@ -515,7 +611,7 @@ def test_permissions(client):
     assert deleted == 4
 
     # check app permissions
-    rv = client.get(f'/permissions/{grimm_namespace}/{app_repository}', headers=headers)
+    rv = client.get(f'/permissions/{grimm_namespace}/{grimm_repo}', headers=headers)
 
     result = rv.get_json()
 
@@ -526,7 +622,7 @@ def test_permissions(client):
 
 
     # check app without auth
-    rv = client.get(f'/apps/{grimm_namespace}/{app_repository}/{app_version}')
+    rv = client.get(f'/apps/{grimm_namespace}/{grimm_repo}/{grimm_v}')
 
     result = rv.get_json()
 
@@ -554,7 +650,7 @@ def test_permissions(client):
     assert "data" in result
     assert len(result["data"]) > 0
     assert "name" in result["data"][0]
-    assert result["data"][0]["name"] == "simple"
+    assert result["data"][0]["name"] == grimm_repo
 
     # list all namespaces
     rv = client.get(f'/namespaces', headers=headers)
@@ -585,7 +681,7 @@ def test_permissions(client):
     print(f'result: {json.dumps(result)}', file=sys.stderr)
 
     # view permissions as testuser2
-    rv = client.get(f'/permissions/{grimm_namespace}/{app_repository}', headers=headers_testuser2)
+    rv = client.get(f'/permissions/{grimm_namespace}/{grimm_repo}', headers=headers_testuser2)
 
     result = rv.get_json()
     print(f'result: {json.dumps(result)}', file=sys.stderr)
@@ -595,7 +691,7 @@ def test_permissions(client):
 
     # delete app
 
-    rv = client.delete(f'/apps/{grimm_namespace}/{app_repository}/{app_version}', headers=headers_testuser2)
+    rv = client.delete(f'/apps/{grimm_namespace}/{grimm_repo}/{grimm_v}', headers=headers_testuser2)
     result = rv.get_json()
 
     assert "deleted" in result
@@ -616,6 +712,10 @@ def test_namespaces(client):
 def test_repositories(client):
     headers = {"Authorization" : "sage token1"}
 
+    app_namespace = "sageX"
+
+
+
     rv = client.get(f'/apps/{app_namespace}', headers=headers)
     assert rv.status_code == 200
     result = rv.get_json()
@@ -627,6 +727,9 @@ def test_repositories(client):
 
 def test_authz(client):
     headers = {"Authorization" : "sage token3"}
+
+    app_namespace = "sage"
+    app_repository = "simple"
 
 
     sample_request = {
