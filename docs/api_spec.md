@@ -134,6 +134,11 @@ Example repsonse:
 }
 ```
 
+## DELETE /namespaces/{namespace}
+```bash
+curl -X DELETE ${ECR_API}/namespaces/${APP_NAMESPACE} -H "Authorization: sage ${SAGE_USER_TOKEN}"
+```
+
 
 ## GET /apps/{namespace}/{repository}
 List all versions in repository:

@@ -522,6 +522,8 @@ class EcrDB():
     # permissions grnated to owner_id itself are ignored
     def getRepoPermissionsByOwner(self, owner_id ):
 
+        if not owner_id:
+            raise Exception("This function requires are user.")
 
         fields_str = 'namespace, name, owner_id, Permissions.resourceType,Permissions.resourceName,Permissions.granteeType,Permissions.grantee,Permissions.permission'
         fields =  [x.strip() for x in fields_str.split(',')]

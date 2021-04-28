@@ -1069,9 +1069,9 @@ class Repository(MethodView):
             raise ErrorResponse(f'Repository {repository} not empty. It contains {len(apps)} apps', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
-        ecr_db.deleteRepository(namespace,repository )
+        count = ecr_db.deleteRepository(namespace,repository )
 
-        return {"deleted": 1}
+        return {"deleted": count}
 
 
 
@@ -1296,6 +1296,20 @@ class AuthZ(MethodView):
 
         return response_str
 
+class CatchAll(MethodView):
+
+    def get(self, path):
+        return jsonify({"error": "Resource not supported"})
+
+    def post(self, path):
+        return jsonify({"error": "Resource not supported"})
+
+    def put(self, path):
+        return jsonify({"error": "Resource not supported"})
+
+    def delete(self, path):
+        return jsonify({"error": "Resource not supported"})
+
 
 
 def createJenkinsName(app_spec):
@@ -1377,6 +1391,9 @@ app.add_url_rule('/builds/<string:namespace>/<string:repository>/<string:version
 
 # endpoint used by docker_auth to verify access rights
 app.add_url_rule('/authz', view_func=AuthZ.as_view('authz'))
+
+app.add_url_rule('/<path:path>', view_func=CatchAll.as_view('catchAll'))
+
 
 
 
