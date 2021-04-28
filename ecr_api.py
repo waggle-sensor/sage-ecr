@@ -581,7 +581,7 @@ class Apps(MethodView):
 
         returnObj, ok =ecr_db.listApps(user=requestUser, namespace=namespace, repository=repository, version=version, isAdmin=isAdmin, view=view)
         if not ok:
-            raise ErrorResponse(f'App not found', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+            raise ErrorResponse(f'App not found', status_code=HTTPStatus.NOT_FOUND)
 
 
         return jsonify(returnObj)
@@ -704,13 +704,14 @@ def get_build(requestUser, isAdmin, namespace, repository, version):
 
     ecr_db = ecrdb.EcrDB()
     #app_spec, ok = ecr_db.getApp(namespace=namespace, name=repository, version=version)
-    app_spec, ok = ecr_db.listApps(user=requestUser , isAdmin=isAdmin, namespace=namespace, name=repository, version=version)
+    app_spec, ok = ecr_db.listApps(user=requestUser , isAdmin=isAdmin, namespace=namespace, repository=repository, version=version)
     if not ok:
-        return {"error":f"app_spec not found {namespace}/{repository}:{version}"}
-
+        #return {"error":f"app_spec not found {namespace}/{repository}:{version}"}
+        return ErrorResponse(f"app_spec not found {namespace}/{repository}:{version}", status_code=HTTPStatus.NOT_FOUND)
     app_id = app_spec.get("id", "")
     if not app_id:
-        return {"error":"app not found"}
+        return ErrorResponse(f"app id not found", status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+        #return {"error":"app not found"}
 
 
 
@@ -752,7 +753,7 @@ def build_app(requestUser, isAdmin, namespace, repository, version):
         raise ErrorResponse(f'JenkinsServer({host}, {username}) returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
     ecr_db = ecrdb.EcrDB()
-    app_spec, ok = ecr_db.listApps(user=requestUser , namespace=namespace, name=repository, version=version, isAdmin=isAdmin)
+    app_spec, ok = ecr_db.listApps(user=requestUser , namespace=namespace, repository=repository, version=version, isAdmin=isAdmin)
     if not ok:
         return {"error":f"app_spec not found {namespace}/{repository}:{version}"}
 
@@ -850,9 +851,15 @@ class Builds(MethodView):
         requestUser = request.environ.get('user', "")
         isAdmin = request.environ.get('admin', False)
 
-        result = get_build(requestUser,isAdmin, namespace, repository, version)
+        try:
+            result = get_build(requestUser,isAdmin, namespace, repository, version)
+        except ErrorResponse as e:
+            raise e
+        except Exception as e:
+            raise ErrorResponse(f"get_build returned: {type(e).__name__},{str(e)}", status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
-        return result
+
+        return jsonify(result)
 
 
 
@@ -865,7 +872,7 @@ class Builds(MethodView):
         isAdmin = request.environ.get('admin', False)
 
         result = build_app(requestUser, isAdmin, namespace, repository, version)
-        return result
+        return jsonify(result)
 
 
 # /namespaces
@@ -959,9 +966,11 @@ class Namespace(MethodView):
         #    raise ErrorResponse(f'Not authorized', status_code=HTTPStatus.UNAUTHORIZED)
 
         # check if empty
-        repo_list = ecr_db.listRepositories(namespace=namespace)
-        if len(repo_list) > 0:
-            raise ErrorResponse(f'Namespace is not empty', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+        repo_count = ecr_db.countRepositories(namespace)
+        if repo_count > 0:
+            raise ErrorResponse(f'Namespace is not empty, {repo_count} repositories found', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+
 
         # delete namespace
         ecr_db.deleteNamespace(namespace)
@@ -1064,14 +1073,14 @@ class Repository(MethodView):
         ecr_db = ecrdb.EcrDB()
 
         # check that repository is empty:
-        apps = ecr_db.listApps(namespace=namespace,repository=repository)
-        if len(apps) > 0:
-            raise ErrorResponse(f'Repository {repository} not empty. It contains {len(apps)} apps', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+        app_count = ecr_db.countApps(namespace,repository)
+        if app_count > 0:
+            raise ErrorResponse(f'Repository {namespace}/{repository} not empty. It contains {app_count} apps', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
         count = ecr_db.deleteRepository(namespace,repository )
 
-        return {"deleted": count}
+        return jsonify({"deleted": count})
 
 
 
@@ -1207,7 +1216,7 @@ class Healthy(MethodView):
         except Exception as e: # pragma: no cover
             return f'error ({e})'
 
-        return "ok"
+        return jsonify({"status" : "ok"})
 
 
 # /authz
@@ -1299,16 +1308,17 @@ class AuthZ(MethodView):
 class CatchAll(MethodView):
 
     def get(self, path):
-        return jsonify({"error": "Resource not supported"})
-
-    def post(self, path):
-        return jsonify({"error": "Resource not supported"})
+        raise ErrorResponse(f"Resource not supported", status_code=HTTPStatus.NOT_FOUND)
 
     def put(self, path):
-        return jsonify({"error": "Resource not supported"})
+        raise ErrorResponse(f"Resource not supported", status_code=HTTPStatus.NOT_FOUND)
+
+    def post(self, path):
+        raise ErrorResponse(f"Resource not supported", status_code=HTTPStatus.NOT_FOUND)
 
     def delete(self, path):
-        return jsonify({"error": "Resource not supported"})
+        raise ErrorResponse(f"Resource not supported", status_code=HTTPStatus.NOT_FOUND)
+
 
 
 

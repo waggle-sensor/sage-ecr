@@ -198,6 +198,37 @@ class EcrDB():
         self.db.commit()
         return int(self.cur.rowcount)
 
+    # counts all apps, independent of permissions
+    def countApps(self, namespace, repository):
+
+        stmt = f'SELECT COUNT(id) FROM Apps WHERE namespace=%s AND name=%s'
+
+        debug_stmt = stmt
+        for key in [namespace, repository]:
+            debug_stmt = debug_stmt.replace("%s", f'"{key}"', 1)
+
+        logger.debug(f'(countApps) debug stmt: {debug_stmt}')
+
+        self.cur.execute(stmt , (namespace, repository,))
+        result=self.cur.fetchone()
+
+        return result[0]
+
+    def countRepositories(self, namespace):
+
+        stmt = f'SELECT COUNT(name) FROM Apps WHERE namespace=%s'
+
+        debug_stmt = stmt
+        for key in [namespace]:
+            debug_stmt = debug_stmt.replace("%s", f'"{key}"', 1)
+
+        logger.debug(f'(countApps) debug stmt: {debug_stmt}')
+
+        self.cur.execute(stmt , (namespace,))
+        result=self.cur.fetchone()
+
+        return result[0]
+
     # in case of a single app (namespace, repository and version specified), this does not return a list
     # filter supports "public" , "owner", "shared" (owner and shared have no overlap)
     def listApps(self, user="", app_id="", namespace="", repository="", version="", limit=None, continuationToken=None, isAdmin=False, filter={}, view=""):

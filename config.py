@@ -91,9 +91,9 @@ if auth_method == "sage":
 
 # static_tokens: only used for testing
 static_tokens = {   "token1" : { "id": "testuser"} ,
-                    "token2" : { "id":"admin", "is_admin": True} ,
+                    "admin_token" : { "id":"admin", "is_admin": True} ,
                     "token3" : { "id": "sage_docker_auth", "scopes":"ecr_authz_introspection"} ,
-                    "token10" : { "id": "testuser2"}
+                    "token2" : { "id": "testuser2"}
                 }
 
 add_user=os.getenv('ADD_USER', default="")

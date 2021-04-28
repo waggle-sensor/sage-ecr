@@ -50,34 +50,54 @@ def test_connect(client):
 
 def upload_and_build(client, test_failure=False):
     headers = {"Authorization" : "sage token1"}
+    admin_headers = {"Authorization" : "sage admin_token"}
+
 
     #global test_app_def
 
+    app_namespace = "sagebuildtest"
 
+    app_version = "1.0"
 
     local_test_app_def = None
 
     if test_failure:
+        app_repository = "test_app_fail"
         # make copy
         test_app_def_failure_obj  = json.loads(json.dumps(test_app_def_obj))
 
-        test_app_def_failure_obj["name"] = "test_app_fail"
+        test_app_def_failure_obj["name"] = app_repository
+
         test_app_def_failure_obj["source"]["url"] = "https://github.com/waggle-sensor/does_not_exist.git"
 
 
         local_test_app_def = json.dumps(test_app_def_failure_obj)
 
     else:
+        app_repository = "simple"
         local_test_app_def = test_app_def
+
+    # delete app first
+    rv = client.delete(f'/apps/{app_namespace}/{app_repository}/{app_version}', headers=admin_headers)
+    result = rv.get_json()
+
+    if "error" in result:
+        assert "App not found" in result["error"]
+    else:
+        assert rv.status_code == 200
+
 
 
     print(f'local_test_app_def rv.data: {local_test_app_def}' , file=sys.stderr)
 
     rv = client.post(f'/apps/{app_namespace}/{app_repository}/{app_version}', data = local_test_app_def, headers=headers)
-    assert rv.data != ""
     print(f'upload_and_build rv.data: {rv.data}' , file=sys.stderr)
 
     result = rv.get_json()
+
+    assert "error" not in result
+
+
 
 
     assert result != None
@@ -85,8 +105,6 @@ def upload_and_build(client, test_failure=False):
     if test_failure:
         assert result["source"]["url"] == "https://github.com/waggle-sensor/does_not_exist.git"
 
-    if not test_failure:
-        assert result["name"] ==  test_app_def_obj["name"]
 
 
 
@@ -225,7 +243,7 @@ def test_app_upload_and_download(client):
 
 
     headers = {"Authorization" : "sage token1"}
-    admin_headers = {"Authorization" : "sage token2"}
+    admin_headers = {"Authorization" : "sage admin_token"}
 
     app_namespace = "sage"
     app_repository = "simple"
@@ -326,8 +344,8 @@ def test_app_upload_and_download(client):
 
 def test_listApps(client):
     headers = {"Authorization" : "sage token1"}
-    admin_headers = {"Authorization" : "sage token2"}
-    headers_testuser2 = {"Authorization" : "sage token10"}
+    admin_headers = {"Authorization" : "sage admin_token"}
+    headers_testuser2 = {"Authorization" : "sage token2"}
 
 
     mars_namespace = "planetmars"
@@ -452,8 +470,8 @@ def test_listApps(client):
 
 def test_permissions(client):
     headers = {"Authorization" : "sage token1"}
-    headers_testuser2 = {"Authorization" : "sage token10"}
-    admin_headers = {"Authorization" : "sage token2"}
+    headers_testuser2 = {"Authorization" : "sage token2"}
+    admin_headers = {"Authorization" : "sage admin_token"}
 
     grimm_namespace = "brothers-grimm"
     grimm_repo = "hansel_and_gretel"
@@ -494,12 +512,20 @@ def test_permissions(client):
 
     assert result["id"] == app_id
 
-    # verify that the app (repository to be precise) is private
+    # (1/2) verify that the app (repository to be precise) is private
     rv = client.get(f'/apps/{grimm_namespace}/{grimm_repo}/{grimm_v}', headers=headers_testuser2)
 
     result = rv.get_json()
 
     assert "error" in result
+
+    # (1/2) verify that the app (repository to be precise) is private
+    rv = client.get(f'/apps/{grimm_namespace}/{grimm_repo}', headers=headers_testuser2)
+
+    result = rv.get_json()
+
+    assert "data" in result
+    assert  len(result["data"]) == 0
 
     #verify that testuser2 cannot yet see the app in the listing
     rv = client.get(f'/apps/', headers=headers_testuser2)
@@ -764,8 +790,11 @@ def test_health(client):
     assert rv.data == b"SAGE Edge Code Repository"
 
     rv = client.get('/healthy')
+    result = rv.get_json()
+    assert "error" not in result
+    assert "status" in result
 
-    assert rv.data == b"ok"
+    assert result["status"] == "ok"
 
 
 def test_error(client):

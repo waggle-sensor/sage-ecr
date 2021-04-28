@@ -43,7 +43,7 @@ curl ${ECR_API}/permissions/sage/simple -H "Authorization: sage ${SAGE_USER_TOKE
 
 verify (view app as testuser2)
 ```bash
-curl ${ECR_API}/apps/sage/simple/1.0 -H "Authorization: sage token10"  | jq .
+curl ${ECR_API}/apps/sage/simple/1.0 -H "Authorization: sage token2"  | jq .
 ```
 
 ## share namespace sage with testuser2
