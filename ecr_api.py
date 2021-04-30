@@ -740,7 +740,7 @@ def get_build(requestUser, isAdmin, namespace, repository, version):
 
 
 
-def build_app(requestUser, isAdmin, namespace, repository, version):
+def build_app(requestUser, isAdmin, namespace, repository, version, skip_image_push=False):
 
     host = config.jenkins_server
     username = config.jenkins_user
@@ -779,7 +779,7 @@ def build_app(requestUser, isAdmin, namespace, repository, version):
 
 
     try:
-        js.createJob(app_human_id, app_spec, overwrite=overwrite)
+        js.createJob(app_human_id, app_spec, overwrite=overwrite, skip_image_push=skip_image_push)
     except Exception as e:
         raise ErrorResponse(f'createJob() returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
@@ -871,7 +871,9 @@ class Builds(MethodView):
         requestUser = request.environ.get('user', "")
         isAdmin = request.environ.get('admin', False)
 
-        result = build_app(requestUser, isAdmin, namespace, repository, version)
+        skip_image_push = request.args.get('skip_image_push', "") in ["true", "1"]
+
+        result = build_app(requestUser, isAdmin, namespace, repository, version, skip_image_push=skip_image_push)
         return jsonify(result)
 
 

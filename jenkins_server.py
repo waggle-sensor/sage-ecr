@@ -72,7 +72,7 @@ class JenkinsServer():
 
 
 
-    def createJob(self, id, app_spec, overwrite=False):
+    def createJob(self, id, app_spec, overwrite=False, skip_image_push=False):
 
 
 
@@ -126,6 +126,10 @@ class JenkinsServer():
         '''
 
 
+        do_push="--push"
+        if skip_image_push:
+            docker_login = ""
+            do_push =""
 
         name = app_spec["name"]
         template = Template(jenkinsfileTemplate)
@@ -139,13 +143,14 @@ class JenkinsServer():
                                                 platforms=platforms_str,
                                                 build_args_command_line=build_args_command_line,
                                                 docker_registry_url=docker_registry_url,
-                                                docker_login=docker_login)
+                                                docker_login=docker_login,
+                                                do_push=do_push)
         except Exception as e:
             raise Exception(f'  url={git_url}, branch={git_branch}, directory={git_directory}  e={str(e)}')
 
         #print(jenkins.EMPTY_CONFIG_XML)
         newJob = createPipelineJobConfig(jenkinsfile, f'{actual_namespace}/{name}')
-        #print(newJob)
+        print(newJob)
 
 
 

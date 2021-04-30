@@ -141,7 +141,7 @@ jenkinsfileTemplate = '''pipeline {
                     sh "docker version"
                     sh "docker buildx version"
                     ${docker_login}
-                    sh "docker buildx build --pull --builder sage --platform ${platforms} ${build_args_command_line} --push -t ${docker_registry_url}/${namespace}/${name}:${version} ."
+                    sh "docker buildx build --pull --builder sage --platform ${platforms} ${build_args_command_line} ${do_push} -t ${docker_registry_url}/${namespace}/${name}:${version} ."
                 }
                 sleep 10
                 echo 'Building..'

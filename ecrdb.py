@@ -172,8 +172,11 @@ class EcrDB():
 
         #decode embedded json
         if field in ["inputs", "metadata"]:
-            if field in returnObj:
-                returnObj[field] = json.loads(returnObj[field])
+            if field in returnObj and returnObj[field] != "":
+                try:
+                    returnObj[field] = json.loads(returnObj[field])
+                except json.JSONDecodeError:
+                    returnObj[field] = {"error":"could not parse json"}
 
         return returnObj[field]
 
@@ -379,7 +382,12 @@ class EcrDB():
                 if ref_hash[field] == "datetime":
                     target[field] = row[pos].isoformat() + 'Z'
                 elif ref_hash[field] == "json":
-                    target[field] = json.loads(row[pos])
+                    if row[pos] != "":
+                        try:
+                            target[field] = json.loads(row[pos])
+                        except json.JSONDecodeError:
+                            target[field] = {"error": "could not parse json"}
+
                 elif ref_hash[field] == "bool":
                     target[field] = (row[pos] == "1")
                 else:
