@@ -345,20 +345,20 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
 
     # inputs validation
     appInputs = postData.get("inputs", [])
-    if len(appInputs) > 0:
-        for app_input in appInputs:
-            for field in app_input:
-                if not  field in  config.input_fields_valid:
-                    raise Exception(f'Input field {field} not supported')
 
-            for expected in config.input_fields_valid:
-                if not  expected in  app_input:
-                    raise Exception(f'Expected field {expected} missing')
-                input_type = app_input["type"]
-                if not input_type in config.input_valid_types:
-                    raise Exception(f'Input type {input_type} not supported')
+    for app_input in appInputs:
+        for field in app_input:
+            if not  field in  config.input_fields_valid:
+                raise Exception(f'Input field {field} not supported')
 
-        appInputs_str = json.dumps(appInputs)
+        for expected in config.input_fields_valid:
+            if not  expected in  app_input:
+                raise Exception(f'Expected field {expected} missing')
+            input_type = app_input["type"]
+            if not input_type in config.input_valid_types:
+                raise Exception(f'Input type {input_type} not supported')
+
+    appInputs_str = json.dumps(appInputs)
 
     ##### resources
 
@@ -370,7 +370,7 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
         #resources_str = json.dumps(resourcesArray)
 
     ##### metadata
-    appMetadata = postData.get("metadata", None)
+    appMetadata = postData.get("metadata", "{}")
 
 
 
@@ -381,11 +381,10 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
     for key in config.valid_fields_set:
         dbObject[key] = ""
 
-    if appMetadata:
-        #raise ErrorResponse(f'metadata is missing', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-        if not isinstance(appMetadata, dict):
-            raise Exception(f'Field metadata has to be an object, got {str(appMetadata)}')
-        dbObject["metadata"] = json.dumps(appMetadata)
+
+    if not isinstance(appMetadata, dict):
+        raise Exception(f'Field metadata has to be an object, got {str(appMetadata)}')
+    dbObject["metadata"] = json.dumps(appMetadata)
 
 
 
