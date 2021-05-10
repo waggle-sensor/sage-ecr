@@ -15,10 +15,10 @@ def login_required(func):
         authenticated = request.environ['authenticated']
         if not authenticated:
             raise ErrorResponse('Not authenticated', status_code=HTTPStatus.UNAUTHORIZED)
-        
+
 
         return func(self, **kwargs)
-    
+
     return wrapper2
 
 
@@ -26,7 +26,7 @@ def login_required(func):
 def has_permission(*permission):
     def real_decorator(func):
         def wrapper(self, app_id):
-                
+
 
             authenticated = request.environ['authenticated']
 
@@ -47,8 +47,8 @@ def has_permission(*permission):
             raise ErrorResponse(f'Not authorized.', status_code=HTTPStatus.UNAUTHORIZED)
 
 
-        
-       
+
+
         return wrapper
     return real_decorator
 
@@ -56,7 +56,7 @@ def has_permission(*permission):
 
 def has_resource_permission(permission):
     def real_decorator(func):
-        def wrapper2(self, namespace, repository=None, version=None):
+        def wrapper2(self, namespace=None, repository=None, version=None):
 
 
             authenticated = request.environ['authenticated']
@@ -65,11 +65,16 @@ def has_resource_permission(permission):
             resourceType = ""
             resourceName = ""
             if repository:
-                resourceType="repository"    
+                if not namespace:
+                    raise ErrorResponse(f'namespace missing (should not happen, code:a)', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+                resourceType="repository"
                 resourceName=f'{namespace}/{repository}'
-            else:
-                resourceType="namespace"    
+            elif namespace:
+                resourceType="namespace"
                 resourceName=namespace
+            else:
+                raise ErrorResponse(f'namespace missing (should not happen, code:b)', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
             ecr_db = ecrdb.EcrDB()
 
@@ -79,7 +84,7 @@ def has_resource_permission(permission):
                     return func(self, namespace, repository, version)
 
                 raise ErrorResponse(f'Not authorized.', status_code=HTTPStatus.UNAUTHORIZED)
-                
+
 
             requestUser = request.environ.get('user', "")
             isAdmin = request.environ.get('admin', False)
@@ -90,7 +95,7 @@ def has_resource_permission(permission):
                 if (isAdmin or ecr_db.hasPermission(resourceType, resourceName, "USER", requestUser ,permission)):
                     #return func(self, namespace, repository, version)
                     return func(self, namespace)
-                    
+
                 raise ErrorResponse(f'Not authorized. (User {requestUser} does not have permission {permission} for {resourceType} {resourceName})', status_code=HTTPStatus.UNAUTHORIZED)
 
             #
@@ -103,8 +108,8 @@ def has_resource_permission(permission):
             raise ErrorResponse(f'Not authorized. (User {requestUser} does not have permission {permission} for {resourceType} {resourceName})', status_code=HTTPStatus.UNAUTHORIZED)
 
 
-        
-       
+
+
         return wrapper2
     return real_decorator
 

@@ -2,7 +2,6 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: ecr-registry
-  namespace: sage
   annotations:
     traefik.ingress.kubernetes.io/router.tls: ""
 spec:
@@ -13,7 +12,7 @@ spec:
       - path: /
         pathType: Prefix
         backend:
-          service: 
+          service:
             name: ecr-registry
             port:
               number: 80

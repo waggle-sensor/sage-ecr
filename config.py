@@ -13,14 +13,43 @@ mysql_password =  os.getenv('MYSQL_PASSWORD')
 
 
 
-
-# app definition
-valid_fields =["name", "description", "version", "namespace", "source", "depends_on", "baseCommand", "arguments", "inputs", "resources", "metadata", "frozen"]
+# app definition , these are the app fields (as seen by user) that are stored in the tables Apps
+valid_fields =["namespace", "name", "version", "description" , "source", "depends_on", "baseCommand", "arguments", "inputs", "resources", "metadata", "frozen"]
 valid_fields_set = set(valid_fields)
-required_fields = set(["name", "description", "version", "source"])
 
-mysql_fields = ["name", "description", "version", "namespace", "depends_on", "baseCommand", "arguments", "inputs", "metadata", "frozen"]
-mysql_fields_det = set(valid_fields)
+app_view_fields = ["namespace", "name", "version", "description" , "source", "depends_on", "baseCommand", "arguments", "inputs", "resources", "metadata"]
+
+required_fields = { "description" : "str",
+                    "source" : "dict"}
+
+
+mysql_Apps_fields = {
+                "id"            : "str",
+                "namespace"     : "str",
+                "name"          : "str",
+                "version"       : "str",
+                "description"   : "str",
+                "depends_on"    : "str",
+                "baseCommand"   : "str",
+                "arguments"     : "str",
+                "inputs"        : "json",
+                "metadata"      : "json",
+                "frozen"        : "bool",
+                "owner"         : "str",
+                "time_created"  : "datetime",
+                "time_last_updated"        : "datetime",
+                }
+
+
+mysql_Sources_fields = {
+                "architectures": "json",
+                "url":"str",
+                "branch":"str",
+                "directory":"str",
+                "dockerfile":"str",
+                "build_args":"json"
+            }
+#mysql_Apps_fields_set = set(valid_fields)
 
 # architecture https://github.com/docker-library/official-images#architectures-other-than-amd64
 architecture_valid = ["linux/amd64", "linux/arm64", "linux/arm/v6", "linux/arm/v7", "linux/arm/v8"]
@@ -29,12 +58,13 @@ architecture_valid = ["linux/amd64", "linux/arm64", "linux/arm/v6", "linux/arm/v
 # app input
 input_fields_valid = ["id", "type"]
 # "Directory" not suypported yet # ref: https://www.commonwl.org/v1.1/CommandLineTool.html#CWLType
-input_valid_types = ["boolean", "int", "long", "float", "double", "string", "File"] 
+input_valid_types = ["boolean", "int", "long", "float", "double", "string", "File"]
 
 
-# database fields
-dbFields = mysql_fields + ["owner"]
-dbFields_str  = ",".join(dbFields)
+# Apps table fields
+#dbAppsFields = mysql_Apps_fields.keys()
+dbAppsFields_str  = ",".join(mysql_Apps_fields.keys())
+dbSourcesFields_str  = ",".join(mysql_Sources_fields.keys())
 
 
 
@@ -56,14 +86,14 @@ if auth_method == "sage":
         sys.exit("tokenInfoUser not defined")
     if tokenInfoPassword == "":
         sys.exit("tokenInfoPassword not defined")
-        
+
 
 
 # static_tokens: only used for testing
-static_tokens = {   "token1" : { "id": "testuser"} , 
-                    "token2" : { "id":"admin", "is_admin": True} ,
+static_tokens = {   "token1" : { "id": "testuser"} ,
+                    "admin_token" : { "id":"admin", "is_admin": True} ,
                     "token3" : { "id": "sage_docker_auth", "scopes":"ecr_authz_introspection"} ,
-                    "token10" : { "id": "testuser2"}
+                    "token2" : { "id": "testuser2"}
                 }
 
 add_user=os.getenv('ADD_USER', default="")
@@ -98,7 +128,7 @@ docker_registry_push_allowed = os.environ.get("DOCKER_REGISTRY_PUSH_ALLOWED", "0
 
 jenkinsfileTemplate = '''pipeline {
     agent any
-    
+
     stages {
         stage('Build') {
             steps {
@@ -110,8 +140,8 @@ jenkinsfileTemplate = '''pipeline {
                 dir("$${env.WORKSPACE}/${directory}"){
                     sh "docker version"
                     sh "docker buildx version"
-                    ${docker_login} 
-                    sh "docker buildx build --pull --builder sage --platform ${platforms} ${build_args_command_line} --push -t ${docker_registry_url}/${namespace}/${name}:${version} ."
+                    ${docker_login}
+                    sh "docker buildx build --pull --builder sage --platform ${platforms} ${build_args_command_line} ${do_push} -t ${docker_registry_url}/${namespace}/${name}:${version} ."
                 }
                 sleep 10
                 echo 'Building..'

@@ -8,7 +8,7 @@ WARNING: this is currently not working with a local docker registry. It will wor
 The following instructions are targeted at a local test deployment via [minikube](https://kubernetes.io/docs/tasks/tools/install-minikube/). Everything is already pre-configured and should run as is. For a production deployment the configuration should be overwritten with kubernetes kustomize overlays.
 
 
-## Preparation
+## Preparation (Minikube example)
 
 ```bash
 minikube start
@@ -17,61 +17,112 @@ minikube start --insecure-registry "10.0.0.0/24" --insecure-registry "ecr-regist
 
 kubectl config use-context minikube
 
-kubectl create namespace sage
+#kubectl create namespace sage
 
 # permanently save the namespace for all subsequent kubectl commands in that context.
-kubectl config set-context --current --namespace=sage
+#kubectl config set-context --current --namespace=sage
+
+
+
 ```
 
+## MySQL
+
+Install MySQL, e.g.
+```bash
+helm install mysql --set image.tag=8.0.23-debian-10-r30 --set primary.persistence.size=1Gi bitnami/mysql
+```
+
+load schema
+```bash
+MYSQL_ROOT_PASSWORD=$(kubectl get secret --namespace default mysql -o jsonpath="{.data.mysql-root-password}" | base64 --decode)
+echo "MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}"
+
+kubectl exec -i mysql-0 -- mysql -u root -p${MYSQL_ROOT_PASSWORD} < ../schema.sql
+#verify database and tables exist now:
+kubectl exec -i mysql-0 -- mysql -u root -p${MYSQL_ROOT_PASSWORD} -e 'show databases;'
+kubectl exec -i mysql-0 -- mysql -u root -p${MYSQL_ROOT_PASSWORD} -e 'use SageECR; show tables;'
+```
+
+Create MySQL user
+```bash
+
+MYSQL_ROOT_PASSWORD=$(kubectl get secret --namespace default mysql -o jsonpath="{.data.mysql-root-password}" | base64 --decode)
+echo "MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}"
+
+kubectl exec -ti mysql-0 -- mysql -u root -p${MYSQL_ROOT_PASSWORD} -D SageECR
+```
+
+Inside of MySQL create user with password: (In test environment use "test" as password)
+```bash
+CREATE USER 'ecr-user'@'%' identified by '<NEW_USER_PASSWORD>';
+GRANT ALL PRIVILEGES ON SageECR.* TO 'ecr-user'@'%';
+#verify:
+SELECT User, Host  FROM mysql.user;
+exit
+```
+Save the `<NEW_USER_PASSWORD>` as an overlay in the ecr-api secret.
 
 ## Deploy
+
+For prodcution deployment it is recommended to copy the overlay-example directory contents and create a new overlay directory in a secure location.
+
+```bash
+#verify overlay
+kubectl kustomize ./overlay-example/
+
+# this starts all services, but ECR will be missing a Jenkins token!
+kubectl apply -k ./overlay-example/
 ```
-minikube addons enable ingress
-
-kubectl create configmap ecr-db-initdb-config -n sage --from-file=../schema.sql
-
-
-# this starts all services, but Jenkins creates a token which the ecr-api will need
-kubectl kustomize ./overlay/ | kubectl apply -f -
-```
-
-# fix if needed
-`sed -e 's/^  name: ecr-jenkins-casc-secret.*/  name: ecr-jenkins-casc-secret/`
-Note that the `sed` may be needed due to a bug where the automatic suffix-hash after the secret name is not replaced in the reference in the deployment. Thus we simply remove the suffix.
-
 
 ## Inject token
 
-To let `ecr-api` talk to Jenkins a token is needed. Because Jenkins does not let us inject a token on startup, it is automatically generated when Jenkins starts. After Jenkins has started and generated a token for user `ecrdb`, the token has to be extracted form the Jenkins pod (container) and stored as a secret.
+To let `ecr-api` talk to Jenkins a token is needed. Because Jenkins does not let us inject a token on startup, it is automatically generated when Jenkins starts. After Jenkins has started and generated a token for user `ecrdb`, the token has to be extracted from the Jenkins pod (container) and stored as a secret.
 
+Get token from Jenkins or user ecrdb  (fix namespace if needed)
 ```bash
-
-# get token from Jenkins or user ecrdb
-export JENKINS_TOKEN=$(kubectl exec -ti $(kubectl get pods -n sage | grep "^ecr-jenkins-" | cut -f 1 -d ' ') -n sage -- /bin/cat /var/jenkins_home/secrets/ecrdb_token.txt)
+export JENKINS_TOKEN=$(kubectl exec -ti $(kubectl get pods -n default | grep "^ecr-jenkins-" | cut -f 1 -d ' ') -n default -- /bin/cat /var/jenkins_home/secrets/ecrdb_token.txt)
 echo "JENKINS_TOKEN=${JENKINS_TOKEN}"
-
-
-sed -i -e 's/JENKINS_TOKEN: .*/JENKINS_TOKEN: "'${JENKINS_TOKEN}'"/' overlay/ecr-api.secret.yaml 
-
-
-kubectl kustomize ./overlay/ | kubectl apply -f -
-
-# restart api to use new token from secret
-kubectl rollout restart deployment ecr-api -n sage
-
 ```
 
-## IP address
-
-In case of a minikube deployment:
-
+Two options to inject secret:
+a) only in test environment, without overlay:
 ```bash
+kubectl patch secret ecr-api-secret -p='{"stringData":{"JENKINS_TOKEN": "'${JENKINS_TOKEN}'"}}'
+```
+The default kustomize ecr-api-secret will overwrite that!
+
+b) Store token in secret / generate
+```bash
+sed -i -e 's/JENKINS_TOKEN: .*/JENKINS_TOKEN: "'${JENKINS_TOKEN}'"/' overlay/ecr-api.secret.yaml
+kubectl apply -k ./overlay/
+```
+
+Restart ecr-api to use new token from secret
+```bash
+kubectl rollout restart deployment ecr-api
+```
+
+## Ingress Controller
+
+### minikube
+```bash
+minikube addons enable ingress
 minikube ip
 ```
 
 Visit `<IP>/jenkins` to access the Jenkins instance.
 
+### docker desktop
 
+Install ingress-nginx
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v0.45.0/deploy/static/provider/cloud/deploy.yaml
+```
+
+visit:
+- http://localhost:80/ecr/jenkins/
+- http://localhost:80/ecr/api/
 
 # testing
 

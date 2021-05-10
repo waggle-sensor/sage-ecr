@@ -18,6 +18,6 @@ RUN /usr/local/bin/python -m pip install --upgrade pip
 COPY  . /usr/src/app
 RUN pip install -r requirements.txt
 
-CMD ./ecr_api.py
-#CMD gunicorn ecr_api:app --bind=0.0.0.0:5000
+#CMD ./ecr_api.py
+CMD gunicorn ecr_api:app --capture-output --enable-stdio-inheritance --log-level=debug --access-logfile - --error-logfile - --bind=0.0.0.0:5000
 

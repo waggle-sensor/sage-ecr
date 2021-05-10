@@ -8,8 +8,8 @@ jenkins:
         - id: "ecrdb"
           password: "test"
         - id: "admin"
-          password: "admin"
-  authorizationStrategy:
+          password: "testtest"
+  authorizationStrategy: 
     loggedInUsersCanDoAnything:
       allowAnonymousRead: true
 
@@ -23,4 +23,4 @@ credentials:
               username: sage-ecr
               password: 123
 
-
+  

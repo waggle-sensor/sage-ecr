@@ -1,0 +1,33 @@
+
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ecr-api-ingress
+  annotations:
+
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    #nginx.ingress.kubernetes.io/proxy-body-size: "0" # required for docker registry
+spec:
+  rules:
+  # host: ecr.localhost
+  - http:
+      paths:
+      - path: /ecr/api(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: ecr-api
+            port:
+              number: 5000
+
+  #- host: ecr-registry
+  #  http:
+  #    paths:
+  #    - path: /
+  #      backend:
+  #        service:
+  #          name: ecr-registry
+  #          port:
+  #            number: 5000

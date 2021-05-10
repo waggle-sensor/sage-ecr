@@ -10,15 +10,19 @@ import json
 from error_response import *
 from datetime import datetime , timedelta
 import re
+import logging
+import base64
 
-
+#logger = logging.getLogger('gunicorn.error')
+#logger = logging.getLogger('__name__')
+logger=None
 
 class EcrDB():
     def __init__ ( self , retries=60) :
 
         if not config.mysql_host:
             raise Exception("mysql_host is not defined")
-        
+
         count = 0
         while True:
             try:
@@ -37,7 +41,7 @@ class EcrDB():
         return
 
     # returns true if user has the permissions
-    # TODO if resourceType  = repository, also check namespace 
+    # TODO if resourceType  = repository, also check namespace
     def hasPermission(self, resourceType, resourceName, granteeType, grantee, permission):
 
         if not grantee:
@@ -54,10 +58,10 @@ class EcrDB():
             else:
                 permissions = [permission, "FULL_CONTROL" ]
 
-        
+
 
         permissionIN = "permission IN (%s"+ " , %s" * (len(permissions) -1) + ")"
-        
+
 
         permissionsPublicRead = 'FALSE'
         if permission == 'READ'  and not (granteeType == 'GROUP' and grantee == "Allusers"):
@@ -65,10 +69,10 @@ class EcrDB():
 
         stmt = f'SELECT * FROM Permissions WHERE resourceType = %s AND resourceName = %s AND ((  granteeType = %s AND grantee = %s AND ({permissionIN}) ) OR {permissionsPublicRead}  )'
         #print(f'stmt: {stmt}  resourceType={resourceType} resourceName={resourceName} granteeType={granteeType} grantee={grantee} permissions={json.dumps(permissions)}', file=sys.stderr)
-    
+
         debug_stmt = stmt
-        
-        
+
+
         debug_stmt = debug_stmt.replace("%s", resourceType, 1)
         debug_stmt = debug_stmt.replace("%s", resourceName, 1)
         debug_stmt = debug_stmt.replace("%s", granteeType, 1)
@@ -90,23 +94,48 @@ class EcrDB():
 
         return False
 
-       
-
-    def deleteApp(self, namespace, repository, version, force=False):
+    def insertApp(self, col_names_str, values, variables_str, sources_values, resourcesArray):
 
 
-        app, ok = self.getApp(namespace=namespace, name=repository, version=version)
+        stmt = f'REPLACE INTO Sources ( id, architectures , url, branch, directory, dockerfile, build_args ) VALUES (%s , %s, %s, %s, %s, %s, %s)'
+        print(f"replace statement: {stmt}", file=sys.stderr)
+        #print(f"build_args_str: {build_args_str}", file=sys.stderr)
+        self.cur.execute(stmt, sources_values)
+
+        id_str = sources_values[0]
+        for res in resourcesArray:
+            res_str = json.dumps(res)
+            stmt = f'REPLACE INTO Resources ( id, resource) VALUES (%s , %s)'
+            self.cur.execute(stmt, (id_str, res_str,))
+
+
+        print(f'values: {values}', file=sys.stderr)
+
+
+        stmt = f'REPLACE INTO Apps ( {col_names_str}) VALUES ({variables_str})'
+        print(f'stmt: {stmt}', file=sys.stderr)
+        self.cur.execute(stmt, values)
+
+        self.db.commit()
+
+        return
+
+
+    def deleteApp(self, user, isAdmin, namespace, repository, version, force=False):
+
+
+        app, ok = self.listApps(user=user, isAdmin=isAdmin, namespace=namespace, repository=repository, version=version)
 
         if not ok:
             raise Exception("App not found")
 
         app_id = app.get("id", "")
         if not app_id:
-            raise Exception("App id empty")
+            raise Exception("App id empty "+json.dumps(app))
 
         frozen = app.get("frozen", False)
         if frozen and (not force):
-            raise Exception("App {app_id} is frozen, it cannot be deleted") 
+            raise Exception("App {app_id} is frozen, it cannot be deleted")
 
 
         #namespace = app["namespace"]
@@ -115,7 +144,7 @@ class EcrDB():
 
         for table in ["Apps", "Sources", "Certifications", "Profiles"]:
 
-            stmt_apps = f'DELETE FROM {table} WHERE BIN_TO_UUID(id) = %s'
+            stmt_apps = f'DELETE FROM {table} WHERE `id` = %s'
             print(f'stmt: {stmt_apps} app_id={app_id}', file=sys.stderr)
             self.cur.execute(stmt_apps, (app_id, ))
 
@@ -123,85 +152,10 @@ class EcrDB():
 
         return 1
 
-    def getApp(self, app_id=None, namespace=None, name=None, version=None):
-
-        current_identifier = ""
-        if app_id:
-            current_identifier = app_id
-            stmt = f'SELECT  BIN_TO_UUID(id), {config.dbFields_str} FROM Apps WHERE BIN_TO_UUID(id) = %s'
-            print(f'stmt: {stmt} app_id={app_id}', file=sys.stderr)
-            self.cur.execute(stmt, (app_id, ))
-        else:
-            current_identifier = f'{namespace}/{name}:{version}'
-            stmt = f'SELECT  BIN_TO_UUID(id), {config.dbFields_str} FROM Apps WHERE namespace = %s AND name = %s AND version = %s'
-            print(f'stmt: {stmt} id={namespace}/{name}:{version}', file=sys.stderr)
-            self.cur.execute(stmt, (namespace, name, version ))
-
-        returnFields = ["id"] + config.dbFields
-        returnObj={}
-        row = self.cur.fetchone()
-        i = 0
-        if row == None:
-            return {}, False
-        for value in row:
-            print(f'value: {value}', file=sys.stderr)
-            returnObj[returnFields[i]] = value
-            i+=1
 
 
-        if not app_id:
-            app_id = row[0]
-
-
-        #decode embedded json
-        for field in ["inputs", "metadata"]:
-            value = returnObj.get(field, None)
-            if value:
-                try:
-                    returnObj[field] = json.loads(value)
-                except Exception as e:
-                    raise Exception(f'Error in reading json in field {field}, got "{value}" and error {str(e)}')
-        
-        stmt = f'SELECT  BIN_TO_UUID(id), resource FROM Resources WHERE BIN_TO_UUID(id) = %s'
-        print(f'stmt: {stmt} app_id={app_id}', file=sys.stderr)
-        self.cur.execute(stmt, (app_id, ))
-        resources = []
-        rows = self.cur.fetchall()
-        for row in rows:
-            row_obj = json.loads(row[1])
-            resources.append(row_obj)
-
-        if len(resources) > 0:
-            returnObj["resources"] = resources
-
-
-        stmt = f'SELECT  BIN_TO_UUID(id), architectures , url, branch, directory, dockerfile, build_args FROM Sources WHERE BIN_TO_UUID(id) = %s'
-        print(f'stmt: {stmt} app_id={app_id}', file=sys.stderr)
-        self.cur.execute(stmt, (app_id, ))
-        #sources_array = []
-        rows = self.cur.fetchall()
-
-        row = rows[0]
-       
-
-        source_obj = {}
-        
-        source_obj["architectures"] = json.loads(row[1])
-        source_obj["url"] = row[2]
-        source_obj["branch"] = row[3]
-        source_obj["directory"] = row[4]
-        source_obj["dockerfile"] = row[5]
-        source_obj["build_args"] = json.loads(row[6])
-
-        #sources_array.append(source_obj)
-
-
-        returnObj["source"] = source_obj
-
-        return returnObj, True
-    
     def getAppField(self, app_id, field):
-        stmt = f'SELECT  BIN_TO_UUID(id), {field} FROM Apps WHERE BIN_TO_UUID(id) = %s'
+        stmt = f'SELECT  id, {field} FROM Apps WHERE `id` = %s'
         print(f'stmt: {stmt} app_id={app_id}', file=sys.stderr)
         self.cur.execute(stmt, (app_id, ))
 
@@ -218,58 +172,187 @@ class EcrDB():
 
         #decode embedded json
         if field in ["inputs", "metadata"]:
-            if field in returnObj:
-                returnObj[field] = json.loads(returnObj[field])
+            if field in returnObj and returnObj[field] != "":
+                try:
+                    returnObj[field] = json.loads(returnObj[field])
+                except json.JSONDecodeError:
+                    returnObj[field] = {"error":"could not parse json"}
 
         return returnObj[field]
 
+    def setAppField(self, namespace, repository, version, field, value):
 
-    def listApps(self, user="", app_id="", namespace="", repository="", isAdmin=False):
+        # convert bool to int for stupid mysql
+        if isinstance(value, bool):
+            if value:
+                value = 1
+            else:
+                value = 0
+
+        values = (value, namespace, repository,version )
+        stmt  = f"UPDATE Apps SET {field} = %s WHERE namespace = %s AND name = %s AND version = %s"
+        debug_stmt = stmt
+        for key in values:
+            debug_stmt = debug_stmt.replace("%s", f'"{key}"', 1)
+
+        logger.debug(f'(setAppField) debug_stmt: {debug_stmt}')
+
+        self.cur.execute(stmt, values)
+        self.db.commit()
+        return int(self.cur.rowcount)
+
+    # counts all apps, independent of permissions
+    def countApps(self, namespace, repository):
+
+        stmt = f'SELECT COUNT(id) FROM Apps WHERE namespace=%s AND name=%s'
+
+        debug_stmt = stmt
+        for key in [namespace, repository]:
+            debug_stmt = debug_stmt.replace("%s", f'"{key}"', 1)
+
+        logger.debug(f'(countApps) debug stmt: {debug_stmt}')
+
+        self.cur.execute(stmt , (namespace, repository,))
+        result=self.cur.fetchone()
+
+        return result[0]
+
+    def countRepositories(self, namespace):
+
+        stmt = f'SELECT COUNT(name) FROM Apps WHERE namespace=%s'
+
+        debug_stmt = stmt
+        for key in [namespace]:
+            debug_stmt = debug_stmt.replace("%s", f'"{key}"', 1)
+
+        logger.debug(f'(countApps) debug stmt: {debug_stmt}')
+
+        self.cur.execute(stmt , (namespace,))
+        result=self.cur.fetchone()
+
+        return result[0]
+
+    # in case of a single app (namespace, repository and version specified), this does not return a list
+    # filter supports "public" , "owner", "shared" (owner and shared have no overlap)
+    def listApps(self, user="", app_id="", namespace="", repository="", version="", limit=None, continuationToken=None, isAdmin=False, filter={}, view=""):
+
+
+        for key in filter:
+            if not key in ["public", "owner", "shared"]:
+                raise Exception(f"Unknown filter option {key}")
+
 
         query_data = []
+
+        include_public = True
+
+        owner_condition = ''
+        if filter.get("shared", False):
+            # only show apps shared with user + exclude own apps
+            include_public = False
+            owner_condition = ' AND Apps.owner != %s '
+            query_data.append(user)
+
+        if filter.get("owner", False):
+            include_public = False
+            owner_condition = ' AND Apps.owner = %s '
+            query_data.append(user)
 
         appID_condition = ''
         if app_id != "":
             appID_condition = ' AND id = %s'
             query_data.append(app_id)
- 
 
-        repo_condition= ''
-        if repository:
-            repo_condition = ' AND Apps.name=%s'
-            query_data.append(repository)
+
+
 
         namespace_condition= ''
         if namespace:
             namespace_condition = ' AND Apps.namespace=%s'
             query_data.append(namespace)
 
+        repo_condition= ''
+        if repository:
+            if not namespace:
+                raise Exception("Repository specified without namespace")
+
+            repo_condition = ' AND Apps.name=%s'
+            query_data.append(repository)
+
+        version_condition=''
+        if version:
+            if not namespace:
+                raise Exception("namespace required")
+            if not repository:
+                raise Exception("repository required")
+
+            version_condition = ' AND Apps.version=%s'
+            query_data.append(version)
+
         user_condition = 'FALSE'
         if isAdmin:
             user_condition = 'TRUE'
         else:
-            if user != "" :
+            if user != "" and (not filter.get("public", False)) :
+                # without this, api returns only public apps
                 user_condition = '(granteeType="USER" AND grantee=%s)'
                 query_data.append(user)
 
+        limit_stmt = ""
+
+        if limit:
+            if not isinstance(limit, int):
+                raise Exception("limit has to be of type int")
+
+            limit_stmt = f" LIMIT {limit}"
+
+        token_stmt = ""
+        if continuationToken:
+            continuationToken = base64.b64decode(str.encode(continuationToken)).decode()
+            token_stmt = f" WHERE id > %s "
+            query_data.append(continuationToken)
 
         # this line matches the correct app row with the correct permissions rows
         sub_stmt =  '( Permissions.resourceType="repository" AND Permissions.resourceName=CONCAT(Apps.namespace , "/", Apps.name )  OR (Permissions.resourceType="namespace" AND Permissions.resourceName=Apps.namespace) )'
 
-        stmt = f'SELECT DISTINCT BIN_TO_UUID(id), namespace, name, version FROM Apps INNER JOIN Permissions  ON {sub_stmt} {appID_condition} {repo_condition} {namespace_condition} AND ( ({user_condition}) OR (granteeType="GROUP" AND grantee="AllUsers")) AND (permission in ("READ", "WRITE", "FULL_CONTROL"))'
-        
-        debug_stmt = ""
+        #dbAppsFields_str  = ",".join(config.mysql_Apps_fields.keys())
+        # this adds prefix "Apps." and create a single string
+        dbAppsFields_str = ",".join(["Apps."+item for item in config.mysql_Apps_fields.keys()])
+
+        dbSourcesFields_str = ",".join(["s."+item for item in config.mysql_Sources_fields.keys()])
+
+
+        if include_public:
+            public_stmt = '(granteeType="GROUP" AND grantee="AllUsers")'
+        else:
+            public_stmt = 'FALSE'
+
+        # a) all apps
+        # b) only public
+        # c) user is owner
+        # d) shared with user
+
+        # this makes sure only apps for which user has permission are returned
+        permissions_stmt=f'( ({user_condition}) OR {public_stmt} ) AND ( permission in ("READ", "WRITE", "FULL_CONTROL") )'
+
+
+        # INNER JOIN Permissions : makes sure App disappear if the user does not have any permission
+        stmt = f'SELECT DISTINCT {dbAppsFields_str},{dbSourcesFields_str} FROM Apps LEFT JOIN Sources s ON s.id = Apps.id INNER JOIN Permissions ON {sub_stmt} {owner_condition} {appID_condition} {namespace_condition} {repo_condition} {version_condition} AND {permissions_stmt} {token_stmt} ORDER BY `namespace`, `name`, `version` ASC {limit_stmt}'
+
+
+        debug_stmt = stmt
         for key in query_data:
             debug_stmt = debug_stmt.replace("%s", f'"{key}"', 1)
 
-        print(f'(listApps) debug stmt: {debug_stmt}', file=sys.stderr)
+        logger.debug(f'(listApps) debug stmt: {debug_stmt}')
 
-        
+
         #print(f'stmt: {stmt}', file=sys.stderr)
         self.cur.execute(stmt , query_data)
 
-        
-        
+        #self.cur.rowcount
+
+
         rows = self.cur.fetchall()
 
         app_list = []
@@ -277,14 +360,57 @@ class EcrDB():
         for row in rows:
             print(f'row: {row}', file=sys.stderr)
 
-            app_list.append({"id": row[0], "namespace": row[1], "name": row[2], "version":row[3]})
-        
+            app_obj = {}
+            app_obj["source"] = {}
+
+            ref_hash = config.mysql_Apps_fields
+            target = app_obj
+            count = len(config.mysql_Apps_fields)
+            table = "Apps"
+            for pos, field in enumerate(list(config.mysql_Apps_fields.keys()) + list(config.mysql_Sources_fields.keys())):
+                if pos == count:
+                    table = "Sources"
+                    ref_hash = config.mysql_Sources_fields
+                    target = app_obj["source"]
+
+                if view == "app" and table == "Apps":
+                    if field not in config.app_view_fields:
+                        continue
+
+                if not field in ref_hash:
+                    raise Exception(f"Type not found for field {field} in table {table}")
+                if ref_hash[field] == "datetime":
+                    target[field] = row[pos].isoformat() + 'Z'
+                elif ref_hash[field] == "json":
+                    if row[pos] != "":
+                        try:
+                            target[field] = json.loads(row[pos])
+                        except json.JSONDecodeError:
+                            target[field] = {"error": "could not parse json"}
+
+                elif ref_hash[field] == "bool":
+                    target[field] = (row[pos] == "1")
+                else:
+                    target[field] = row[pos]
+
+            app_list.append(app_obj)
+            #app_list.append({"id": row[0], "namespace": row[1], "name": row[2], "version":row[3], "time_created":row[4].isoformat() + 'Z'})
+
+        if app_id or (namespace and repository and version):
+            # only single app was requested, return object, not list
+            if len(app_list)==0:
+                return None, False
+            if len(app_list)> 1:
+                raise Exception("More than one app found, but only one expected.")
+
+            return app_list[0], True
+
         return app_list
 
     def listNamespaces(self, user=""):
 
         query_data = []
- 
+
         user_condition = 'FALSE'
         if user != "" :
             user_condition = '(granteeType="USER" AND grantee=%s)'
@@ -293,19 +419,19 @@ class EcrDB():
 
 
         stmt = f'SELECT DISTINCT id , owner_id FROM Namespaces INNER JOIN Permissions  ON Permissions.resourceType="namespace" AND Permissions.resourceName=Namespaces.id  AND ( ({user_condition}) OR (granteeType="GROUP" AND grantee="AllUsers")) AND (permission in ("READ", "WRITE", "FULL_CONTROL"))'
-        
+
 
         print(f'stmt: {stmt}', file=sys.stderr)
-        
+
         debug_stmt = stmt
         if user != "" :
             debug_stmt = debug_stmt.replace("%s", f'"{user}"', 1)
         print(f'(listNamespaces) debug stmt: {debug_stmt}', file=sys.stderr)
-        
+
         self.cur.execute(stmt , query_data)
 
-        
-        
+
+
         rows = self.cur.fetchall()
 
         app_list = []
@@ -314,59 +440,104 @@ class EcrDB():
             print(f'row: {row}', file=sys.stderr)
 
             app_list.append({"id": row[0], "owner_id": row[1], "type": "namespace"})
-        
+
         return app_list
 
-
-    def listRepositories(self, user="", namespace=""):
+    # filter supports "public" , "owner", "shared" (owner and shared have no overlap)
+    def listRepositories(self, user="", namespace="", isAdmin=None, filter={}):
 
         query_data = []
-        
+
+        include_public = True
+
+        for key in filter:
+            if not key in ["public", "owner", "shared"]:
+                raise Exception(f"Unknown filter option {key}")
+
+
+        owner_condition = ''
+        if filter.get("shared", False):
+            # only show apps shared with user + exclude own apps
+            include_public = False
+            owner_condition = ' AND Repositories.owner_id != %s '
+            query_data.append(user)
+
+
+        if filter.get("owner", False):
+            include_public = False
+            owner_condition = ' AND Repositories.owner_id = %s '
+            query_data.append(user)
+
 
         namespace_condition=''
         if namespace:
             namespace_condition='AND Repositories.namespace=%s'
             query_data.append(namespace)
-            
+
 
         user_condition = 'FALSE'
-        if user != "" :
-            user_condition = '(granteeType="USER" AND grantee=%s)'
-            query_data.append(user)
-           
+        if isAdmin:
+            user_condition = 'TRUE'
+        else:
+            if user != "" and (not filter.get("public", False)) :
+                # without this, api returns only public apps
+                user_condition = '(granteeType="USER" AND grantee=%s)'
+                query_data.append(user)
+
+
+
+
+        if include_public:
+            public_stmt = '(granteeType="GROUP" AND grantee="AllUsers")'
+        else:
+            public_stmt = 'FALSE'
 
         sub_stmt =  '( Permissions.resourceType="repository" AND Permissions.resourceName=CONCAT(Repositories.namespace , "/", Repositories.name )  OR (Permissions.resourceType="namespace" AND Permissions.resourceName=Repositories.namespace) )'
 
+        # this makes sure only apps for which user has permission are returned
+        permissions_stmt=f'( ({user_condition}) OR {public_stmt} ) AND ( permission in ("READ", "WRITE", "FULL_CONTROL") )'
+
             # not needed ?  --->    AND ( Permissions.resourceName LIKE CONCAT(Repositories.namespace, \"%%\") )
 
-        stmt = f'''SELECT DISTINCT namespace , name , owner_id FROM Repositories INNER JOIN Permissions ON {sub_stmt} {namespace_condition}    AND ( ({user_condition}) OR (granteeType="GROUP" AND grantee="AllUsers")) AND (permission in ("READ", "WRITE", "FULL_CONTROL"))'''
-        
-        
-        
+        fields = ["namespace" , "name" , "owner_id", "description","external_link"]
+        fields_str = ",".join(fields)
+        stmt = f'''SELECT DISTINCT {fields_str} FROM Repositories INNER JOIN Permissions ON {sub_stmt} {owner_condition} {namespace_condition}    AND {permissions_stmt}'''
+
+
+
         debug_stmt = stmt
         for key in query_data:
             debug_stmt = debug_stmt.replace("%s", key, 1)
-        
-        
 
 
-        print(f'(listRepositories) debug stmt: {debug_stmt}', file=sys.stderr)
+
+
+        logger.debug(f'(listRepositories) debug stmt: {debug_stmt}')
         #print(f'stmt: {stmt}', file=sys.stderr)
         #print(f'query_data: {query_data}', file=sys.stderr)
         self.cur.execute(stmt , query_data)
         #self.cur.execute(stmt , (namespace, user))
         #self.cur.execute(debug_stmt )
-        
-        
+
+
         rows = self.cur.fetchall()
 
         rep_list = []
-        print(f'len(rows): {len(rows)}', file=sys.stderr)
+        logger.debug(f'len(rows): {len(rows)}')
         for row in rows:
-            print(f'row: {row}', file=sys.stderr)
+            #print(f'row: {row}', file=sys.stderr)
+            obj = {}
 
-            rep_list.append({"type": "repository", "namespace": row[0], "name": row[1], "owner_id": row[2]})
-        
+            #obj = dict(zip(fields, row))
+            obj["type"]="repository"
+            for pos, field in enumerate(fields):
+                if row[pos]:
+                    obj[field] = row[pos]
+                else:
+                    obj[field] = ""
+            rep_list.append(obj)
+            #rep_list.append({"type": "repository", "namespace": row[0], "name": row[1], "owner_id": row[2]})
+
         return rep_list
 
 
@@ -386,16 +557,51 @@ class EcrDB():
 
         return perm_list
 
-    
+    # this will return all permissions of repos that are owned by owner_id
+    # permissions grnated to owner_id itself are ignored
+    def getRepoPermissionsByOwner(self, owner_id ):
+
+        if not owner_id:
+            raise Exception("This function requires are user.")
+
+        fields_str = 'namespace, name, owner_id, Permissions.resourceType,Permissions.resourceName,Permissions.granteeType,Permissions.grantee,Permissions.permission'
+        fields =  [x.strip() for x in fields_str.split(',')]
+
+        #TODO this is risky, ignoring grantee works, but may ignore a group of same name (did not find a nice solution. maybe use CONCAT)
+
+        stmt = f'SELECT {fields_str}  FROM Repositories INNER JOIN Permissions ON ( Permissions.resourceType="repository" AND Permissions.resourceName=CONCAT(Repositories.namespace , "/", Repositories.name )  OR (Permissions.resourceType="namespace" AND Permissions.resourceName=Repositories.namespace) )  WHERE (owner_id = %s OR (granteeType="GROUP" and grantee="AllUsers")) AND grantee != %s  ORDER BY namespace, name, resourceType, resourceName;'
+        debug_stmt = stmt
+        for key in [owner_id, owner_id]:
+            debug_stmt = debug_stmt.replace("%s", f'"{key}"', 1)
+
+        logger.debug(f'getRepoPermissionsByOwner: {debug_stmt}')
+
+
+        self.cur.execute(stmt, (owner_id, owner_id, ))
+
+        rows = self.cur.fetchall()
+
+        perm_list = []
+
+        for row in rows:
+            #print(f'row: {row}', file=sys.stderr)
+            obj = {}
+            for pos, field in enumerate(fields):
+                obj[field] = row[pos]
+
+            perm_list.append(obj)
+
+        return perm_list
+
     def addPermission(self, resourceType, resourceName, granteeType , grantee , permission):
 
         if granteeType=="GROUP" and grantee=="AllUsers" and permission != "READ":
             raise ErrorResponse(f'AllUsers can only get READ permission.', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
-        stmt = f'REPLACE INTO Permissions ( resourceType, resourceName, granteeType , grantee, permission) VALUES (%s , %s , %s,  %s, %s)'
+        stmt = f'INSERT IGNORE INTO Permissions ( resourceType, resourceName, granteeType , grantee, permission) VALUES (%s , %s , %s,  %s, %s)'
 
         debug_stmt = stmt
-        
+
         for key in [resourceType, resourceName, granteeType , grantee , permission]:
             debug_stmt = debug_stmt.replace("%s", f'"{key}"', 1)
 
@@ -406,18 +612,16 @@ class EcrDB():
 
         self.db.commit()
 
-        return 1
+        return int(self.cur.rowcount)
 
     # deletes all permissions unless limited by any of optional parameters
-    # permissions for owner will be excluded 
+    # permissions for owner will be excluded
     def deletePermissions(self, owner, resourceType, resourceName, granteeType=None , grantee=None , permission=None):
-        
+
         #owner = self.getAppField(app_id, "owner")
-        
+
         if not owner:
             raise ErrorResponse('Owner not found', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-        
 
         stmt_delete_permissions = f'DELETE FROM Permissions WHERE resourceType = %s AND resourceName =%s'
         params = [resourceType, resourceName]
@@ -431,26 +635,26 @@ class EcrDB():
 
         if permission:
             stmt_delete_permissions += ' AND permission=%s'
-            params.append(permission)   
+            params.append(permission)
 
         # make sure owner does not take his own permissions away
-        if owner:
-            stmt_delete_permissions +=  ' AND NOT (granteeType="USER" AND grantee=%s AND permission="FULL_CONTROL")' 
-            params.append(owner)
+
+        stmt_delete_permissions +=  ' AND NOT (granteeType="USER" AND grantee=%s AND permission="FULL_CONTROL")'
+        params.append(owner)
 
         print(f'delete stmt: {stmt_delete_permissions} params='+json.dumps(params), file=sys.stderr)
         self.cur.execute(stmt_delete_permissions, params)
         self.db.commit()
 
-        
+
         return int(self.cur.rowcount)
 
 
     def getBuildInfo(self, app_id, name):
-    
-       
 
-        stmt = f'SELECT  BIN_TO_UUID(id), build_number , architectures FROM Builds WHERE BIN_TO_UUID(id) = %s AND build_name=%s ORDER BY time_created DESC LIMIT 1'
+
+
+        stmt = f'SELECT  id, build_number , architectures FROM Builds WHERE id = %s AND build_name=%s ORDER BY time_created DESC LIMIT 1'
         print(f'stmt: {stmt} app_id={app_id}', file=sys.stderr)
         self.cur.execute(stmt, (app_id, name))
 
@@ -458,7 +662,7 @@ class EcrDB():
         if row == None:
             raise Exception("No build id found in database")
 
-       
+
         number = row[1]
         architectures = json.loads(row[2])
 
@@ -470,7 +674,7 @@ class EcrDB():
         architectures_str = json.dumps(architectures)
 
 
-        stmt = 'REPLACE INTO Builds ( id, build_name, build_number, architectures)  VALUES (UUID_TO_BIN(%s) , %s,  %s, %s) '
+        stmt = 'REPLACE INTO Builds ( id, build_name, build_number, architectures)  VALUES (%s , %s,  %s, %s) '
 
 
         self.cur.execute(stmt, (app_id, build_name, build_number, architectures_str))
@@ -479,13 +683,13 @@ class EcrDB():
 
 
         return
-        
+
 
     # return user id if token found, empty string otherwise
     def getTokenInfo(self, token):
         stmt = 'SELECT user, scopes, is_admin FROM TokenCache WHERE SHA2(%s, 512) = token'
         print(f'stmt: {stmt} token={token[:4]}...', file=sys.stderr)
-        
+
         self.cur.execute(stmt, (token,))
 
 
@@ -502,9 +706,9 @@ class EcrDB():
     def setTokenInfo(self, token, user_id, scopes, is_admin):
 
         # ignore should be ok, scopes should not change for a given token
-        
+
         stmt = 'INSERT IGNORE INTO TokenCache (token, user, scopes, is_admin, expires) VALUES (SHA2(%s, 512), %s, %s, %s, %s)'
-    
+
         expires = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
 
         self.cur.execute(stmt, (token, user_id, scopes, is_admin, expires))
@@ -513,16 +717,16 @@ class EcrDB():
 
         return
 
-    # returns owner, otherwise empty string 
+    # returns owner, otherwise empty string
     def getNamespace(self, name):
         stmt = 'SELECT id, owner_id FROM Namespaces WHERE id = %s'
         print(f'stmt: {stmt} id=name', file=sys.stderr)
-        
+
         self.cur.execute(stmt, (name,))
 
 
         row = self.cur.fetchone()
-        
+
         if row == None:
             return {}, False
 
@@ -539,7 +743,7 @@ class EcrDB():
         stmt = f'DELETE FROM Namespaces WHERE id = %s'
         debug_stmt = stmt
         debug_stmt = debug_stmt.replace("%s", f'"{namespace}"', 1)
-        
+
         print(f'debug_stmt: {debug_stmt}', file=sys.stderr)
 
         self.cur.execute(stmt, (namespace,))
@@ -549,31 +753,29 @@ class EcrDB():
 
         return 1
 
-    def addNamespace(self, name, owner_id, public=False):
+    def addNamespace(self, name, owner_id):
 
         # name restriction from https://docs.docker.com/docker-id/
         # "... can only contain numbers and lowercase letters."
-        
+
         p = re.compile(f'[a-z0-9]+', re.ASCII)
         if not p.match(name):
             raise Exception("Namespace can only contain numbers and lowercase letters")
-    
+
         if len(name) < 4 or len(name) > 30 :
             raise Exception("Namespace must be between 4 and 30 characters long")
 
         stmt = 'INSERT INTO Namespaces (id, owner_id) VALUES (%s, %s)'
         print(f'stmt: {stmt} id=name', file=sys.stderr)
-        
+
         self.cur.execute(stmt, (name, owner_id))
 
 
         stmt = 'REPLACE INTO Permissions (resourceType, resourceName, granteeType, grantee, permission) VALUES (%s, %s, %s, %s, %s)'
         print(f'stmt: {stmt} id={name}', file=sys.stderr)
-        
+
         self.cur.execute(stmt, ("namespace", name, "USER", owner_id, "FULL_CONTROL"))
-        
-        if public:
-            self.cur.execute(stmt, ("namespace", name, "GROUP", "AllUsers", "READ"))
+
 
         self.db.commit()
 
@@ -585,19 +787,19 @@ class EcrDB():
 
         return result
 
-    # returns owner, otherwise empty string 
+    # returns owner, otherwise empty string
     def getRepository(self, namespace, name):
 
         #full_name = f'{namespace}/{name}'
 
         stmt = 'SELECT namespace, name, owner_id FROM Repositories WHERE namespace = %s AND name = %s'
         print(f'stmt: {stmt} namespace={namespace} name={name}', file=sys.stderr)
-        
+
         self.cur.execute(stmt, (namespace,name))
 
 
         row = self.cur.fetchone()
-       
+
         if row == None:
             return {}, False
 
@@ -636,25 +838,25 @@ class EcrDB():
 
         # name restriction from https://docs.docker.com/docker-hub/repos/
         # "The repository name needs to be unique in that namespace, can be two to 255 characters, and can only contain lowercase letters, numbers or - and _."
-        
+
         p = re.compile(f'[a-z0-9_-]+', re.ASCII)
         if not p.match(name):
             raise Exception("Repository can only contain numbers and lowercase letters")
-    
+
         if len(name) < 2 or len(name) > 255 :
             raise Exception("Repository must be between 2 and 255 characters long")
 
-        
+
 
         stmt = 'INSERT INTO Repositories (namespace, name, owner_id) VALUES (%s, %s, %s)'
         print(f'stmt: {stmt} namespace={namespace} name={name}', file=sys.stderr)
-        
+
         self.cur.execute(stmt, (namespace, name, owner_id))
 
         full_name = f'{namespace}/{name}'
         stmt = 'INSERT INTO Permissions (resourceType, resourceName, granteeType, grantee, permission) VALUES (%s, %s, %s, %s, %s)'
         print(f'stmt: {stmt} id={full_name}', file=sys.stderr)
-        
+
         self.cur.execute(stmt, ("repository", full_name, "USER", owner_id, "FULL_CONTROL"))
 
 
