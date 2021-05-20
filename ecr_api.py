@@ -110,7 +110,7 @@ class ecr_middleware():
 
 
 
-        USE_TOKEN_CACHE=False
+        USE_TOKEN_CACHE=True
         ecr_db = None
         user_id = ""
         scopes = ""
@@ -124,6 +124,10 @@ class ecr_middleware():
                 print(f'found cached token', file=sys.stderr)
                 environ['authenticated'] = True
                 environ['user'] = user_id
+                environ['scopes'] = scopes
+                environ['admin'] = is_admin
+
+
                 return self.app(environ, start_response)
 
             print(f'did not find cached token...', file=sys.stderr)
@@ -370,9 +374,13 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
         #resources_str = json.dumps(resourcesArray)
 
     ##### metadata
-    appMetadata = postData.get("metadata", "{}")
+    try:
+        appMetadata = postData.get("metadata", {})
+    except Exception:
+        raise Exception(f'Could not retrieve metadata')
 
-
+    if not isinstance(appMetadata, dict):
+        raise Exception("metadata has to be an object")
 
 
     ##### create dbObject
@@ -382,12 +390,7 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
         dbObject[key] = ""
 
 
-    if not isinstance(appMetadata, dict):
-        raise Exception(f'Field metadata has to be an object, got {str(appMetadata)}')
-    dbObject["metadata"] = json.dumps(appMetadata)
-
-
-
+    dbObject["metadata"] = json.dumps(appMetadata) # should at least be an empty dictionary
     dbObject["namespace"] = namespace
     dbObject["name"] = repository
     dbObject["version"] = version
