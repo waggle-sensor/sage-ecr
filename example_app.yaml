@@ -6,22 +6,22 @@
 description: "very important app"
 source:
     architectures :
-        - "linux/amd64"  # required
+        - "linux/amd64"  # required, valid fields: "linux/amd64", "linux/arm64", "linux/arm/v6", "linux/arm/v7", "linux/arm/v8
     url: "https://github.com/waggle-sensor/edge-plugins.git"   # required
-    branch: "master"  # optional, default: master
+    branch: "main"  # optional, default: main
     directory : "plugin-simple"  # optional, default: root of git repository
     dockerfile : "Dockerfile_sage"   # optional, default: Dockerfile , relative to context directory
-    build_args:
+    build_args: # optional, key-value pairs for docker build
       VARIABLE1: "value1"
-resources:
+resources:  # future feature
   - type: "RGB_image_producer"
     view: "top"
     min_resolution: "600x800"
 
-inputs:
+inputs:  # future feature
     - id: "speed"
       type: "int"
 
-metadata:
+metadata: # custom key-value pairs
   my-science-data : 12345
 
