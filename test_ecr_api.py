@@ -535,7 +535,7 @@ def test_permissions(client):
     headers_testuser2 = {"Authorization" : "sage token2"}
     admin_headers = {"Authorization" : "sage admin_token"}
 
-    grimm_namespace = "brothers-grimm"
+    grimm_namespace = "brothersgrimm"
     grimm_repo = "hansel_and_gretel"
     grimm_v = "1.0"
     #test_app_def_obj["namespace"] = grimm_namespace
