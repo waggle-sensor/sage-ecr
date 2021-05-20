@@ -235,6 +235,68 @@ def test_upload_and_build(client):
 #    return upload_and_build(client, test_failure=True)
 
 
+def test_app_upload_multiple(client):
+    """Start with a blank database."""
+
+
+    headers = {"Authorization" : "sage token1"}
+    admin_headers = {"Authorization" : "sage admin_token"}
+
+    app_namespace = "sageother"
+    app_repository = "simple_other"
+    app_version = "1.0"
+
+    #this_test_app = json.dumps(test_app_def_obj)
+    this_test_app_obj = json.loads(json.dumps(test_app_def_obj))
+    del this_test_app_obj["metadata"]
+
+
+    # delete app in case app already exists and is frozen
+    rv = client.delete(f'/apps/{app_namespace}/{app_repository}/{app_version}', headers=admin_headers)
+    result = rv.get_json()
+
+    if "error" in result:
+        assert "App not found" in result["error"]
+    else:
+        assert rv.status_code == 200
+
+    # delete repository:
+    rv = client.delete(f'/repositories/{app_namespace}/{app_repository}', headers=admin_headers)
+    print(f'rv.data: {rv.data}' , file=sys.stderr)
+    assert rv.status_code == 200
+
+    # delete namespace
+    rv = client.get(f'/namespaces/{app_namespace}', headers=admin_headers)
+    if rv.status_code == 200:
+        rv = client.delete(f'/namespaces/{app_namespace}', headers=admin_headers)
+        print(f'rv.data: {rv.data}' , file=sys.stderr)
+        assert rv.status_code == 200
+        result = rv.get_json()
+        assert result != None
+        assert "error"  not in result
+
+    # create namespace (not needed, but increases test coverage)
+    rv = client.put(f'/namespaces', data = json.dumps({"id":app_namespace}), headers=headers)
+    print(f'(create namespace) rv.data: {rv.data}' , file=sys.stderr)
+    assert rv.data != ""
+    assert rv.status_code == 200
+    result = rv.get_json()
+    assert result != None
+    assert "error"  not in result
+
+
+    # submit
+    rv = client.post(f'/apps/{app_namespace}/{app_repository}/{app_version}', data = json.dumps(this_test_app_obj), headers=headers)
+    assert rv.data != ""
+    print(f'rv.data: {rv.data}' , file=sys.stderr)
+
+    result = rv.get_json()
+
+
+    assert result != None
+    assert "error" not in result
+    assert "name" in result
+    assert result["name"] ==  app_repository
 
 
 
@@ -473,7 +535,7 @@ def test_permissions(client):
     headers_testuser2 = {"Authorization" : "sage token2"}
     admin_headers = {"Authorization" : "sage admin_token"}
 
-    grimm_namespace = "brothers-grimm"
+    grimm_namespace = "brothersgrimm"
     grimm_repo = "hansel_and_gretel"
     grimm_v = "1.0"
     #test_app_def_obj["namespace"] = grimm_namespace

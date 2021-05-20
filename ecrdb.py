@@ -759,7 +759,7 @@ class EcrDB():
         # "... can only contain numbers and lowercase letters."
 
         p = re.compile(f'[a-z0-9]+', re.ASCII)
-        if not p.match(name):
+        if not p.fullmatch(name):
             raise Exception("Namespace can only contain numbers and lowercase letters")
 
         if len(name) < 4 or len(name) > 30 :
@@ -840,7 +840,7 @@ class EcrDB():
         # "The repository name needs to be unique in that namespace, can be two to 255 characters, and can only contain lowercase letters, numbers or - and _."
 
         p = re.compile(f'[a-z0-9_-]+', re.ASCII)
-        if not p.match(name):
+        if not p.fullmatch(name):
             raise Exception("Repository can only contain numbers and lowercase letters")
 
         if len(name) < 2 or len(name) > 255 :

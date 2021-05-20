@@ -118,7 +118,7 @@ CREATE TABLE IF NOT EXISTS SageECR.TokenCache (
     user                VARCHAR(256) NOT NULL,
     scopes              VARCHAR(512) NOT NULL,
     is_admin            BOOLEAN,
-    expires             TIMESTAMP,
+    expires             TIMESTAMP,  /* this is the cache expiration (1hour), not real token expiration (weeks) */
     PRIMARY KEY (token)
 );
 
@@ -126,7 +126,7 @@ CREATE TABLE IF NOT EXISTS SageECR.TokenCache (
 CREATE EVENT IF NOT EXISTS `SageECR`.`AuthNCacheEvent`
 ON SCHEDULE
 EVERY 1 HOUR
-COMMENT 'Description'
+COMMENT 'TokenCleanup'
 DO
 DELETE FROM `SageECR`.`TokenCache` WHERE `expires` < NOW();
 
