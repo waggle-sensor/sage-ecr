@@ -89,7 +89,7 @@ class JenkinsServer():
         #sourceArray = source.split("#", 3)
 
         git_url = source.get("url", "")
-        git_branch = source.get("branch", "master")
+        git_branch = source.get("branch", "main")
         git_directory = source.get("directory", ".")
         if git_directory.startswith("/"):
             git_directory=git_directory[1:]
