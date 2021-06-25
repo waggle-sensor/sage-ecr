@@ -14,10 +14,10 @@ mysql_password =  os.getenv('MYSQL_PASSWORD')
 
 
 # app definition , these are the app fields (as seen by user) that are stored in the tables Apps
-valid_fields =["namespace", "name", "version", "description" , "source", "depends_on", "baseCommand", "arguments", "inputs", "resources", "metadata", "frozen"]
+valid_fields =["namespace", "name", "version", "description" , "source", "depends_on", "baseCommand", "arguments", "inputs", "resources", "metadata", "frozen","testing"]
 valid_fields_set = set(valid_fields)
 
-app_view_fields = ["namespace", "name", "version", "description" , "source", "depends_on", "baseCommand", "arguments", "inputs", "resources", "metadata"]
+app_view_fields = ["namespace", "name", "version", "description" , "source", "depends_on", "baseCommand", "arguments", "inputs", "resources", "metadata","testing"]
 
 required_fields = { "description" : "str",
                     "source" : "dict"}
@@ -35,6 +35,7 @@ mysql_Apps_fields = {
                 "inputs"        : "json",
                 "metadata"      : "json",
                 "frozen"        : "bool",
+                "testing"       : "json",
                 "owner"         : "str",
                 "time_created"  : "datetime",
                 "time_last_updated"        : "datetime",
@@ -141,7 +142,8 @@ jenkinsfileTemplate = '''pipeline {
                     sh "docker version"
                     sh "docker buildx version"
                     ${docker_login}
-                    sh "docker buildx build --pull --builder sage --platform ${platforms} ${build_args_command_line} ${do_push} -t ${docker_registry_url}/${namespace}/${name}:${version} ."
+                    sh "docker buildx build --pull --load --builder sage --platform ${platforms} -t ${docker_registry_url}/${namespace}/${name}:${version} ."
+
                 }
                 sleep 10
                 echo 'Building..'
@@ -149,7 +151,17 @@ jenkinsfileTemplate = '''pipeline {
         }
         stage('Test') {
             steps {
-                echo 'Testing..'
+              
+                git branch: '${branch}',
+                    url: '${url}'
+                dir("$${env.WORKSPACE}/${directory}"){
+                    sh "docker version"
+                    sh "docker buildx version"
+
+                    sh "docker run -i --rm --entrypoint=\\"\\" ${docker_registry_url}/${namespace}/${name}:${version}  \'${testing}\' "
+                    
+                }
+
             }
         }
     }

@@ -1,0 +1,23 @@
+
+namespace: "sage"
+name: "numpy-example"
+description: "Numpy example which computes some stats of a test frame."
+version: "0.1.0"
+source:
+  architectures:
+    - "linux/amd64"
+    # - "linux/arm64"
+    # - "linux/arm/v7"
+  # url: "https://github.com/waggle-sensor/plugin-numpy-example"
+  url: "https://github.com/aabayomi/plugin-numpy-example"
+  branch: "main" 
+
+
+resources:  # future feature
+  - type: "RGB_image_producer"
+    view: "top"
+    min_resolution: "600x800"
+
+
+testing:
+    command: [python3 ,test.py]

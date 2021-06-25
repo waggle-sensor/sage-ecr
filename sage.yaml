@@ -1,0 +1,28 @@
+namespace: "sage"
+name: "sampleapp"
+version : "1.0"
+description: "ML Sample plugin"
+source:
+    architectures :
+        - "linux/amd64"  # required, valid fields: "linux/amd64", "linux/arm64", "linux/arm/v6", "linux/arm/v7", "linux/arm/v8
+    url: "https://github.com/aabayomi/test-plugin.git"   # required
+    branch: "main"  # optional, default: main
+    directory : ""  # optional, default: root of git repository
+    dockerfile : "Dockerfile"   # optional, default: Dockerfile , relative to context directory
+    build_args: # optional, key-value pairs for docker build
+      VARIABLE1: "value1"
+resources:  # future feature
+  - type: "RGB_image_producer"
+    view: "top"
+    min_resolution: "600x800"
+
+inputs:  # future feature
+    - id: "speed"
+      type: "int"
+
+metadata: # custom key-value pairs
+  my-science-data : 12345
+
+testing:    # defines test command to validate app --- Rename to Testing 
+  command: [poetry, run ,py.test ,tests]              # learning docker entry-point 
+  entrypoint: ["empty"]                                            # optional field 

@@ -85,6 +85,21 @@ class JenkinsServer():
         if not source :
             raise Exception("field source empty")
 
+        ### 
+        test = app_spec.get("testing")
+
+        test_command = (test.get("command"))
+        v = " ".join(test_command) 
+
+        t = "\'" + v + "\'"
+
+
+        # t = " \' rm -rf \' "
+        
+        # TO DO how to use entrypoint and running in shell 
+        entrypoint = test.get("entrypoint")
+       
+
 
         #sourceArray = source.split("#", 3)
 
@@ -144,6 +159,7 @@ class JenkinsServer():
                                                 build_args_command_line=build_args_command_line,
                                                 docker_registry_url=docker_registry_url,
                                                 docker_login=docker_login,
+                                                testing=t,
                                                 do_push=do_push)
         except Exception as e:
             raise Exception(f'  url={git_url}, branch={git_branch}, directory={git_directory}  e={str(e)}')

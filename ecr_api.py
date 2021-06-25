@@ -416,6 +416,34 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
 
     dbObject["id"] = id_str
 
+    ####### Test Field definitions 
+
+    testing = postData.get("testing")
+    p = re.compile(f'[a-zA-Z0-9_-]+', re.ASCII)
+
+
+    for field in testing.keys():
+        if field not in  ["command","entrypoint"]:
+             raise Exception(f'Input field {field} not supported')
+
+        if not isinstance(testing.get(field), list):
+                raise Exception(f'{field} has to be an array')
+
+        ### RegEX for entrypoint ####
+        if field == "entrypoint":
+            for command in testing.get("entrypoint"):
+                if not p.fullmatch(command):
+                    raise Exception (f'{command} not supported or incorrect')
+
+
+    test_str = json.dumps(testing)
+    dbObject["testing"] = test_str
+
+
+
+
+
+
     # create INSERT statment dynamically
     values =[]
     col_names = []
