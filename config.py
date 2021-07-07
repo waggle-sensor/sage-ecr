@@ -127,6 +127,10 @@ if docker_registry_url == "":
 docker_registry_push_allowed = os.environ.get("DOCKER_REGISTRY_PUSH_ALLOWED", "0") == "1"
 
 
+
+
+
+
 jenkinsfileTemplate = '''pipeline {
     agent any
 
@@ -136,14 +140,21 @@ jenkinsfileTemplate = '''pipeline {
                 script {
                     currentBuild.displayName = "${version}"
                 }
+    
                 git branch: '${branch}',
                     url: '${url}'
                 dir("$${env.WORKSPACE}/${directory}"){
                     sh "docker version"
                     sh "docker buildx version"
                     ${docker_login}
-                    sh "docker buildx build --pull --load --builder sage --platform ${platforms} -t ${docker_registry_url}/${namespace}/${name}:${version} ."
 
+                     sh """
+                           for arch in ${platforms_list}
+                           do
+                                echo "arch: \$$arch"
+                                docker buildx build --pull --load --builder sage --platform \$$arch ${build_args_command_line} -t ${docker_registry_url}/${namespace}/${name}:${version} .
+                           done 
+                        """          
                 }
                 sleep 10
                 echo 'Building..'
@@ -151,17 +162,33 @@ jenkinsfileTemplate = '''pipeline {
         }
         stage('Test') {
             steps {
-              
+                   
                 git branch: '${branch}',
                     url: '${url}'
                 dir("$${env.WORKSPACE}/${directory}"){
                     sh "docker version"
                     sh "docker buildx version"
 
-                    sh "docker run -i --rm --entrypoint=\\"\\" ${docker_registry_url}/${namespace}/${name}:${version}  \'${testing}\' "
-                    
-                }
+                    sh """
+                        if [ "${command}" != " " ]
+                            docker run -i --rm ${docker_registry_url}/${namespace}/${name}:${version} ${command}
 
+                        # elif [ "${entrypoint}" != " " ] && [ "${command}" == "" ]
+                        # then
+                        #     echo "${entrypoint}"
+                        #     #docker run -i --rm --entrypoint \"\"  ${docker_registry_url}/${namespace}/${name}:${version}  \'${entrypoint}\'
+                   
+                        # elif [ "${command}" == "${entrypoint}" ]
+                        # then 
+                        #     echo " No Test Defined"
+                        # else 
+                        #    # redefine both endpoint and command
+                        #     docker run -i --rm --entrypoint= ${entrypoint} ${docker_registry_url}/${namespace}/${name}:${version} ${command}
+                   
+                      #  fi
+                       """                    
+                }
+                
             }
         }
     }

@@ -70,7 +70,7 @@ class JenkinsServer():
 
 
 
-
+    
 
     def createJob(self, id, app_spec, overwrite=False, skip_image_push=False):
 
@@ -88,16 +88,29 @@ class JenkinsServer():
         ### 
         test = app_spec.get("testing")
 
-        test_command = (test.get("command"))
-        v = " ".join(test_command) 
+        run_test = ""
+        run_entrypoint = ""
 
-        t = "\'" + v + "\'"
+        test_command = (test.get("command"))
+
+        # TO DO how to use entrypoint and running in shell 
+        entrypoint_command = ""
+        if "entrypoint" in test.keys():
+            entrypoint_command = test.get("entrypoint")
+    
+
+        if entrypoint_command:
+            all_entrypoint_command = " ".join(entrypoint_command)
+            run_entrypoint = "\'" + all_entrypoint_command + "\'"
+        if test_command:
+            all_test_command = " ".join(test_command)
+            run_test = "\'" +  all_test_command + "\'"
+
+        
 
 
         # t = " \' rm -rf \' "
         
-        # TO DO how to use entrypoint and running in shell 
-        entrypoint = test.get("entrypoint")
        
 
 
@@ -113,6 +126,8 @@ class JenkinsServer():
         if len(platforms) == 0:
             raise Exception("No architectures specified")
         platforms_str = ",".join(platforms)
+
+        platforms_list = " ".join(platforms)
 
         build_args = source.get("build_args", {})
         build_args_command_line = ""
@@ -159,7 +174,9 @@ class JenkinsServer():
                                                 build_args_command_line=build_args_command_line,
                                                 docker_registry_url=docker_registry_url,
                                                 docker_login=docker_login,
-                                                testing=t,
+                                                command = run_test,
+                                                platforms_list = platforms_list,
+                                                entrypoint =run_entrypoint,
                                                 do_push=do_push)
         except Exception as e:
             raise Exception(f'  url={git_url}, branch={git_branch}, directory={git_directory}  e={str(e)}')

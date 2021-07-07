@@ -416,35 +416,38 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
 
     dbObject["id"] = id_str
 
-    ####### Test Field definitions 
+    ####### Test Field definitions #################
+    #### To Do check database if entry is present 
 
-    testing = postData.get("testing")
-    p = re.compile(f'[a-zA-Z0-9_-]+', re.ASCII)
+    if not postData.get("testing"):
+        test_data = {"command": [""], "entrypoint": [""]}
+        dbObject["testing"] = json.dumps(test_data)
+    else:
+        testing = postData.get("testing")
+        p = re.compile(f'[a-zA-Z0-9_.-]+', re.ASCII)
+
+        for field in testing.keys():
+            if field not in  ["command","entrypoint"]:
+                raise Exception(f'Input field {field} not supported')
+
+            if not isinstance(testing.get(field), list):
+                    raise Exception(f'{field} has to be an array')
+
+            ## RegEX for entrypoint ####
+            if field in ["command","entrypoint"]:
+                for argument in testing.get(field):
+                    if not p.fullmatch(argument):
+                        raise Exception (f'{argument} not supported or incorrect')
+
+        test_str = json.dumps(testing)
+        dbObject["testing"] = test_str
 
 
-    for field in testing.keys():
-        if field not in  ["command","entrypoint"]:
-             raise Exception(f'Input field {field} not supported')
-
-        if not isinstance(testing.get(field), list):
-                raise Exception(f'{field} has to be an array')
-
-        ### RegEX for entrypoint ####
-        if field == "entrypoint":
-            for command in testing.get("entrypoint"):
-                if not p.fullmatch(command):
-                    raise Exception (f'{command} not supported or incorrect')
-
-
-    test_str = json.dumps(testing)
-    dbObject["testing"] = test_str
 
 
 
 
-
-
-    # create INSERT statment dynamically
+    # create INSERT statement dynamically
     values =[]
     col_names = []
     variables = []
@@ -509,7 +512,7 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
 
     build_args_dict = build_source.get("build_args", {})
     if not isinstance(build_args_dict, dict):
-        raise Exception(f'build_args needs to be a dictonary')
+        raise Exception(f'build_args needs to be a dictionary')
 
     for key in build_args_dict:
         value = build_args_dict[key]
