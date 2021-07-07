@@ -171,6 +171,7 @@ jenkinsfileTemplate = '''pipeline {
 
                     sh """
                         if [ "${command}" != " " ]
+                        then
                             docker run -i --rm ${docker_registry_url}/${namespace}/${name}:${version} ${command}
 
                         # elif [ "${entrypoint}" != " " ] && [ "${command}" == "" ]
@@ -185,7 +186,7 @@ jenkinsfileTemplate = '''pipeline {
                         #    # redefine both endpoint and command
                         #     docker run -i --rm --entrypoint= ${entrypoint} ${docker_registry_url}/${namespace}/${name}:${version} ${command}
                    
-                      #  fi
+                       fi
                        """                    
                 }
                 

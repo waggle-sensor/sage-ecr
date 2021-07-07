@@ -21,4 +21,4 @@ resources:  # future feature
 
 testing:
     command: [python3 ,test.py]
-    entrypoint: [python3 ,test.py]
+    # entrypoint: [python3 ,test.py]
