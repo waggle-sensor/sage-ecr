@@ -1,4 +1,6 @@
 jenkins:
+  disabledAdministrativeMonitors:
+    - hudson.model.UpdateCenter$CoreUpdateMonitor
   systemMessage: "Jenkins configured automatically by Jenkins Configuration as Code plugin\n\n"
 
   securityRealm:

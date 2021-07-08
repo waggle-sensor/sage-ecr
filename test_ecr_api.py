@@ -110,7 +110,7 @@ def upload_and_build(client, test_failure=False):
 
     # build "default"
     if True:
-        rv = client.post(f'/builds/{app_namespace}/{app_repository}/{app_version}?skip_image_push=true', headers=headers)
+        rv = client.post(f'/builds/{app_namespace}/{app_repository}/{app_version}?skip_image_push=false', headers=headers)
 
         assert rv.data != ""
         print(f'rv.data: {rv.data}' , file=sys.stderr)
