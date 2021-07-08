@@ -2,8 +2,11 @@
 
 # docker build -t sagecontinuum/ecr-jenkins .
 
+FROM jenkins/jenkins:2.289.1-lts-jdk11
+#FROM jenkins/jenkins:2.299-alpine
+#FROM jenkins/jenkins:2.263.4-lts-alpine
+#FROM jenkins/jenkins:2.289.1-lts-alpine
 
-FROM jenkins/jenkins:lts-alpine
 #FROM jenkins/jenkins:alpine
 
 RUN install-plugins.sh \
@@ -18,7 +21,7 @@ RUN install-plugins.sh \
     mailer \
     configuration-as-code \
     configuration-as-code-groovy \
-    credentials-binding                 # required for ecr-registry credentials 
+    credentials-binding                 # required for ecr-registry credentials
 
 
 
@@ -39,8 +42,8 @@ USER root
 RUN sed -i '2icp /init.groovy /var/jenkins_home/' /usr/local/bin/jenkins.sh
 
 
-
-RUN apk update && apk add jq curl file
+RUN apt-get update && apt-get install -y jq curl file
+#RUN apk update && apk add jq curl file
 
 #ENV JAVA_OPTS="-Djenkins.install.runSetupWizard=false"
 
