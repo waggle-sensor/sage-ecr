@@ -18,7 +18,7 @@ fi
 echo "USE_HOST_DOCKER: ${USE_HOST_DOCKER}"
 
 if [ "${USE_HOST_DOCKER}_" != "1_" ] ; then
-  
+
   export DOCKER_BINARY=${DATADIR}/docker-${DOCKER_VERSION}
 
   mkdir -p ${DATADIR}
@@ -31,7 +31,7 @@ if [ "${USE_HOST_DOCKER}_" != "1_" ] ; then
     set +x
     set +e
     mv ${DOCKER_BINARY}.part ${DOCKER_BINARY}
-    chmod +x ${DOCKER_BINARY}  
+    chmod +x ${DOCKER_BINARY}
   fi
 
   ln -sf ${DOCKER_BINARY} /usr/local/bin/docker
@@ -73,21 +73,23 @@ file /usr/local/bin/docker
 
 echo "docker buildx inspect sage"
 docker buildx inspect sage
-if [[ ! $? -eq 0 ]] ; then  
+if [[ ! $? -eq 0 ]] ; then
   set +e # ignore error
+
+  # --driver-opt network=host, see https://github.com/docker/buildx/issues/94
 
   if [ "${DOCKER_REGISTRY_INSECURE}_" == "1_" ] ; then
     set -x
-    /usr/local/bin/docker buildx create --name sage --use --config /buildx.config
+    /usr/local/bin/docker buildx create --name sage --driver-opt network=host --use --config /buildx.config
     set +x
   else
     set -x
-    /usr/local/bin/docker buildx create --name sage --use --buildkitd-flags '--allow-insecure-entitlement network.host'
+    /usr/local/bin/docker buildx create --name sage --driver-opt network=host --use --buildkitd-flags '--allow-insecure-entitlement network.host'
     set +x
   fi
 
-  
- 
+
+
 fi
 
 echo '{ "experimental":"enabled" } ' > /var/jenkins_home/config.json
