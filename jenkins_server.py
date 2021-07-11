@@ -176,6 +176,7 @@ class JenkinsServer():
                                                 docker_login=docker_login,
                                                 command = run_test,
                                                 platforms_list = platforms,
+                                                platform = platforms_str,
                                                 entrypoint =run_entrypoint,
                                                 do_push=do_push)
         except Exception as e:

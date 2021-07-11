@@ -134,7 +134,9 @@ jenkinsfileTemplate = ''' pipeline{
     stages {
         stage ('Write') {
             steps{
+
                 script{
+
                     for (arch in ${platforms_list}){
                        
                         stage('Build') {
@@ -163,10 +165,11 @@ jenkinsfileTemplate = ''' pipeline{
                                 sh "docker version"
                                 sh "docker buildx version"
                                 ${docker_login}
+                                
                                 sh """
                                     if [ "${command}" != " " ]
                                     then
-                                        docker run -i --rm ${docker_registry_url}/${namespace}/${name}:${version} ${command}
+                                        docker run -i --rm ${docker_registry_url}/${namespace}/${name}:${version} \'${command}\'
 
                                     # elif [ "${entrypoint}" != " " ] && [ "${command}" == "" ]
                                     # then
@@ -185,10 +188,30 @@ jenkinsfileTemplate = ''' pipeline{
 
                             }
                                                    
-                        }    
+                        }  
+  
                     }
+                    stage ('Multi Arch Build'){
+                        git branch: '${branch}',
+                        url: '${url}'
+                        dir("$${env.WORKSPACE}/${directory}"){
+                            sh "docker version"
+                            sh "docker buildx version"
+                            ${docker_login}
+                            #sh "docker buildx build --pull --load --builder sage --platform ${platform} ${build_args_command_line} -t ${docker_registry_url}/${namespace}/${name}:${version} ."
+
+                        }
+                    }
+
+                  
+
                 }
+
+
+                
+
             }
+
         }
     
 }
