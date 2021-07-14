@@ -68,8 +68,8 @@ docker exec -ti sage-ecr_sage-ecr_1 /bin/ash -c 'coverage run -m pytest -v --run
 The ECR uses buildx to build multi-arch docker images. This requires not only that docker is installed on the host, but also:
 
 - Experimental mode for the docker CLI needs to be turned on (described above)
-- QEMU installed (`apt-get install qemu`)
-- binfmt, e.g. `docker run --privileged --rm tonistiigi/binfmt --install all`
+- QEMU installed (`apt-get install qemu qemu-user-static`)
+- (this is probably not needed, as it is a depdency of the packages above) binfmt, e.g. `docker run --privileged --rm tonistiigi/binfmt --install all`
 
 
 
