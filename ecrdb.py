@@ -31,7 +31,7 @@ class EcrDB():
             except Exception as e: # pragma: no cover
                 if count > retries:
                     raise
-                print(f'Could not connnect to database, error={e}, retry in 2 seconds', file=sys.stderr)
+                print(f'Could not connect to database, error={e}, retry in 2 seconds', file=sys.stderr)
                 time.sleep(2)
                 count += 1
                 continue

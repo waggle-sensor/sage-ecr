@@ -70,7 +70,7 @@ class JenkinsServer():
 
 
 
-
+    
 
     def createJob(self, id, app_spec, overwrite=False, skip_image_push=False):
 
@@ -85,6 +85,34 @@ class JenkinsServer():
         if not source :
             raise Exception("field source empty")
 
+        ### 
+        test = app_spec.get("testing")
+
+        run_test = ""
+        run_entrypoint = ""
+
+        test_command = (test.get("command"))
+
+        # TO DO how to use entrypoint and running in shell 
+        entrypoint_command = ""
+        if "entrypoint" in test.keys():
+            entrypoint_command = test.get("entrypoint")
+    
+
+        if entrypoint_command:
+            all_entrypoint_command = " ".join(entrypoint_command)
+            run_entrypoint = "\'" + all_entrypoint_command + "\'"
+        if test_command:
+            all_test_command = " ".join(test_command)
+            run_test = "\'" +  all_test_command + "\'"
+
+        
+
+
+        # t = " \' rm -rf \' "
+        
+       
+
 
         #sourceArray = source.split("#", 3)
 
@@ -98,6 +126,8 @@ class JenkinsServer():
         if len(platforms) == 0:
             raise Exception("No architectures specified")
         platforms_str = ",".join(platforms)
+
+        platforms_list = " ".join(platforms)
 
         build_args = source.get("build_args", {})
         build_args_command_line = ""
@@ -144,6 +174,10 @@ class JenkinsServer():
                                                 build_args_command_line=build_args_command_line,
                                                 docker_registry_url=docker_registry_url,
                                                 docker_login=docker_login,
+                                                command = run_test,
+                                                platforms_list = platforms,
+                                                platform = platforms_str,
+                                                entrypoint =run_entrypoint,
                                                 do_push=do_push)
         except Exception as e:
             raise Exception(f'  url={git_url}, branch={git_branch}, directory={git_directory}  e={str(e)}')
