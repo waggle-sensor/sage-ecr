@@ -198,7 +198,7 @@ jenkinsfileTemplate = ''' pipeline{
                             sh "docker version"
                             sh "docker buildx version"
                             ${docker_login}
-                            #sh "docker buildx build --pull --load --builder sage --platform ${platform} ${build_args_command_line} -t ${docker_registry_url}/${namespace}/${name}:${version} ."
+                            sh "docker buildx build --pull --builder sage --platform ${platform} ${build_args_command_line} -t ${docker_registry_url}/${namespace}/${name}:${version} ."
 
                         }
                     }
