@@ -1,7 +1,7 @@
 
-namespace: "sage"
-name: "simple"
-version : "1.0"
+# namespace: "sage"
+# name: "simple"
+# version : "1.0"
 
 description: "very important app"
 source:
@@ -24,7 +24,3 @@ inputs:  # future feature
 
 metadata: # custom key-value pairs
   my-science-data : 12345
-
-testing:   # optional to test application 
-    command: [python3 ,test.py]  # defines how unit test is run
-    # entrypoint: [python3 ,main.py] # Docker application entrypoint definition
