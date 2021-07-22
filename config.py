@@ -138,9 +138,9 @@ jenkinsfileTemplate = ''' pipeline{
                 script{
 
                     for (arch in ${platforms_list}){
-                       
+
                         stage('Build') {
-                                   
+
                             currentBuild.displayName = "${version}"
 
                             git branch: '${branch}',
@@ -149,14 +149,14 @@ jenkinsfileTemplate = ''' pipeline{
                                 sh "docker version"
                                 sh "docker buildx version"
                                 ${docker_login}
-                                sh "docker buildx build --pull --load --builder sage --platform $$arch ${build_args_command_line} -t ${docker_registry_url}/${namespace}/${name}:${version} ."
+                                sh "docker buildx build --pull --load --builder sage --platform $$arch ${build_args_command_line} -t ${docker_registry_url}/${namespace}/${name}:${version} -f ${dockerfile} ."
 
                             }
 
                         }
-    
+
                         stage('Test') {
-                           
+
                             currentBuild.displayName = "${version}"
 
                             git branch: '${branch}',
@@ -175,9 +175,9 @@ jenkinsfileTemplate = ''' pipeline{
                                         }
                                 }
                             }
-                                                   
-                        }  
-  
+
+                        }
+
                     }
                     stage ('Multi Arch Build'){
                         git branch: '${branch}',
@@ -186,22 +186,22 @@ jenkinsfileTemplate = ''' pipeline{
                             sh "docker version"
                             sh "docker buildx version"
                             ${docker_login}
-                            sh "docker buildx build --pull --builder sage --platform ${platform} ${build_args_command_line} -t ${docker_registry_url}/${namespace}/${name}:${version} ."
+                            sh "docker buildx build --pull --builder sage --platform ${platform} ${build_args_command_line} -t ${docker_registry_url}/${namespace}/${name}:${version} -f ${dockerfile} ."
 
                         }
                     }
 
-                  
+
 
                 }
 
 
-                
+
 
             }
 
         }
-    
+
 }
 
     }

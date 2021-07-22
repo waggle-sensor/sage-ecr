@@ -70,7 +70,7 @@ class JenkinsServer():
 
 
 
-    
+
 
     def createJob(self, id, app_spec, overwrite=False, skip_image_push=False):
 
@@ -85,7 +85,7 @@ class JenkinsServer():
         if not source :
             raise Exception("field source empty")
 
-        ### 
+        ###
         test = app_spec.get("testing")
 
         run_test = ""
@@ -93,11 +93,11 @@ class JenkinsServer():
 
         test_command = (test.get("command"))
 
-        # TO DO how to use entrypoint and running in shell 
+        # TO DO how to use entrypoint and running in shell
         entrypoint_command = ""
         if "entrypoint" in test.keys():
             entrypoint_command = test.get("entrypoint")
-    
+
 
         if entrypoint_command:
             all_entrypoint_command = " ".join(entrypoint_command)
@@ -106,12 +106,12 @@ class JenkinsServer():
             all_test_command = " ".join(test_command)
             run_test = "\'" +  all_test_command + "\'"
 
-        
+
 
 
         # t = " \' rm -rf \' "
-        
-       
+
+
 
 
         #sourceArray = source.split("#", 3)
@@ -121,6 +121,8 @@ class JenkinsServer():
         git_directory = source.get("directory", ".")
         if git_directory.startswith("/"):
             git_directory=git_directory[1:]
+
+        git_dockerfile = source.get("dockerfile", "./Dockerfile")
 
         platforms = source.get("architectures", [])
         if len(platforms) == 0:
@@ -167,6 +169,7 @@ class JenkinsServer():
             jenkinsfile = template.substitute(  url=git_url,
                                                 branch=git_branch,
                                                 directory=git_directory,
+                                                dockerfile=git_dockerfile,
                                                 namespace=actual_namespace,
                                                 name=name,
                                                 version=version,
