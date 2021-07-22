@@ -424,7 +424,7 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
         dbObject["testing"] = json.dumps(test_data)
     else:
         testing = postData.get("testing")
-        p = re.compile(f'[a-zA-Z0-9_.-]+', re.ASCII)
+        p = re.compile(f'[a-zA-Z0-9_. -]+', re.ASCII)
 
         for field in testing.keys():
             if field not in  ["command","entrypoint"]:

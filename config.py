@@ -165,27 +165,15 @@ jenkinsfileTemplate = ''' pipeline{
                                 sh "docker version"
                                 sh "docker buildx version"
                                 ${docker_login}
-                                
-                                sh """
-                                    if [ "${command}" != " " ]
-                                    then
-                                        docker run -i --rm ${docker_registry_url}/${namespace}/${name}:${version} \'${command}\'
 
-                                    # elif [ "${entrypoint}" != " " ] && [ "${command}" == "" ]
-                                    # then
-                                    #     echo "${entrypoint}"
-                                    #     #docker run -i --rm --entrypoint \"\"  ${docker_registry_url}/${namespace}/${name}:${version}  \'${entrypoint}\'
-                            
-                                    # elif [ "${command}" == "${entrypoint}" ]
-                                    # then 
-                                    #     echo " No Test Defined"
-                                    # else 
-                                    #    # redefine both endpoint and command
-                                    #     docker run -i --rm --entrypoint= ${entrypoint} ${docker_registry_url}/${namespace}/${name}:${version} ${command}
-                            
-                                    fi
-                                """ 
-
+                                script{
+                                        if ( "${command}" == "''" ){
+                                            ;
+                                        }
+                                        else{
+                                            sh "docker run -i --rm ${docker_registry_url}/${namespace}/${name}:${version} \'${command}\'"
+                                        }
+                                }
                             }
                                                    
                         }  
