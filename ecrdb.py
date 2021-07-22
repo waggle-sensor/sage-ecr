@@ -382,7 +382,7 @@ class EcrDB():
                 if ref_hash[field] == "datetime":
                     target[field] = row[pos].isoformat() + 'Z'
                 elif ref_hash[field] == "json":
-                    if row[pos] != "":
+                    if row[pos] != None and row[pos] != "":
                         try:
                             target[field] = json.loads(row[pos])
                         except json.JSONDecodeError:

@@ -171,7 +171,7 @@ jenkinsfileTemplate = ''' pipeline{
                                             ;
                                         }
                                         else{
-                                            sh "docker run -i --rm ${docker_registry_url}/${namespace}/${name}:${version} \'${command}\'"
+                                            sh "docker run -i --rm ${entrypoint} ${docker_registry_url}/${namespace}/${name}:${version} \'${command}\'"
                                         }
                                 }
                             }
@@ -202,7 +202,13 @@ jenkinsfileTemplate = ''' pipeline{
 
         }
 
+
 }
+post {
+                       always {
+                            cleanWs(cleanWhenNotBuilt: true)
+                        }
+                    }
 
     }
 '''

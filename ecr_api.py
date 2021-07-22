@@ -417,27 +417,37 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
     dbObject["id"] = id_str
 
     ####### Test Field definitions #################
-    #### To Do check database if entry is present 
+    #### To Do check database if entry is present
 
-    if not postData.get("testing"):
-        test_data = {"command": [""], "entrypoint": [""]}
-        dbObject["testing"] = json.dumps(test_data)
-    else:
+    #if not postData.get("testing"):
+    #    test_data = {"command": [""], "entrypoint": [""]}
+    #    dbObject["testing"] = json.dumps(test_data)
+    #else:
+    if postData.get("testing"):
         testing = postData.get("testing")
         p = re.compile(f'[a-zA-Z0-9_. -]+', re.ASCII)
 
         for field in testing.keys():
-            if field not in  ["command","entrypoint"]:
+            if field not in  ["command","mask_entrypoint"]:
                 raise Exception(f'Input field {field} not supported')
 
-            if not isinstance(testing.get(field), list):
-                    raise Exception(f'{field} has to be an array')
+        if not "command" in testing.keys():
+            raise Exception(f'testing specified but command missing')
 
-            ## RegEX for entrypoint ####
-            if field in ["command","entrypoint"]:
-                for argument in testing.get(field):
-                    if not p.fullmatch(argument):
-                        raise Exception (f'{argument} not supported or incorrect')
+        if not isinstance(testing.get("command"), list):
+                raise Exception(f'{field} has to be an array')
+
+        for argument in testing.get("command"):
+            if not p.fullmatch(argument):
+                raise Exception (f'command contains invalid characters')
+
+        if "mask_entrypoint" in testing.keys():
+            if not isinstance(testing.get("mask_entrypoint"), bool):
+                raise Exception(f'Field mask_entrypoint has to be a boolean')
+
+
+        #if field in ["command","entrypoint"]:
+
 
         test_str = json.dumps(testing)
         dbObject["testing"] = test_str

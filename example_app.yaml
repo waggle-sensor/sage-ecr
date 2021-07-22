@@ -26,4 +26,5 @@ metadata: # custom key-value pairs
   my-science-data : 12345
 
 testing:
-  command: [echo,test is successful]
+  mask_entrypoint: true  # this is usually required (to mask ENTRYPOINT defined in Dockerfile)
+  command: ["echo", "test is successful"]

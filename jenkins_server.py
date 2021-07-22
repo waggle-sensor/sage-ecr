@@ -93,15 +93,18 @@ class JenkinsServer():
 
         test_command = (test.get("command"))
 
-        # TO DO how to use entrypoint and running in shell
-        entrypoint_command = ""
-        if "entrypoint" in test.keys():
-            entrypoint_command = test.get("entrypoint")
+
+        mask_entrypoint_value = False
+        if "mask_entrypoint" in test.keys():
+            mask_entrypoint_value = test.get("mask_entrypoint")
+
+            if mask_entrypoint_value:
+                run_entrypoint = ' --entrypoint=\'\''
 
 
-        if entrypoint_command:
-            all_entrypoint_command = " ".join(entrypoint_command)
-            run_entrypoint = "\'" + all_entrypoint_command + "\'"
+        #if entrypoint_command:
+        #    all_entrypoint_command = " ".join(entrypoint_command)
+        #    run_entrypoint = "\'" + all_entrypoint_command + "\'"
         if test_command:
             all_test_command = " ".join(test_command)
             run_test = "\'" +  all_test_command + "\'"
