@@ -26,5 +26,4 @@ metadata: # custom key-value pairs
   my-science-data : 12345
 
 testing:
-  command: [python3,test.py]
-  
+  command: [echo,test is successful]
