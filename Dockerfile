@@ -15,7 +15,7 @@ RUN apk add linux-headers
 
 RUN /usr/local/bin/python -m pip install --upgrade pip
 
-COPY  . /usr/src/app
+COPY  requirements.txt *.py /usr/src/app/
 RUN pip install -r requirements.txt
 
 #CMD ./ecr_api.py

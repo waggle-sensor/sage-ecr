@@ -10,7 +10,7 @@ source:
     url: "https://github.com/waggle-sensor/edge-plugins.git"   # required
     branch: "master"  # optional, default: main
     directory : "plugin-simple"  # optional, default: root of git repository
-    dockerfile : "Dockerfile_sage"   # optional, default: Dockerfile , relative to context directory
+    dockerfile : "Dockerfile"   # optional, default: Dockerfile , relative to context directory
     build_args: # optional, key-value pairs for docker build
       VARIABLE1: "value1"
 resources:  # future feature
@@ -25,3 +25,6 @@ inputs:  # future feature
 metadata: # custom key-value pairs
   my-science-data : 12345
 
+testing:
+  mask_entrypoint: true  # this is usually required (to mask ENTRYPOINT defined in Dockerfile)
+  command: ["echo", "test is successful"]

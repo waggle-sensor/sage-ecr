@@ -85,6 +85,37 @@ class JenkinsServer():
         if not source :
             raise Exception("field source empty")
 
+        ###
+        test = app_spec.get("testing")
+
+        run_test = ""
+        run_entrypoint = ""
+
+        test_command = (test.get("command"))
+
+
+        mask_entrypoint_value = False
+        if "mask_entrypoint" in test.keys():
+            mask_entrypoint_value = test.get("mask_entrypoint")
+
+            if mask_entrypoint_value:
+                run_entrypoint = ' --entrypoint=\'\''
+
+
+        #if entrypoint_command:
+        #    all_entrypoint_command = " ".join(entrypoint_command)
+        #    run_entrypoint = "\'" + all_entrypoint_command + "\'"
+        if test_command:
+            all_test_command = " ".join(test_command)
+            run_test = "\'" +  all_test_command + "\'"
+
+
+
+
+        # t = " \' rm -rf \' "
+
+
+
 
         #sourceArray = source.split("#", 3)
 
@@ -94,10 +125,14 @@ class JenkinsServer():
         if git_directory.startswith("/"):
             git_directory=git_directory[1:]
 
+        git_dockerfile = source.get("dockerfile", "./Dockerfile")
+
         platforms = source.get("architectures", [])
         if len(platforms) == 0:
             raise Exception("No architectures specified")
         platforms_str = ",".join(platforms)
+
+        platforms_list = " ".join(platforms)
 
         build_args = source.get("build_args", {})
         build_args_command_line = ""
@@ -137,6 +172,7 @@ class JenkinsServer():
             jenkinsfile = template.substitute(  url=git_url,
                                                 branch=git_branch,
                                                 directory=git_directory,
+                                                dockerfile=git_dockerfile,
                                                 namespace=actual_namespace,
                                                 name=name,
                                                 version=version,
@@ -144,6 +180,10 @@ class JenkinsServer():
                                                 build_args_command_line=build_args_command_line,
                                                 docker_registry_url=docker_registry_url,
                                                 docker_login=docker_login,
+                                                command = run_test,
+                                                platforms_list = platforms,
+                                                platform = platforms_str,
+                                                entrypoint =run_entrypoint,
                                                 do_push=do_push)
         except Exception as e:
             raise Exception(f'  url={git_url}, branch={git_branch}, directory={git_directory}  e={str(e)}')

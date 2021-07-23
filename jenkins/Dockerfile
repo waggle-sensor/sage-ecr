@@ -21,6 +21,7 @@ RUN install-plugins.sh \
     mailer \
     configuration-as-code \
     configuration-as-code-groovy \
+    ws-cleanup \
     credentials-binding                 # required for ecr-registry credentials
 
 

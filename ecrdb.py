@@ -31,7 +31,7 @@ class EcrDB():
             except Exception as e: # pragma: no cover
                 if count > retries:
                     raise
-                print(f'Could not connnect to database, error={e}, retry in 2 seconds', file=sys.stderr)
+                print(f'Could not connect to database, error={e}, retry in 2 seconds', file=sys.stderr)
                 time.sleep(2)
                 count += 1
                 continue
@@ -382,7 +382,7 @@ class EcrDB():
                 if ref_hash[field] == "datetime":
                     target[field] = row[pos].isoformat() + 'Z'
                 elif ref_hash[field] == "json":
-                    if row[pos] != "":
+                    if row[pos] != None and row[pos] != "":
                         try:
                             target[field] = json.loads(row[pos])
                         except json.JSONDecodeError:

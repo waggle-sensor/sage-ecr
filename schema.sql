@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS SageECR.Apps (
     arguments           VARCHAR(256),
     inputs              VARCHAR(256),
     metadata            TEXT,
+    testing             VARCHAR(256),
     schema_version      VARCHAR(64),
     time_created        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     time_last_updated   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
