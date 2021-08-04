@@ -386,6 +386,9 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
     ##### create dbObject
     dbObject = {}
 
+    ## profile database object
+    profile_db = {}   
+
     for key in config.valid_fields_set:
         dbObject[key] = ""
 
@@ -451,6 +454,130 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
 
         test_str = json.dumps(testing)
         dbObject["testing"] = test_str
+
+
+
+    #### Profile Information from YAML to be stored ###########
+    # Only the storing of targets are saved in the database i have commented the sources portion not sure if we want the users to see
+    # this or we want to give the option for them for fill
+
+
+    profiling  = postData.get("profiling")
+    if not profiling:
+        raise Exception("Field profiling is missing")
+    
+    # profiling_source = profiling.get("source")
+    # if not profiling_source:
+    #     raise Exception("Field source is missing in profiling")
+
+    
+    # profile_url = profiling_source.get("profiler_url","")
+    # if profile_url == "":
+    #     raise Exception("profiling url missing in source")
+    
+    # profiler_branch = profiling_source.get("profiler_branch", "main")
+    # if profiler_branch == "":
+    #     raise Exception(" profiling branch missing in source")
+
+    # profiler_directory = profiling_source.get("profiler_directory", ".")
+    # if profiler_directory == "":
+    #     profiler_directory = "."
+
+    # profiler_dockerfile = profiling_source.get("profiler_dockerfile", "Dockerfile")
+    # if profiler_dockerfile == "":
+    #    profiler_dockerfile = "Dockerfile"
+
+    # profiler_app_docker_args = profiling_source.get("profiler_app_docker_args")
+    # if not isinstance(profiler_app_docker_args, str):
+    #     raise Exception(f'build_args needs to be string')
+
+    # profiler_app_args = profiling_source.get("profiler_app_args")
+    # if not isinstance(profiler_app_args, str):
+    #     raise Exception(f'build_args needs to be string')
+
+    
+    #### only the part is saved in the database 
+
+    profiling_target = profiling.get("targets")
+    if not profiling_target:
+        raise Exception("Field target is missing in profiling")
+
+    if not isinstance(profiling_target,list):
+        raise Exception(f'Field profile targets has to be an array')
+
+
+    profiling_metrics = profiling.get("metrics")
+    if not profiling_metrics:
+        raise Exception("No profiling metrics defined")
+
+    if not isinstance(profiling_metrics,list):
+        raise Exception(f'Field profile metrics has to be an array')
+    
+    for field in profiling_metrics:
+        if field not in ["system","gpu-summary"]:
+            raise Exception(f'Input field {field} not supported')
+
+
+    profiling_str = json.dumps(profiling)
+    dbObject["profiling"] = profiling_str
+
+
+
+
+
+
+    ##### Profile Database Definition Place holder to store profile data ###############
+
+    for key in config.valid_profile_fields_set:
+        profile_db[key] = ""
+
+    profile_db["namespace"] = namespace
+    profile_db["name"] = repository
+    profile_db["version"] = version
+    profile_db["id"] = id_str
+
+    
+    profile_data = {"input": [""], "output": [""]}
+    profile_db["app_profile"] = json.dumps(profile_data)
+    
+
+
+    # INSERT in Profile Table Dynamically
+    profile_values =[]
+    profile_col_names = []
+    profile_variables = []
+
+     #for key in config.mysql_Apps_fields.keys():
+    for key in config.valid_profile_fields + ["id", "owner"]:
+        #print(f"key: {key} value: {dbObject[key]}", file=sys.stderr)
+        if not key in config.mysql_Profile_fields:
+            continue
+        if not key in profile_db:
+            raise Exception(f"key {key} not in profile_db")
+        profile_values.append(profile_db[key])
+        profile_col_names.append(key)
+        profile_variables.append("%s")
+
+    profile_variables_str = ",".join(profile_variables)
+    profile_col_names_str = ",".join(profile_col_names)
+
+   
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -534,6 +661,14 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
 
     sources_values = [id_str, architectures , url, branch, directory, dockerfile, build_args_str]
 
+
+    ####### insert into a place holder database to store profiling results #########
+    try:
+        ecr_db.insertProfile(profile_col_names_str, profile_values, profile_variables_str)
+    except Exception as e:
+        raise Exception(f"insertProfile returned: {type(e).__name__},{str(e)}")
+
+
     try:
         ecr_db.insertApp(col_names_str, values, variables_str, sources_values, resourcesArray)
     except Exception as e:
@@ -554,6 +689,18 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
 
     #args = parser.parse_args()
     return returnObj
+
+
+
+
+
+
+
+
+
+
+
+
 
 # /apps
 class Submit(MethodView):
@@ -586,6 +733,48 @@ class Submit(MethodView):
             raise ErrorResponse(f'{str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
         return jsonify(return_obj)
+
+
+
+
+
+# /apps
+class Profile(MethodView):
+    @login_required
+    def post(self):
+        requestUser = request.environ.get('user', "")
+        isAdmin = request.environ.get('admin', False)
+
+        force_overwrite = request.args.get("force", "").lower() in ["true", "1"]
+
+        postData = request.get_json(force=True, silent=True)
+        if not postData:
+            # try yaml
+            yaml_str = request.get_data().decode("utf-8")
+            print(f"yaml_str: {yaml_str} ", file=sys.stderr)
+            postData = yaml.load(yaml_str , Loader=yaml.FullLoader)
+
+        if not postData:
+            raise ErrorResponse(f'Could not parse app spec', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+
+        try:
+            return_obj = submit_app(requestUser, isAdmin, force_overwrite, postData)
+        except ErrorResponse as e:
+            raise e
+        except Exception as e:
+            raise ErrorResponse(f'{str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        return jsonify(return_obj)
+
+    
+
+
+    
+
+
+
+
 
 
 
@@ -880,6 +1069,101 @@ def build_app(requestUser, isAdmin, namespace, repository, version, skip_image_p
     build_request_counter.inc(1)
     return {"build_number": number }
 
+
+##### Used the same function logic for build_app function
+#     Seperation is used for clarity for profiling 
+def profile_app(requestUser, isAdmin, namespace, repository, version, skip_image_push=False):
+    
+    host = config.jenkins_server
+    username = config.jenkins_user
+    password = config.jenkins_token
+
+    try:
+
+        js = jenkins_server.JenkinsServer(host, username, password)
+    except Exception as e:
+        raise ErrorResponse(f'JenkinsServer({host}, {username}) returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+    ecr_db = ecrdb.EcrDB()
+    app_spec, ok = ecr_db.listApps(user=requestUser , namespace=namespace, repository=repository, version=version, isAdmin=isAdmin)
+    if not ok:
+        return {"error":f"app_spec not found {namespace}/{repository}:{version}"}
+
+    app_id = app_spec.get("id", "")
+    if not app_id:
+        return {"error":"app id not found"}
+
+    source = app_spec.get("source", None)
+    if not source:
+        return {"error":"source  not found"}
+
+    app_human_id = createJenkinsName(app_spec)
+
+    overwrite=False
+    if js.hasJenkinsJob(app_human_id):
+        overwrite =  True
+
+    try:
+        js.createProfileJob(app_human_id, app_spec, overwrite=overwrite, skip_image_push=skip_image_push)
+    except Exception as e:
+        raise ErrorResponse(f'createJob() returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+
+        
+    queue_item_number = js.build_job(app_human_id)
+
+
+    queue_item = None
+
+    # this loop will wait for Jenkins to return build number
+    # note that the previous queue_item_number is a temporary global queue number which will be useless after some time.
+    number = -1
+    while number == -1:
+        time.sleep(2)
+
+        try:
+            queue_item = js.server.get_queue_item(queue_item_number)
+        except Exception as e: # pragma: no cover
+
+            if not "does not exist" in str(e):
+                raise ErrorResponse(f'get_queue_item() returned: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        if not queue_item:
+            continue
+
+        executable=queue_item.get("executable", None)
+        if not executable:
+            continue
+
+        number = executable.get("number", None)
+        if not number: # pragma: no cover
+            continue
+
+        break
+
+
+    build_name = "some name"
+    architectures = source.get("architectures", None)
+    if not architectures:
+        raise ErrorResponse(f'architectures not specified in source', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+    try:
+        ecr_db.SaveBuildInfo(app_id, build_name, number, architectures)
+
+    except Exception as e:
+        raise ErrorResponse(f'error inserting build info for {app_id}, {build_name}, {number} , SaveBuildInfo: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+    #time.sleep(6)
+
+    #queued_item = js.server.get_queue_item(queue_item_number)
+
+    #returnObj = {"queue_item_number":queue_item_number, "queued_item": queued_item}
+    #return returnObj
+    build_request_counter.inc(1)
+    return {"build_number": number }
+
+
+
 # OLD /apps/{app_id}/builds/
 # maybe: /apps/<string:namespace>/<string:repository>/<version>/build
 # maybe /build/<string:app_id>
@@ -918,6 +1202,53 @@ class Builds(MethodView):
 
         result = build_app(requestUser, isAdmin, namespace, repository, version, skip_image_push=skip_image_push)
         return jsonify(result)
+
+
+
+# /profile/<string:namespace>/<string:repository>/<version>
+class Profile_build(MethodView):
+    @login_required
+    @has_resource_permission( "READ" )
+    #def get(self, app_id):
+    def get(self, namespace, repository, version):
+
+        #namespace, repository, version
+        requestUser = request.environ.get('user', "")
+        isAdmin = request.environ.get('admin', False)
+
+        try:
+            result = get_build(requestUser,isAdmin, namespace, repository, version)
+        except ErrorResponse as e:
+            raise e
+        except Exception as e:
+            raise ErrorResponse(f"get_build returned: {type(e).__name__},{str(e)}", status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+
+        return jsonify(result)
+
+    @login_required
+    @has_resource_permission( "FULL_CONTROL" )
+    def post(self, namespace, repository, version):
+
+        requestUser = request.environ.get('user', "")
+        isAdmin = request.environ.get('admin', False)
+
+        skip_image_push = request.args.get('skip_image_push', "") in ["true", "1"]
+
+        result = profile_app(requestUser, isAdmin, namespace, repository, version, skip_image_push=skip_image_push)
+        return jsonify(result)
+
+
+        
+
+
+
+
+
+
+
+
+
 
 
 # /namespaces
@@ -1443,6 +1774,13 @@ app.add_url_rule('/permissions/<string:namespace>', view_func=Permissions.as_vie
 #app.add_url_rule('/apps/<string:app_id>/permissions', view_func=Permissions.as_view('permissionsAPI'))
 
 app.add_url_rule('/builds/<string:namespace>/<string:repository>/<string:version>', view_func=Builds.as_view('buildsAPI'))
+
+
+# to trigger a app profile build in jenkins
+# curl -X POST ${ECR_API}/profile/sage/simple/1.0 -H "Authorization: sage token1"
+app.add_url_rule('/profile/<string:namespace>/<string:repository>/<string:version>', view_func=Profile_build.as_view('profilebuildAPI'))
+
+
 
 # endpoint used by docker_auth to verify access rights
 app.add_url_rule('/authz', view_func=AuthZ.as_view('authz'))
