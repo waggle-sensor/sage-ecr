@@ -89,12 +89,17 @@ CREATE TABLE IF NOT EXISTS SageECR.Certifications (
 );
 
 CREATE TABLE IF NOT EXISTS SageECR.Profiles (
-    id                  VARCHAR(194) NOT NULL PRIMARY KEY,
-    number              INT DEFAULT '-1',
-    profile             VARCHAR(64),
-    certifiedBy         VARCHAR(64),
-    certifiedDate       TIMESTAMP
+    id                  VARCHAR(194) UNIQUE NOT NULL,
+    namespace           VARCHAR(64),
+    name                VARCHAR(64),
+    version             VARCHAR(64),
+    time_created        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    time_last_updated   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    app_profile        VARCHAR(256),
+    INDEX(id, namespace, name, version)
+
 );
+
 
 
 

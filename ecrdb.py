@@ -121,6 +121,25 @@ class EcrDB():
         return
 
 
+
+    def insertProfile(self, col_names_str, values, variables_str):
+        
+        print(f'values: {values}', file=sys.stderr)
+
+
+        stmt = f'REPLACE INTO Profiles ( {col_names_str}) VALUES ({variables_str})'
+        print(f'stmt: {stmt}', file=sys.stderr)
+        self.cur.execute(stmt, values)
+
+        self.db.commit()
+
+        return
+
+
+
+
+
+
     def deleteApp(self, user, isAdmin, namespace, repository, version, force=False):
 
 

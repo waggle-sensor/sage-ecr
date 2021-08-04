@@ -22,7 +22,12 @@ RUN install-plugins.sh \
     configuration-as-code \
     configuration-as-code-groovy \
     ws-cleanup \
-    credentials-binding                 # required for ecr-registry credentials
+    credentials-binding \                
+    docker \                   
+    docker-workflow \
+    docker-build-step \
+    docker-build-publish \
+    docker-compose-build-step         # required for ecr-registry credentials and docker plugins for jenkins
 
 
 

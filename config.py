@@ -14,10 +14,16 @@ mysql_password =  os.getenv('MYSQL_PASSWORD')
 
 
 # app definition , these are the app fields (as seen by user) that are stored in the tables Apps
-valid_fields =["namespace", "name", "version", "description" , "source", "depends_on", "baseCommand", "arguments", "inputs", "resources", "metadata", "frozen","testing"]
+valid_fields =["namespace", "name", "version", "description" , "source", "depends_on", "baseCommand", "arguments", "inputs", "resources", "metadata", "frozen","testing","profiling"]
 valid_fields_set = set(valid_fields)
 
-app_view_fields = ["namespace", "name", "version", "description" , "source", "depends_on", "baseCommand", "arguments", "inputs", "resources", "metadata","testing"]
+# app definition for profiling 
+valid_profile_fields = ["namespace", "name", "version","app_profile"]
+valid_profile_fields_set = set(valid_profile_fields)
+
+
+
+app_view_fields = ["namespace", "name", "version", "description" , "source", "depends_on", "baseCommand", "arguments", "inputs", "resources", "metadata","testing","profiling"]
 
 required_fields = { "description" : "str",
                     "source" : "dict"}
@@ -36,6 +42,7 @@ mysql_Apps_fields = {
                 "metadata"      : "json",
                 "frozen"        : "bool",
                 "testing"       : "json",
+                "profiling"     : "json",
                 "owner"         : "str",
                 "time_created"  : "datetime",
                 "time_last_updated"        : "datetime",
@@ -49,6 +56,18 @@ mysql_Sources_fields = {
                 "directory":"str",
                 "dockerfile":"str",
                 "build_args":"json"
+            }
+
+
+
+mysql_Profile_fields = {
+                "id"            : "str",
+                "namespace"     : "str",
+                "name"          : "str",
+                "version"       : "str",
+                "time_created"  : "datetime",
+                "time_last_updated"        : "datetime",
+                "app_profile": "json",
             }
 #mysql_Apps_fields_set = set(valid_fields)
 
@@ -212,3 +231,72 @@ post {
 
     }
 '''
+
+
+
+
+jenkinsfileTemplateProfile = '''
+  node('master') {        
+            stage ('Profile Build'){
+
+                    git branch: '${branch}',
+                        url: '${url}'
+                    dir("$${env.WORKSPACE}/${directory}"){
+                        docker.withRegistry('https://localhost:5002') {
+                            def customImage = docker.build("${c}")
+                            customImage.push()
+                        }
+                }
+            }
+
+            stage ('Profiler Image'){
+                git branch: '${app_branch}',
+                    url: '${app_url}'
+
+                docker.withRegistry('https://localhost:5002') {
+                    def Image = docker.image("${c}")
+                    Image.pull()
+                             
+                    dir("$${env.WORKSPACE}/${app_dir}"){  
+                        def server_container_build = docker.build('profiling-agent', '--build-arg APP_NAME=${c} .')
+                          server_container_build.push('latest')
+                    }    
+
+                }
+
+            }
+
+             stage ('Profiling'){
+                    git branch: '${branch}',
+                        url: '${url}'
+                     dir("$${env.WORKSPACE}/${directory}"){
+                    docker.withRegistry('https://localhost:5002') {
+
+                        docker.image('profiling-agent'). withRun('-t --entrypoint /bin/bash --volumes-from jenkins --network host ${app_docker_args}') {
+                              // sh 'mkdir profile_output'
+                               echo "The Docker container has finished, stashing profile metrics..."
+                               sh 'ls -l'
+                                
+                        }
+
+                    }
+                }
+            }
+
+        stage ('Saving Profile Output'){
+                sh """
+                    if [ -d "$${env.WORKSPACE}/profile_output" ] 
+                    then
+                         docker exec -i sage-ecr_db_1 mysql -usage -ptest -e 'USE SageECR;UPDATE Profiles SET app_profile = "${namespace}/${name}/profile_output" WHERE namespace = "sage" ; '
+                    else
+                        echo "Error: Directory profile_output does not exists."
+                    fi
+                """
+                sh 'ls -l'
+
+        }
+        
+}
+        
+'''
+
