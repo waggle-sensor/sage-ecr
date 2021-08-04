@@ -387,7 +387,7 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
     dbObject = {}
 
     ## profile database object
-    profile_db = {}  
+    profile_db = {}   
 
     for key in config.valid_fields_set:
         dbObject[key] = ""
@@ -466,6 +466,36 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
     if not profiling:
         raise Exception("Field profiling is missing")
     
+    # profiling_source = profiling.get("source")
+    # if not profiling_source:
+    #     raise Exception("Field source is missing in profiling")
+
+    
+    # profile_url = profiling_source.get("profiler_url","")
+    # if profile_url == "":
+    #     raise Exception("profiling url missing in source")
+    
+    # profiler_branch = profiling_source.get("profiler_branch", "main")
+    # if profiler_branch == "":
+    #     raise Exception(" profiling branch missing in source")
+
+    # profiler_directory = profiling_source.get("profiler_directory", ".")
+    # if profiler_directory == "":
+    #     profiler_directory = "."
+
+    # profiler_dockerfile = profiling_source.get("profiler_dockerfile", "Dockerfile")
+    # if profiler_dockerfile == "":
+    #    profiler_dockerfile = "Dockerfile"
+
+    # profiler_app_docker_args = profiling_source.get("profiler_app_docker_args")
+    # if not isinstance(profiler_app_docker_args, str):
+    #     raise Exception(f'build_args needs to be string')
+
+    # profiler_app_args = profiling_source.get("profiler_app_args")
+    # if not isinstance(profiler_app_args, str):
+    #     raise Exception(f'build_args needs to be string')
+
+    
     #### only the part is saved in the database 
 
     profiling_target = profiling.get("targets")
@@ -474,6 +504,7 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
 
     if not isinstance(profiling_target,list):
         raise Exception(f'Field profile targets has to be an array')
+
 
     profiling_metrics = profiling.get("metrics")
     if not profiling_metrics:
@@ -532,6 +563,8 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
 
    
         
+
+
 
 
 
@@ -657,6 +690,18 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
     #args = parser.parse_args()
     return returnObj
 
+
+
+
+
+
+
+
+
+
+
+
+
 # /apps
 class Submit(MethodView):
 
@@ -688,6 +733,48 @@ class Submit(MethodView):
             raise ErrorResponse(f'{str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
         return jsonify(return_obj)
+
+
+
+
+
+# /apps
+class Profile(MethodView):
+    @login_required
+    def post(self):
+        requestUser = request.environ.get('user', "")
+        isAdmin = request.environ.get('admin', False)
+
+        force_overwrite = request.args.get("force", "").lower() in ["true", "1"]
+
+        postData = request.get_json(force=True, silent=True)
+        if not postData:
+            # try yaml
+            yaml_str = request.get_data().decode("utf-8")
+            print(f"yaml_str: {yaml_str} ", file=sys.stderr)
+            postData = yaml.load(yaml_str , Loader=yaml.FullLoader)
+
+        if not postData:
+            raise ErrorResponse(f'Could not parse app spec', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+
+        try:
+            return_obj = submit_app(requestUser, isAdmin, force_overwrite, postData)
+        except ErrorResponse as e:
+            raise e
+        except Exception as e:
+            raise ErrorResponse(f'{str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        return jsonify(return_obj)
+
+    
+
+
+    
+
+
+
+
 
 
 
@@ -983,9 +1070,6 @@ def build_app(requestUser, isAdmin, namespace, repository, version, skip_image_p
     return {"build_number": number }
 
 
-
-
-
 ##### Used the same function logic for build_app function
 #     Seperation is used for clarity for profiling 
 def profile_app(requestUser, isAdmin, namespace, repository, version, skip_image_push=False):
@@ -1156,6 +1240,7 @@ class Profile_build(MethodView):
 
 
         
+
 
 
 

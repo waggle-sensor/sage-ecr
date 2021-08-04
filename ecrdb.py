@@ -121,9 +121,8 @@ class EcrDB():
         return
 
 
-
     def insertProfile(self, col_names_str, values, variables_str):
-        
+    
         print(f'values: {values}', file=sys.stderr)
 
 
@@ -134,9 +133,6 @@ class EcrDB():
         self.db.commit()
 
         return
-
-
-
 
 
 

@@ -22,7 +22,6 @@ valid_profile_fields = ["namespace", "name", "version","app_profile"]
 valid_profile_fields_set = set(valid_profile_fields)
 
 
-
 app_view_fields = ["namespace", "name", "version", "description" , "source", "depends_on", "baseCommand", "arguments", "inputs", "resources", "metadata","testing","profiling"]
 
 required_fields = { "description" : "str",
@@ -58,8 +57,6 @@ mysql_Sources_fields = {
                 "build_args":"json"
             }
 
-
-
 mysql_Profile_fields = {
                 "id"            : "str",
                 "namespace"     : "str",
@@ -69,6 +66,7 @@ mysql_Profile_fields = {
                 "time_last_updated"        : "datetime",
                 "app_profile": "json",
             }
+
 #mysql_Apps_fields_set = set(valid_fields)
 
 # architecture https://github.com/docker-library/official-images#architectures-other-than-amd64
@@ -235,6 +233,7 @@ post {
 
 
 
+
 jenkinsfileTemplateProfile = '''
   node('master') {        
             stage ('Profile Build'){
@@ -299,4 +298,5 @@ jenkinsfileTemplateProfile = '''
 }
         
 '''
+
 

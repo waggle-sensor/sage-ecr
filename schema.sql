@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS SageECR.Apps (
     inputs              VARCHAR(256),
     metadata            TEXT,
     testing             VARCHAR(256),
+    profiling           VARCHAR(256),
     schema_version      VARCHAR(64),
     time_created        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     time_last_updated   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -87,6 +88,7 @@ CREATE TABLE IF NOT EXISTS SageECR.Certifications (
     certifiedBy         VARCHAR(64),
     certifiedDate       TIMESTAMP
 );
+
 
 CREATE TABLE IF NOT EXISTS SageECR.Profiles (
     id                  VARCHAR(194) UNIQUE NOT NULL,
