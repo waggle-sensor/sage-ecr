@@ -506,7 +506,7 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
         raise Exception("url missing in source")
 
 
-    branch = build_source.get("branch", "main")
+    branch = build_source.get("branch", "")
     if branch == "":
         raise Exception("branch missing in source")
 
