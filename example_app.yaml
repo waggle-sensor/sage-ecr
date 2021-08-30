@@ -9,6 +9,7 @@ source:
         - "linux/amd64"  # required, valid fields: "linux/amd64", "linux/arm64", "linux/arm/v6", "linux/arm/v7", "linux/arm/v8
     url: "https://github.com/waggle-sensor/edge-plugins.git"   # required
     branch: "master"  # optional, default: main
+    #tag: "v1.0"  # recommended
     directory : "plugin-simple"  # optional, default: root of git repository
     dockerfile : "Dockerfile"   # optional, default: Dockerfile , relative to context directory
     build_args: # optional, key-value pairs for docker build

@@ -116,9 +116,15 @@ class JenkinsServer():
         #sourceArray = source.split("#", 3)
 
         git_url = source.get("url", "")
-        git_branch = source.get("branch", "")
-        if git_branch == "":
-            raise Exception("branch not specified")
+
+        git_branch = source.get("tag", "")
+
+        if git_branch == None or git_branch == "":
+            git_branch = source.get("branch", "")
+            if git_branch == None or git_branch == "":
+                raise Exception("neither tag nor branch specified")
+        else:
+            git_branch = f"refs/tags/{git_branch}"
 
         git_directory = source.get("directory", ".")
         if git_directory.startswith("/"):
@@ -194,7 +200,7 @@ class JenkinsServer():
                                                 entrypoint =run_entrypoint,
                                                 do_push=do_push)
         except Exception as e:
-            raise Exception(f'  url={git_url}, branch={git_branch}, directory={git_directory}  e={str(e)}')
+            raise Exception(f'template failed: url={git_url}, branch={git_branch}, directory={git_directory},   e={str(e)}')
 
         #print(jenkins.EMPTY_CONFIG_XML)
         newJob = createPipelineJobConfig(jenkinsfile, f'{actual_namespace}/{name}')

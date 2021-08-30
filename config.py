@@ -46,6 +46,7 @@ mysql_Sources_fields = {
                 "architectures": "json",
                 "url":"str",
                 "branch":"str",
+                "tag":"str",
                 "directory":"str",
                 "dockerfile":"str",
                 "build_args":"json"
@@ -132,6 +133,11 @@ jenkinsfileTemplatePrefix = ''' pipeline{
 
     agent any
     stages {
+        stage ("checkout") {
+            steps{
+                checkout scm: [$$class: 'GitSCM', userRemoteConfigs: [[url: '${url}']], branches: [[name: '${branch}']]], poll: false
+            }
+        }
         stage ('Write') {
             steps{
 
@@ -143,8 +149,10 @@ jenkinsfileTemplatePrefix = ''' pipeline{
 
                             currentBuild.displayName = "${version}"
 
-                            git branch: '${branch}',
-                            url: '${url}'
+                            //git branch: '${branch}',
+                            //url: '${url}'
+
+
                             dir("$${env.WORKSPACE}/${directory}"){
                                 echo "########### Building for architecture $$arch"
                                 sh "docker version"
@@ -165,8 +173,8 @@ jenkinsfileTemplateTestStage = '''
 
                             currentBuild.displayName = "${version}"
 
-                            git branch: '${branch}',
-                            url: '${url}'
+                            //git branch: '${branch}',
+                            //url: '${url}'
                             dir("$${env.WORKSPACE}/${directory}"){
                                 echo "########### Testing for architecture $$arch"
 
@@ -188,8 +196,8 @@ jenkinsfileTemplateTestStage = '''
 jenkinsfileTemplateSuffix = '''
                     }
                     stage ('Multi Arch Build'){
-                        git branch: '${branch}',
-                        url: '${url}'
+                        //git branch: '${branch}',
+                        //url: '${url}'
                         dir("$${env.WORKSPACE}/${directory}"){
                             echo "########### Final build for multi-arch docker image"
 

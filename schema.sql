@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS SageECR.Sources (
     architectures       VARCHAR(256),
     url                 VARCHAR(256) NOT NULL,
     branch              VARCHAR(64),
+    tag                 VARCHAR(64),
     directory           VARCHAR(256),
     dockerfile          VARCHAR(256),
     build_args          VARCHAR(256),
