@@ -16,8 +16,8 @@ from flask.views import MethodView
 
 
 import MySQLdb
-from flask import request
-from flask import abort, jsonify
+from flask import request, abort, jsonify
+
 
 import re
 #import uuid
@@ -45,6 +45,10 @@ from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from werkzeug.exceptions import HTTPException
 
 from prometheus_client import Counter, make_wsgi_app
+
+RAW_GITHUB_URL = 'https://raw.githubusercontent.com'
+DEFAULT_BRANCH = 'main'
+
 
 app_submission_counter = Counter("app_submission_counter", "This metric counts the total number of successful app submissions.")
 build_request_counter = Counter("build_request_counter", "This metric counts the total number of requested builds.")
@@ -588,6 +592,49 @@ class Submit(MethodView):
         return jsonify(return_obj)
 
 
+def import_meta_files(app_obj, namespace=None, repository=None, version=None):
+    ecr_db = ecrdb.EcrDB()
+
+    # use app source.url as source of meta files; todo(nc): support tags
+    repo_url = app_obj['source']['url']
+    branch = app_obj['source'].get('branch', DEFAULT_BRANCH)
+
+    # parse github username/repo_name
+    if 'git@github.com:' in repo_url:
+        repo_path = repo_url.split(':')[1].replace('.git', '')
+    else:
+        repo_path = '/'.join(repo_url.split('/')[3:]).replace('.git', '')
+
+    meta_path = f'{RAW_GITHUB_URL}/{repo_path}/{branch}/ecr-meta'
+
+    # files we'll grab from github and their associated kind
+    file_dicts = [{
+        'name': 'ecr-icon.jpg',
+        'kind': 'thumb'
+    }, {
+        'name': 'ecr-science-image.jpg',
+        'kind': 'image'
+    }, {
+        'name': 'ecr-science-description.md',
+        'kind': 'science_description'
+    }]
+
+    for f_dict in file_dicts:
+        f_name = f_dict['name']
+        kind = f_dict['kind']
+
+        url = f'{meta_path}/{f_name}'
+        res = requests.get(url)
+
+        if res.status_code != 200:
+            continue
+
+        blob = res.content
+
+        # insert the data
+        ecr_db.addMetaFile(namespace, repository, version, f_name, blob, kind)
+
+
 
 
 # /apps/<string:namespace>/<string:repository>/<string:version>
@@ -668,14 +715,25 @@ class Apps(MethodView):
             raise ErrorResponse(f'Could not parse app spec', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
+        # save yaml
         try:
-            return_obj = submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=namespace, repository=repository, version=version)
+            app_obj = submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=namespace, repository=repository, version=version)
         except ErrorResponse as e:
             raise e
         except Exception as e:
             raise ErrorResponse(f'{str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
-        return jsonify(return_obj)
+        # save meta files
+        try:
+            import_meta_files(app_obj, namespace=namespace, repository=repository, version=version)
+        except ErrorResponse as e:
+            raise e
+        except Exception as e:
+            raise ErrorResponse(f'{str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+        return jsonify(app_obj)
+
+
 
 # Lists all apps, the user has permission to see
 # /apps
@@ -1235,6 +1293,11 @@ class Permissions(MethodView):
         return jsonify(obj)
 
 
+# /meta-files/<namespace>/<name>/<version>/<file_name>
+class MetaFiles(MethodView):
+    def get(self, namespace, name, version, file_name):
+        ecr_db = ecrdb.EcrDB()
+        return ecr_db.getMetaFile(namespace, name, version, file_name)
 
 
 # /
@@ -1418,11 +1481,8 @@ def handle_invalid_usage(error):
 app.add_url_rule('/', view_func=Base.as_view('appsBase'))
 app.add_url_rule('/healthy', view_func=Healthy.as_view('healthy'), strict_slashes=False)
 app.add_url_rule('/submit', view_func=Submit.as_view('submitAPI'), strict_slashes=False)   #  this is a shortcut, replacing POST to /apps/<string:namespace>/<string:repository>
-#app.add_url_rule('/apps/<string:app_id>', view_func=Apps.as_view('appsAPI'))
 
-#app.add_url_rule('/apps', view_func=NamespacesList.as_view('namespacesListAPI'))
 app.add_url_rule('/apps', view_func=AppsGlobal.as_view('appsGlobal'), strict_slashes=False)
-
 app.add_url_rule('/apps/<string:namespace>', view_func=AppsGlobal.as_view('AppsGlobal_namespaces'), strict_slashes=False)
 app.add_url_rule('/apps/<string:namespace>/<string:repository>', view_func=AppsGlobal.as_view('AppsGlobal_repo'), strict_slashes=False)
 app.add_url_rule('/apps/<string:namespace>/<string:repository>/<string:version>', view_func=Apps.as_view('appsAPI'))
@@ -1437,11 +1497,6 @@ app.add_url_rule('/repositories/<string:namespace>/<string:repository>', view_fu
 app.add_url_rule('/permissions/<string:namespace>/<string:repository>', view_func=Permissions.as_view('permissionsAPI_2'), methods=['GET', 'PUT', 'DELETE'], strict_slashes=False)
 app.add_url_rule('/permissions/<string:namespace>', view_func=Permissions.as_view('permissionsAPI_3'), methods=['GET', 'PUT', 'DELETE'], strict_slashes=False)
 
-#app.add_url_rule('/apps/<string:namespace>/<string:repository>/<version>/build', view_func=Builds.as_view('buildAPI'))
-
-#app.add_url_rule('/permissions/<string:app_id>', view_func=Permissions.as_view('permissionsAPI'))
-#app.add_url_rule('/apps/<string:app_id>/permissions', view_func=Permissions.as_view('permissionsAPI'))
-
 app.add_url_rule('/builds/<string:namespace>/<string:repository>/<string:version>', view_func=Builds.as_view('buildsAPI'))
 
 # endpoint used by docker_auth to verify access rights
@@ -1449,7 +1504,7 @@ app.add_url_rule('/authz', view_func=AuthZ.as_view('authz'))
 
 app.add_url_rule('/<path:path>', view_func=CatchAll.as_view('catchAll'))
 
-
+app.add_url_rule('/meta-files/<string:namespace>/<string:name>/<string:version>/<string:file_name>', view_func=MetaFiles.as_view('metaFilesAPI'), strict_slashes=False)
 
 
 app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {

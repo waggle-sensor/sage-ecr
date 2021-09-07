@@ -864,3 +864,26 @@ class EcrDB():
         return 1
 
 
+    def addMetaFile(self, namespace, name, version, file_name, blob, kind):
+        app_id = f'{namespace}/{name}:{version}'
+        stmt = 'INSERT INTO MetaFiles (app_id, namespace, name, version, file_name, file, kind) VALUES (%s, %s, %s, %s, %s, %s, %s)'
+
+        print(f'stmt: {stmt} app_id={app_id} ={namespace} name={name} version={version} file_name={file_name} kind={kind}', file=sys.stderr)
+
+        self.cur.execute(stmt, (app_id, namespace, name, version, file_name, [blob], kind))
+        self.db.commit()
+        return 1
+
+
+    def getMetaFile(self, namespace, name, version, file_name):
+
+        app_id = f'{namespace}/{name}:{version}'
+
+        stmt = 'SELECT file_name, file FROM MetaFiles where app_id = %s AND file_name = %s'
+
+        print(f'stmt: {stmt} app_id={app_id} file_name={file_name}', file=sys.stderr)
+
+        self.cur.execute(stmt, (app_id, file_name))
+        record = self.cur.fetchone()
+        return record[1]
+
