@@ -137,16 +137,15 @@ class EcrDB():
         if frozen and (not force):
             raise Exception("App {app_id} is frozen, it cannot be deleted")
 
-
-        #namespace = app["namespace"]
-        #name = app["name"]
-        #version = app["version"]
-
         for table in ["Apps", "Sources", "Certifications", "Profiles"]:
-
             stmt_apps = f'DELETE FROM {table} WHERE `id` = %s'
             print(f'stmt: {stmt_apps} app_id={app_id}', file=sys.stderr)
             self.cur.execute(stmt_apps, (app_id, ))
+
+        # also cleanup metafiles
+        stmt_apps = f'DELETE FROM MetaFiles WHERE `app_id` = %s'
+        print(f'stmt: {stmt_apps} app_id={app_id}', file=sys.stderr)
+        self.cur.execute(stmt_apps, (app_id, ))
 
         self.db.commit()
 
