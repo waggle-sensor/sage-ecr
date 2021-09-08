@@ -11,3 +11,4 @@ prometheus_client
 pyyaml
 gunicorn
 Werkzeug
+bleach

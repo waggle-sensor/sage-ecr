@@ -838,7 +838,6 @@ def test_meta_file_import(client, test_failure=False):
 
     app_def_str = json.dumps(app_def)
 
-    print(f'/apps/{app_namespace}/{app_repository}/{app_version}')
 
     # delete app first
     rv = client.delete(f'/apps/{app_namespace}/{app_repository}/{app_version}', headers=admin_headers)

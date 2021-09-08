@@ -12,6 +12,7 @@ from datetime import datetime , timedelta
 import re
 import logging
 import base64
+import bleach
 
 #logger = logging.getLogger('gunicorn.error')
 #logger = logging.getLogger('__name__')
@@ -913,11 +914,15 @@ class EcrDB():
 
         app_id = f'{namespace}/{name}:{version}'
 
-        stmt = 'SELECT file_name, file FROM MetaFiles where app_id = %s AND file_name = %s'
+        stmt = 'SELECT file, kind FROM MetaFiles where app_id = %s AND file_name = %s'
 
         print(f'stmt: {stmt} app_id={app_id} file_name={file_name}', file=sys.stderr)
 
         self.cur.execute(stmt, (app_id, file_name))
-        record = self.cur.fetchone()
-        return record[1]
+        content, kind = self.cur.fetchone()
+
+        if kind == 'science_description':
+            content = bleach.clean(content.decode('utf-8'))
+
+        return content
 
