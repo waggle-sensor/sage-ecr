@@ -59,15 +59,6 @@ build_request_counter = Counter("build_request_counter", "This metric counts the
 
 
 
-
-
-
-
-
-
-
-
-
 # do token introspection
 # from https://medium.com/swlh/creating-middlewares-with-python-flask-166bd03f2fd4
 class ecr_middleware():
@@ -402,7 +393,7 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
     dbObject["inputs"] = appInputs_str
 
     #copy fields
-    for key in ["description"]:
+    for key in ["description", "keywords", "authors", "collaborators", "homepage", "funding", "license"]:
         dbObject[key] = postData.get(key, "")
 
 
@@ -510,7 +501,7 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
         raise Exception("url missing in source")
 
 
-    branch = build_source.get("branch", "main")
+    branch = build_source.get("branch", DEFAULT_BRANCH)
     if branch == "":
         raise Exception("branch missing in source")
 
@@ -697,8 +688,6 @@ class Apps(MethodView):
     # auth disabled because user can create namespace
     # @has_resource_permission( "WRITE")
     def post(self, namespace, repository, version):
-
-
         requestUser = request.environ.get('user', "")
         isAdmin = request.environ.get('admin', False)
 
@@ -1148,8 +1137,6 @@ class RepositoriesList(MethodView):
 
 class Repository(MethodView):
     def get(self, namespace, repository):
-
-
         requestUser = request.environ.get('user', "")
         isAdmin = request.environ.get('admin', "")
 
@@ -1164,6 +1151,7 @@ class Repository(MethodView):
 
         repo_obj["versions"] = app_list
         return jsonify(repo_obj)
+
 
     # delete repository (and permissions) if it is empty
     @login_required

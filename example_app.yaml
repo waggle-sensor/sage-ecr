@@ -4,6 +4,10 @@
 # version : "1.0"
 
 description: "very important app"
+homepage: "https://github.com/waggle-sensor/edge-plugins.git"
+keywords: "machine learning, camera, some keyword"
+authors: "zelda <zelda@hyrule.org>"
+license: "MIT license"
 source:
     architectures :
         - "linux/amd64"  # required, valid fields: "linux/amd64", "linux/arm64", "linux/arm/v6", "linux/arm/v7", "linux/arm/v8
@@ -25,6 +29,3 @@ inputs:  # future feature
 metadata: # custom key-value pairs
   my-science-data : 12345
 
-testing:
-  mask_entrypoint: true  # this is usually required (to mask ENTRYPOINT defined in Dockerfile)
-  command: ["echo", "test is successful"]
