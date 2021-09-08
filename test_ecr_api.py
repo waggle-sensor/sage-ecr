@@ -819,7 +819,63 @@ def test_repositories(client):
     assert rv.status_code == 200
 
 
+def test_meta_file_import(client, test_failure=False):
+    headers = {"Authorization" : "sage token1"}
+    admin_headers = {"Authorization" : "sage admin_token"}
+    app_namespace = "sagebuildtest"
+    app_version = "1.0"
 
+    # copy example app spec
+    app_def = json.loads(test_app_def)
+
+    app_repository = "example_with_meta_files"
+    app_def["name"] = app_repository
+    app_def["description"] = "a very important app (with meta files)"
+
+    # use a remote repo for testing meta import
+    # todo: update hello-world-ml with meta and use that for testing instead
+    app_def["source"]["url"] = "https://github.com/nconrad/Bird-Song-Classifier-Plugin.git"
+
+    app_def_str = json.dumps(app_def)
+
+    print(f'/apps/{app_namespace}/{app_repository}/{app_version}')
+
+    # delete app first
+    rv = client.delete(f'/apps/{app_namespace}/{app_repository}/{app_version}', headers=admin_headers)
+    result = rv.get_json()
+
+    if "error" in result:
+        assert "App not found" in result["error"]
+    else:
+        assert rv.status_code == 200
+
+
+    # register app
+    rv = client.post(f'/apps/{app_namespace}/{app_repository}/{app_version}', data = app_def_str, headers=headers)
+    result = rv.get_json()
+    assert "error" not in result
+    assert result != None
+
+
+    # ensure files are retrievable
+    file_dicts = [{
+        'name': 'ecr-icon.jpg',
+        'size': 9237
+    }, {
+        'name': 'ecr-science-image.jpg',
+        'size': 29888
+    }, {
+        'name': 'ecr-science-description.md',
+        'size': 4157
+    }]
+
+    for f in file_dicts:
+        name = f['name']
+        rv = client.get(f'/meta-files/{app_namespace}/{app_repository}/{app_version}/{name}', data = app_def_str, headers=headers)
+        result = rv.get_data()
+
+        assert result != None
+        assert sys.getsizeof(result) == f['size']
 
 
 def test_authz(client):
