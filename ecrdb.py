@@ -404,6 +404,41 @@ class EcrDB():
 
             return app_list[0], True
 
+        # if no apps, we are done
+        if not app_list:
+            return app_list
+
+        # quote app_id list for queries
+        app_ids = [f"{app['id']}" for app in app_list]
+        format_strings = ','.join(['%s'] * len(app_ids))
+
+        # get thumbnails  # todo(nc): write as join without subqueries?
+        stmt = f'SELECT app_id, namespace, name, version, file_name FROM MetaFiles WHERE kind = "thumb" AND app_id IN ({format_strings});'
+        self.cur.execute(stmt, tuple(app_ids))
+        thumbs = self.cur.fetchall()
+
+        # images
+        stmt = f'SELECT app_id, namespace, name, version, file_name FROM MetaFiles WHERE kind = "image" AND app_id IN ({format_strings});'
+        self.cur.execute(stmt, tuple(app_ids))
+        images = self.cur.fetchall()
+
+        # science markdown
+        stmt = f'SELECT app_id, namespace, name, version, file_name FROM MetaFiles WHERE kind = "science_description" AND app_id IN ({format_strings});'
+        self.cur.execute(stmt, tuple(app_ids))
+        sci_descripts = self.cur.fetchall()
+
+        # (hacky) joining of the meta paths
+        for app in app_list:
+            thumb_paths = [f'{thumb[1]}/{thumb[2]}/{thumb[3]}/{thumb[4]}' for thumb in thumbs if thumb[0] == app['id']]
+            image_paths = [f'{img[1]}/{img[2]}/{img[3]}/{img[4]}' for img in images if img[0] == app['id']]
+            sci_paths = [f'{sci_d[1]}/{sci_d[2]}/{sci_d[3]}/{sci_d[4]}' for sci_d in sci_descripts if sci_d[0] == app['id']]
+
+            app.update({
+                'thumbnail': thumb_paths[0] if len(thumb_paths) > 0 else None,
+                'images': image_paths if image_paths else None,
+                'science_description': sci_paths[0] if len(sci_paths) > 0 else None
+            })
+
         return app_list
 
     def listNamespaces(self, user=""):
@@ -498,9 +533,9 @@ class EcrDB():
 
             # not needed ?  --->    AND ( Permissions.resourceName LIKE CONCAT(Repositories.namespace, \"%%\") )
 
-        fields = ["namespace" , "name" , "owner_id", "description","external_link"]
+        fields = ["namespace" , "name" , "owner_id", "description", "external_link"]
         fields_str = ",".join(fields)
-        stmt = f'''SELECT DISTINCT {fields_str} FROM Repositories INNER JOIN Permissions ON {sub_stmt} {owner_condition} {namespace_condition}    AND {permissions_stmt}'''
+        stmt = f'''SELECT DISTINCT {fields_str} FROM Repositories INNER JOIN Permissions ON {sub_stmt} {owner_condition} {namespace_condition} AND {permissions_stmt}'''
 
 
 
