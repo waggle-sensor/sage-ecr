@@ -66,7 +66,6 @@ CREATE TABLE IF NOT EXISTS SageECR.Repositories (
 
 /* meta files (for things like images, markdown, etc) */
 CREATE TABLE IF NOT EXISTS SageECR.MetaFiles (
-    id                    INT NOT NULL AUTO_INCREMENT,
     app_id                VARCHAR(194) NOT NULL,
     namespace             VARCHAR(64),
     name                  VARCHAR(64),
@@ -75,7 +74,7 @@ CREATE TABLE IF NOT EXISTS SageECR.MetaFiles (
     file                  MEDIUMBLOB,
     kind                  ENUM('thumb', 'image', 'science_description'),
     description           TEXT,  /* maybe useful for alt text, but not currently used */
-    PRIMARY KEY (id),
+    PRIMARY KEY (app_id, file_name),
     INDEX(app_id, namespace, name, version)
 );
 
