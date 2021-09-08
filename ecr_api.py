@@ -203,7 +203,14 @@ class ecr_middleware():
 
 
 
+def getValue(dict, key,  default):
+    if not key in dict:
+        return default
 
+    if dict[key] == None:
+        return default
+
+    return dict[key]
 
 
 def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, repository=None, version=None):
@@ -500,10 +507,11 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
     if url == "":
         raise Exception("url missing in source")
 
+    tag = getValue(build_source, "tag", "")
+    branch = getValue(build_source, "branch", "")
 
-    branch = build_source.get("branch", DEFAULT_BRANCH)
-    if branch == "":
-        raise Exception("branch missing in source")
+    if branch == "" and tag == "":
+        raise Exception("Neither tag nor branch specified")
 
 
     directory = build_source.get("directory", ".")
@@ -527,7 +535,7 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
 
     build_args_str = json.dumps(build_args_dict)
 
-    sources_values = [id_str, architectures , url, branch, directory, dockerfile, build_args_str]
+    sources_values = [id_str, architectures , url, branch, tag, directory, dockerfile, build_args_str]
 
     try:
         ecr_db.insertApp(col_names_str, values, variables_str, sources_values, resourcesArray)

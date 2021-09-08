@@ -57,6 +57,7 @@ mysql_Sources_fields = {
                 "architectures": "json",
                 "url":"str",
                 "branch":"str",
+                "tag":"str",
                 "directory":"str",
                 "dockerfile":"str",
                 "build_args":"json"
@@ -139,10 +140,15 @@ docker_registry_push_allowed = os.environ.get("DOCKER_REGISTRY_PUSH_ALLOWED", "0
 
 
 
-jenkinsfileTemplate = ''' pipeline{
+jenkinsfileTemplatePrefix = ''' pipeline{
 
     agent any
     stages {
+        stage ("checkout") {
+            steps{
+                checkout scm: [$$class: 'GitSCM', userRemoteConfigs: [[url: '${url}']], branches: [[name: '${branch}']]], poll: false
+            }
+        }
         stage ('Write') {
             steps{
 
@@ -154,9 +160,12 @@ jenkinsfileTemplate = ''' pipeline{
 
                             currentBuild.displayName = "${version}"
 
-                            git branch: '${branch}',
-                            url: '${url}'
+                            //git branch: '${branch}',
+                            //url: '${url}'
+
+
                             dir("$${env.WORKSPACE}/${directory}"){
+                                echo "########### Building for architecture $$arch"
                                 sh "docker version"
                                 sh "docker buildx version"
                                 ${docker_login}
@@ -166,15 +175,20 @@ jenkinsfileTemplate = ''' pipeline{
 
                         }
 
+
+'''
+
+jenkinsfileTemplateTestStage = '''
+
                         stage('Test') {
 
                             currentBuild.displayName = "${version}"
 
-                            git branch: '${branch}',
-                            url: '${url}'
+                            //git branch: '${branch}',
+                            //url: '${url}'
                             dir("$${env.WORKSPACE}/${directory}"){
-                                sh "docker version"
-                                sh "docker buildx version"
+                                echo "########### Testing for architecture $$arch"
+
                                 ${docker_login}
 
                                 script{
@@ -188,14 +202,16 @@ jenkinsfileTemplate = ''' pipeline{
                             }
 
                         }
+'''
 
+jenkinsfileTemplateSuffix = '''
                     }
                     stage ('Multi Arch Build'){
-                        git branch: '${branch}',
-                        url: '${url}'
+                        //git branch: '${branch}',
+                        //url: '${url}'
                         dir("$${env.WORKSPACE}/${directory}"){
-                            sh "docker version"
-                            sh "docker buildx version"
+                            echo "########### Final build for multi-arch docker image"
+
                             ${docker_login}
                             sh "docker buildx build --pull --builder sage --platform ${platform} ${build_args_command_line} -t ${docker_registry_url}/${namespace}/${name}:${version} -f ${dockerfile} ."
 

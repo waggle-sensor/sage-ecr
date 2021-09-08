@@ -97,7 +97,7 @@ class EcrDB():
     def insertApp(self, col_names_str, values, variables_str, sources_values, resourcesArray):
 
 
-        stmt = f'REPLACE INTO Sources ( id, architectures , url, branch, directory, dockerfile, build_args ) VALUES (%s , %s, %s, %s, %s, %s, %s)'
+        stmt = f'REPLACE INTO Sources ( id, architectures , url, branch, tag, directory, dockerfile, build_args ) VALUES (%s , %s, %s, %s, %s, %s, %s, %s)'
         print(f"replace statement: {stmt}", file=sys.stderr)
         #print(f"build_args_str: {build_args_str}", file=sys.stderr)
         self.cur.execute(stmt, sources_values)

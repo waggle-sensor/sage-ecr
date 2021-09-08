@@ -1,18 +1,16 @@
-
-# namespace: "sage"
-# name: "simple"
-# version : "1.0"
-
-description: "very important app"
+description: "very important app"   # recommended, short description
+authors: "Princess Zelda <zelda@hyrule.org>, King Rhoam <rhoam@hyrule.org> (https://hyrule.org)" # recommended; comma separated (email & url optional)
+keywords: "machine learning, audio, birds, some keyword"  # recommended
+license: "MIT license"  # recommended
+collaborators: "link <link@hyrule.org>" # optional; comma seperated
+funding: 'NSF'  # optional
 homepage: "https://github.com/waggle-sensor/edge-plugins.git"
-keywords: "machine learning, camera, some keyword"
-authors: "zelda <zelda@hyrule.org>"
-license: "MIT license"
 source:
     architectures :
         - "linux/amd64"  # required, valid fields: "linux/amd64", "linux/arm64", "linux/arm/v6", "linux/arm/v7", "linux/arm/v8
     url: "https://github.com/waggle-sensor/edge-plugins.git"   # required
-    branch: "master"  # optional, default: main
+    branch: "master"  # optional, default: main  (better use tag instead)
+    #tag: "v0.5"  # recommended
     directory : "plugin-simple"  # optional, default: root of git repository
     dockerfile : "Dockerfile"   # optional, default: Dockerfile , relative to context directory
     build_args: # optional, key-value pairs for docker build
@@ -29,3 +27,6 @@ inputs:  # future feature
 metadata: # custom key-value pairs
   my-science-data : 12345
 
+testing:
+  mask_entrypoint: true  # recommended, masks ENTRYPOINT defined in Dockerfile
+  command: ["echo", "test is successful"]

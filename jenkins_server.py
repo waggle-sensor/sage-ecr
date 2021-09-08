@@ -86,28 +86,24 @@ class JenkinsServer():
             raise Exception("field source empty")
 
         ###
-        test = app_spec.get("testing")
-
-        run_test = ""
+        run_test = "\'echo No test defined\'"
         run_entrypoint = ""
-
-        test_command = (test.get("command"))
-
-
-        mask_entrypoint_value = False
-        if "mask_entrypoint" in test.keys():
-            mask_entrypoint_value = test.get("mask_entrypoint")
-
-            if mask_entrypoint_value:
-                run_entrypoint = ' --entrypoint=\'\''
+        test = app_spec.get("testing")
+        if test:
 
 
-        #if entrypoint_command:
-        #    all_entrypoint_command = " ".join(entrypoint_command)
-        #    run_entrypoint = "\'" + all_entrypoint_command + "\'"
-        if test_command:
-            all_test_command = " ".join(test_command)
-            run_test = "\'" +  all_test_command + "\'"
+            test_command = test.get("command")
+
+            if "mask_entrypoint" in test.keys() and test.get("mask_entrypoint"):
+                    run_entrypoint = ' --entrypoint=\'\''
+
+
+            #if entrypoint_command:
+            #    all_entrypoint_command = " ".join(entrypoint_command)
+            #    run_entrypoint = "\'" + all_entrypoint_command + "\'"
+            if test_command:
+                all_test_command = " ".join(test_command)
+                run_test = "\'" +  all_test_command + "\'"
 
 
 
@@ -120,7 +116,16 @@ class JenkinsServer():
         #sourceArray = source.split("#", 3)
 
         git_url = source.get("url", "")
-        git_branch = source.get("branch", "main")
+
+        git_branch = source.get("tag", "")
+
+        if git_branch == None or git_branch == "":
+            git_branch = source.get("branch", "")
+            if git_branch == None or git_branch == "":
+                raise Exception("neither tag nor branch specified")
+        else:
+            git_branch = f"refs/tags/{git_branch}"
+
         git_directory = source.get("directory", ".")
         if git_directory.startswith("/"):
             git_directory=git_directory[1:]
@@ -167,6 +172,15 @@ class JenkinsServer():
             do_push =""
 
         name = app_spec["name"]
+
+
+        jenkinsfileTemplate = ""
+
+        if test:
+            jenkinsfileTemplate = jenkinsfileTemplatePrefix + jenkinsfileTemplateTestStage + jenkinsfileTemplateSuffix
+        else:
+            jenkinsfileTemplate = jenkinsfileTemplatePrefix + jenkinsfileTemplateSuffix
+
         template = Template(jenkinsfileTemplate)
         try:
             jenkinsfile = template.substitute(  url=git_url,
@@ -186,7 +200,7 @@ class JenkinsServer():
                                                 entrypoint =run_entrypoint,
                                                 do_push=do_push)
         except Exception as e:
-            raise Exception(f'  url={git_url}, branch={git_branch}, directory={git_directory}  e={str(e)}')
+            raise Exception(f'template failed: url={git_url}, branch={git_branch}, directory={git_directory},   e={str(e)}')
 
         #print(jenkins.EMPTY_CONFIG_XML)
         newJob = createPipelineJobConfig(jenkinsfile, f'{actual_namespace}/{name}')
