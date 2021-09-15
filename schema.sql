@@ -11,6 +11,12 @@ CREATE TABLE IF NOT EXISTS SageECR.Apps (
     version             VARCHAR(64),
     frozen              BOOLEAN DEFAULT FALSE,
     description         TEXT,
+    authors             TEXT,
+    collaborators       TEXT,
+    keywords            TEXT,
+    homepage            TEXT,
+    funding             TEXT,
+    license             VARCHAR(256),
     depends_on          VARCHAR(128),
     baseCommand         VARCHAR(64),
     arguments           VARCHAR(256),
@@ -57,6 +63,20 @@ CREATE TABLE IF NOT EXISTS SageECR.Repositories (
     PRIMARY KEY (namespace,name)
 );
 
+
+/* meta files (for things like images, markdown, etc) */
+CREATE TABLE IF NOT EXISTS SageECR.MetaFiles (
+    app_id                VARCHAR(194) NOT NULL,
+    namespace             VARCHAR(64),
+    name                  VARCHAR(64),
+    version               VARCHAR(64),
+    file_name             VARCHAR(256),
+    file                  MEDIUMBLOB,
+    kind                  ENUM('thumb', 'image', 'science_description'),
+    description           TEXT,  /* maybe useful for alt text, but not currently used */
+    PRIMARY KEY (app_id, file_name),
+    INDEX(app_id, namespace, name, version)
+);
 
 
 /* Owner of repositories is the namespace owner  */

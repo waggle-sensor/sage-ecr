@@ -1,9 +1,10 @@
-
-# namespace: "sage"
-# name: "simple"
-# version : "1.0"
-
-description: "very important app"
+description: "very important app"   # recommended, short description
+authors: "Princess Zelda <zelda@hyrule.org>, King Rhoam <rhoam@hyrule.org> (https://hyrule.org)" # recommended; comma separated (email & url optional)
+keywords: "machine learning, audio, birds, some keyword"  # recommended
+license: "MIT license"  # recommended
+collaborators: "link <link@hyrule.org>" # optional; comma seperated
+funding: 'NSF'  # optional
+homepage: "https://github.com/waggle-sensor/edge-plugins.git"
 source:
     architectures :
         - "linux/amd64"  # required, valid fields: "linux/amd64", "linux/arm64", "linux/arm/v6", "linux/arm/v7", "linux/arm/v8

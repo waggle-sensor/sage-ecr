@@ -12,6 +12,7 @@ from datetime import datetime , timedelta
 import re
 import logging
 import base64
+import bleach
 
 #logger = logging.getLogger('gunicorn.error')
 #logger = logging.getLogger('__name__')
@@ -137,16 +138,15 @@ class EcrDB():
         if frozen and (not force):
             raise Exception("App {app_id} is frozen, it cannot be deleted")
 
-
-        #namespace = app["namespace"]
-        #name = app["name"]
-        #version = app["version"]
-
         for table in ["Apps", "Sources", "Certifications", "Profiles"]:
-
             stmt_apps = f'DELETE FROM {table} WHERE `id` = %s'
             print(f'stmt: {stmt_apps} app_id={app_id}', file=sys.stderr)
             self.cur.execute(stmt_apps, (app_id, ))
+
+        # also cleanup metafiles
+        stmt_apps = f'DELETE FROM MetaFiles WHERE `app_id` = %s'
+        print(f'stmt: {stmt_apps} app_id={app_id}', file=sys.stderr)
+        self.cur.execute(stmt_apps, (app_id, ))
 
         self.db.commit()
 
@@ -405,6 +405,41 @@ class EcrDB():
 
             return app_list[0], True
 
+        # if no apps, we are done
+        if not app_list:
+            return app_list
+
+        # quote app_id list for queries
+        app_ids = [f"{app['id']}" for app in app_list]
+        format_strings = ','.join(['%s'] * len(app_ids))
+
+        # get thumbnails  # todo(nc): write as join without subqueries?
+        stmt = f'SELECT app_id, namespace, name, version, file_name FROM MetaFiles WHERE kind = "thumb" AND app_id IN ({format_strings});'
+        self.cur.execute(stmt, tuple(app_ids))
+        thumbs = self.cur.fetchall()
+
+        # images
+        stmt = f'SELECT app_id, namespace, name, version, file_name FROM MetaFiles WHERE kind = "image" AND app_id IN ({format_strings});'
+        self.cur.execute(stmt, tuple(app_ids))
+        images = self.cur.fetchall()
+
+        # science markdown
+        stmt = f'SELECT app_id, namespace, name, version, file_name FROM MetaFiles WHERE kind = "science_description" AND app_id IN ({format_strings});'
+        self.cur.execute(stmt, tuple(app_ids))
+        sci_descripts = self.cur.fetchall()
+
+        # (hacky) joining of the meta paths
+        for app in app_list:
+            thumb_paths = [f'{thumb[1]}/{thumb[2]}/{thumb[3]}/{thumb[4]}' for thumb in thumbs if thumb[0] == app['id']]
+            image_paths = [f'{img[1]}/{img[2]}/{img[3]}/{img[4]}' for img in images if img[0] == app['id']]
+            sci_paths = [f'{sci_d[1]}/{sci_d[2]}/{sci_d[3]}/{sci_d[4]}' for sci_d in sci_descripts if sci_d[0] == app['id']]
+
+            app.update({
+                'thumbnail': thumb_paths[0] if len(thumb_paths) > 0 else None,
+                'images': image_paths if image_paths else None,
+                'science_description': sci_paths[0] if len(sci_paths) > 0 else None
+            })
+
         return app_list
 
     def listNamespaces(self, user=""):
@@ -499,9 +534,9 @@ class EcrDB():
 
             # not needed ?  --->    AND ( Permissions.resourceName LIKE CONCAT(Repositories.namespace, \"%%\") )
 
-        fields = ["namespace" , "name" , "owner_id", "description","external_link"]
+        fields = ["namespace" , "name" , "owner_id", "description", "external_link"]
         fields_str = ",".join(fields)
-        stmt = f'''SELECT DISTINCT {fields_str} FROM Repositories INNER JOIN Permissions ON {sub_stmt} {owner_condition} {namespace_condition}    AND {permissions_stmt}'''
+        stmt = f'''SELECT DISTINCT {fields_str} FROM Repositories INNER JOIN Permissions ON {sub_stmt} {owner_condition} {namespace_condition} AND {permissions_stmt}'''
 
 
 
@@ -863,4 +898,31 @@ class EcrDB():
         self.db.commit()
         return 1
 
+
+    def addMetaFile(self, namespace, name, version, file_name, blob, kind):
+        app_id = f'{namespace}/{name}:{version}'
+        stmt = 'INSERT INTO MetaFiles (app_id, namespace, name, version, file_name, file, kind) VALUES (%s, %s, %s, %s, %s, %s, %s)'
+
+        print(f'stmt: {stmt} app_id={app_id} ={namespace} name={name} version={version} file_name={file_name} kind={kind}', file=sys.stderr)
+
+        self.cur.execute(stmt, (app_id, namespace, name, version, file_name, [blob], kind))
+        self.db.commit()
+        return 1
+
+
+    def getMetaFile(self, namespace, name, version, file_name):
+
+        app_id = f'{namespace}/{name}:{version}'
+
+        stmt = 'SELECT file, kind FROM MetaFiles where app_id = %s AND file_name = %s'
+
+        print(f'stmt: {stmt} app_id={app_id} file_name={file_name}', file=sys.stderr)
+
+        self.cur.execute(stmt, (app_id, file_name))
+        content, kind = self.cur.fetchone()
+
+        if kind == 'science_description':
+            content = bleach.clean(content.decode('utf-8'))
+
+        return content
 
