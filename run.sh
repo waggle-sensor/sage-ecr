@@ -46,9 +46,9 @@ fi
 
 if [[ "$OSTYPE" == "darwin"* ]] ; then
     export DOCKER_GATEWAY_HOST="host.docker.internal"
-else 
+else
     export DOCKER_GATEWAY_HOST=${DOCKER_GATEWAY_IP}
-fi    
+fi
 
 
 export JENKINS_SERVER=http://${DOCKER_GATEWAY_HOST}:8082
@@ -59,7 +59,7 @@ echo "DOCKER_GATEWAY_IP: ${DOCKER_GATEWAY_IP}"
 echo "JENKINS_SERVER: ${JENKINS_SERVER}"
 
 cd jenkins/
-docker build -t sagecontinuum/ecr-jenkins .
+docker build -t waggle/ecr-jenkins .
 cd ..
 
 
@@ -82,7 +82,7 @@ fi
 
 
 set -x
-docker run -d --name jenkins --env USE_HOST_DOCKER=${USE_HOST_DOCKER} --env DOCKER_REGISTRY_INSECURE=1 --add-host registry.local:${DOCKER_GATEWAY_IP} --env JAVA_OPTS=-Dhudson.footerURL=http://localhost:8082 -p 8082:8080  -p 50000:50000 -v `pwd`/jenkins/casc_jenkins.yaml:/config/casc_jenkins.yaml:ro -v `pwd`/temp:/docker:rw -v /var/run/docker.sock:/var/run/docker.sock ${DOCKER_MOUNT} sagecontinuum/ecr-jenkins 
+docker run -d --name jenkins --env USE_HOST_DOCKER=${USE_HOST_DOCKER} --env DOCKER_REGISTRY_INSECURE=1 --add-host registry.local:${DOCKER_GATEWAY_IP} --env JAVA_OPTS=-Dhudson.footerURL=http://localhost:8082 -p 8082:8080  -p 50000:50000 -v `pwd`/jenkins/casc_jenkins.yaml:/config/casc_jenkins.yaml:ro -v `pwd`/temp:/docker:rw -v /var/run/docker.sock:/var/run/docker.sock ${DOCKER_MOUNT} waggle/ecr-jenkins
 set +x
 
 echo "waiting for jenkins..."
@@ -91,7 +91,7 @@ sleep 3
 
 export JENKINS_TOKEN=""
 
-while [ 1 ] ; do 
+while [ 1 ] ; do
 
     docker exec jenkins test -f /var/jenkins_home/secrets/ecrdb_token.txt
     if [ $? -eq 0 ] ; then
@@ -105,7 +105,7 @@ while [ 1 ] ; do
           continue
         fi
     fi
-    
+
     # check if container exists
     docker container inspect jenkins > /dev/null
     if [ ! $? -eq 0 ] ; then
@@ -132,8 +132,8 @@ if [[ "$OSTYPE" == "darwin"* ]] ; then
     docker-compose up $@
     set +x
     set +e
-else 
-    
+else
+
     # this requires DOCKER_INTERNAL
     export DOCKER_INTERNAL=${DOCKER_GATEWAY_HOST}
     set -e
@@ -152,7 +152,7 @@ fi
 # export JENKINS_ADMIN_PWD=$(echo $(docker exec -ti jenkins cat /var/jenkins_home/secrets/initialAdminPassword) | grep -o "[0-9a-z]\+" | tr -d '\n')
 # echo "JENKINS_ADMIN_PWD: ${JENKINS_ADMIN_PWD}"
 # export JENKINS_TOKEN=${JENKINS_ADMIN_PWD}
- 
+
 
 
 
