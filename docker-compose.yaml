@@ -7,7 +7,7 @@ version: '3.7'
 services:
 
   sage-ecr:
-    image: sagecontinuum/sage-ecr:latest
+    image: waggle/sage-ecr:latest
     build:
       context: .
       dockerfile: Dockerfile

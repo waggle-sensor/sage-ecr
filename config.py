@@ -213,7 +213,7 @@ jenkinsfileTemplateSuffix = '''
                             echo "########### Final build for multi-arch docker image"
 
                             ${docker_login}
-                            sh "docker buildx build --pull --builder sage --platform ${platform} ${build_args_command_line} -t ${docker_registry_url}/${namespace}/${name}:${version} -f ${dockerfile} ."
+                            sh "docker buildx build --pull --builder sage --platform ${platforms} ${build_args_command_line} ${do_push} -t ${docker_registry_url}/${namespace}/${name}:${version} -f ${dockerfile} ."
 
                         }
                     }

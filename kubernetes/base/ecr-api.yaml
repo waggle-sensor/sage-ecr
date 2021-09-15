@@ -69,7 +69,7 @@ spec:
         k8s-app: ecr-api
     spec:
       containers:
-      - image: sagecontinuum/sage-ecr:latest
+      - image: waggle/sage-ecr:latest
         name: ecr-api
 
         env:

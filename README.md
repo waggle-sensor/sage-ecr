@@ -26,7 +26,7 @@ Important: Note that pushing to the insecure registry using `docker buildx build
 The test environment uses docker-compose but has to be invoked by a wrapper script:
 
 ```
-./run.sh -d --build
+./run.sh --build
 ```
 
 Option `-d` will deamonize the docker-compose environment.
