@@ -33,13 +33,13 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: ecr-jenkins-pvc
-spec:
-  #storageClassName: manual
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 500Mi
+# spec:
+#   #storageClassName: manual
+#   accessModes:
+#     - ReadWriteOnce
+#   resources:
+#     requests:
+#       storage: 500Mi
 
 
 ---
@@ -64,13 +64,6 @@ spec:
       containers:
       - image: sagecontinuum/ecr-jenkins:latest
         name: ecr-jenkins
-        #resources:
-        #  limits:
-        #    cpu: 4
-        #    memory: 4Gi
-        #  requests:
-        #    memory: 2Gi
-        #    cpu: 2
         volumeMounts:
         - mountPath: /var/jenkins_home/
           name: ecr-jenkins
