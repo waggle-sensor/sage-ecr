@@ -192,6 +192,7 @@ class JenkinsServer():
                                                 version=version,
                                                 platforms=platforms_str,
                                                 build_args_command_line=build_args_command_line,
+                                                docker_run_args=docker_run_args,
                                                 docker_registry_url=docker_registry_url,
                                                 docker_login=docker_login,
                                                 command = run_test,
