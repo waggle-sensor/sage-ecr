@@ -196,7 +196,7 @@ jenkinsfileTemplateTestStage = '''
                                             ;
                                         }
                                         else{
-                                            sh "docker run -i ${docker_run_args}--rm ${entrypoint} ${docker_registry_url}/${namespace}/${name}:${version} \'${command}\'"
+                                            sh "docker run -i ${docker_run_args} --rm ${entrypoint} ${docker_registry_url}/${namespace}/${name}:${version} \'${command}\'"
                                         }
                                 }
                             }
