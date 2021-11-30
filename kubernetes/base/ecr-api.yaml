@@ -71,78 +71,85 @@ spec:
       containers:
       - image: waggle/sage-ecr:latest
         name: ecr-api
+        envFrom:
+          - configMapRef:
+              name: ecr-api-config
+        resources:
+          limits:
+            cpu: "250m"
+            memory: 12Gi
 
         env:
-        - name: DISABLE_AUTH
-          valueFrom:
-            configMapKeyRef:
-              name:  ecr-api-config
-              key: DISABLE_AUTH
-        - name: DOCKER_REGISTRY_URL
-          valueFrom:
-            configMapKeyRef:
-              name: ecr-api-config
-              key: DOCKER_REGISTRY_URL
-        - name: DOCKER_BUILD_ARGS
-          valueFrom:
-            configMapKeyRef:
-              name: ecr-api-config
-              key: DOCKER_BUILD_ARGS
-        - name: tokenInfoEndpoint
-          valueFrom:
-            configMapKeyRef:
-              name: ecr-api-config
-              key: tokenInfoEndpoint
-        - name: tokenInfoUser
-          valueFrom:
-            configMapKeyRef:
-              name: ecr-api-config
-              key: tokenInfoUser
+        # - name: DISABLE_AUTH
+        #   valueFrom:
+        #     configMapKeyRef:
+        #       name:  ecr-api-config
+        #       key: DISABLE_AUTH
+        # - name: DOCKER_REGISTRY_URL
+        #   valueFrom:
+        #     configMapKeyRef:
+        #       name: ecr-api-config
+        #       key: DOCKER_REGISTRY_URL
+        # - name: DOCKER_BUILD_ARGS
+        #   valueFrom:
+        #     configMapKeyRef:
+        #       name: ecr-api-config
+        #       key: DOCKER_BUILD_ARGS
+        # - name: tokenInfoEndpoint
+        #   valueFrom:
+        #     configMapKeyRef:
+        #       name: ecr-api-config
+        #       key: tokenInfoEndpoint
+        # - name: tokenInfoUser
+        #   valueFrom:
+        #     configMapKeyRef:
+        #       name: ecr-api-config
+        #       key: tokenInfoUser
         - name: tokenInfoPassword
           valueFrom:
             secretKeyRef:
               name: ecr-api-secret
               key: tokenInfoPassword
-        - name: JENKINS_SERVER
-          valueFrom:
-            configMapKeyRef:
-              name: ecr-api-config
-              key: JENKINS_SERVER
-        - name: JENKINS_USER
-          valueFrom:
-            configMapKeyRef:
-              name: ecr-api-config
-              key: JENKINS_USER
+        # - name: JENKINS_SERVER
+        #   valueFrom:
+        #     configMapKeyRef:
+        #       name: ecr-api-config
+        #       key: JENKINS_SERVER
+        # - name: JENKINS_USER
+        #   valueFrom:
+        #     configMapKeyRef:
+        #       name: ecr-api-config
+        #       key: JENKINS_USER
         - name: JENKINS_TOKEN
           valueFrom:
             secretKeyRef:
               name: ecr-api-secret
               key: JENKINS_TOKEN
-        - name: MYSQL_HOST
-          valueFrom:
-            configMapKeyRef:
-              name: ecr-api-config
-              key: MYSQL_HOST
-        - name: AUTH_METHOD
-          valueFrom:
-            configMapKeyRef:
-              name: ecr-api-config
-              key: AUTH_METHOD
-        - name: MYSQL_USER
-          valueFrom:
-            configMapKeyRef:
-              name: ecr-api-config
-              key: MYSQL_USER
+        # - name: MYSQL_HOST
+        #   valueFrom:
+        #     configMapKeyRef:
+        #       name: ecr-api-config
+        #       key: MYSQL_HOST
+        # - name: AUTH_METHOD
+        #   valueFrom:
+        #     configMapKeyRef:
+        #       name: ecr-api-config
+        #       key: AUTH_METHOD
+        # - name: MYSQL_USER
+        #   valueFrom:
+        #     configMapKeyRef:
+        #       name: ecr-api-config
+        #       key: MYSQL_USER
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
               name: ecr-api-secret
               key: MYSQL_PASSWORD
-        - name: MYSQL_DATABASE
-          valueFrom:
-            configMapKeyRef:
-              name: ecr-api-config
-              key: MYSQL_DATABASE
+        # - name: MYSQL_DATABASE
+        #   valueFrom:
+        #     configMapKeyRef:
+        #       name: ecr-api-config
+        #       key: MYSQL_DATABASE
         ports:
           - name: api
             containerPort: 5000

@@ -31,7 +31,14 @@ spec:
             subPath: server.crt
           - mountPath: /var/lib/registry
             name: ecr-registry
-
+        livenessProbe:
+          httpGet:
+            path: /
+            port: api
+        readinessProbe:
+          httpGet:
+            path: /
+            port: api
       restartPolicy: Always
       volumes:
       - name: ecr-registry

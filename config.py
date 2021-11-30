@@ -128,7 +128,7 @@ jenkins_token = os.environ.get("JENKINS_TOKEN", "")
 jenkins_server = os.getenv('JENKINS_SERVER', default="http://localhost:8082")
 
 docker_build_args= os.environ.get("DOCKER_BUILD_ARGS", "")
-
+docker_run_args=os.environ.get("DOCKER_RUN_ARGS", "")
 
 # docker registry
 docker_registry_url = os.environ.get("DOCKER_REGISTRY_URL", "")
@@ -196,7 +196,7 @@ jenkinsfileTemplateTestStage = '''
                                             ;
                                         }
                                         else{
-                                            sh "docker run -i --rm ${entrypoint} ${docker_registry_url}/${namespace}/${name}:${version} \'${command}\'"
+                                            sh "docker run -i ${docker_run_args} --rm ${entrypoint} ${docker_registry_url}/${namespace}/${name}:${version} \'${command}\'"
                                         }
                                 }
                             }

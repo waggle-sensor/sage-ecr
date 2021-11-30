@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS SageECR.Apps (
     depends_on          VARCHAR(128),
     baseCommand         VARCHAR(64),
     arguments           VARCHAR(256),
-    inputs              VARCHAR(256),
+    inputs              TEXT,
     metadata            TEXT,
     testing             VARCHAR(256),
     schema_version      VARCHAR(64),

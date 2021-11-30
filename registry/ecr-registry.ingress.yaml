@@ -1,18 +1,18 @@
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: ecr-registry
-  annotations:
-    traefik.ingress.kubernetes.io/router.tls: ""
-spec:
-  rules:
-  - host: sage-registry.nautilus.optiputer.net
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: ecr-registry
-            port:
-              number: 80
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: ecr-registry
+#   annotations:
+#     traefik.ingress.kubernetes.io/router.tls: ""
+# spec:
+#   rules:
+#   - host: sage-registry.nautilus.optiputer.net
+#     http:
+#       paths:
+#       - path: /
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: ecr-registry
+#             port:
+#               number: 80
