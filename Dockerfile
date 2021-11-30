@@ -1,7 +1,7 @@
 
 
-# docker build -t sagecontinuum/sage-ecr .
-# docker run -ti --rm -p 5000:5000 -v `pwd`:/usr/src/app sagecontinuum/sage-ecr /bin/ash
+# docker build -t waggle/sage-ecr .
+# docker run -ti --rm -p 5000:5000 -v `pwd`:/usr/src/app waggle/sage-ecr /bin/ash
 
 FROM python:3.8-alpine
 
