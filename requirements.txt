@@ -12,3 +12,4 @@ pyyaml
 gunicorn
 Werkzeug
 bleach
+boto3

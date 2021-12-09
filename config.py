@@ -9,6 +9,14 @@ mysql_password =  os.getenv('MYSQL_PASSWORD')
 #app.config['MYSQL_DATABASE_USER'] = os.getenv('MYSQL_USER')
 #app.config['MYSQL_DATABASE_PASSWORD'] = os.getenv('MYSQL_PASSWORD')
 
+
+S3_ENDPOINT = os.getenv('S3_ENDPOINT')
+S3_ACCESS_KEY = os.getenv('S3_ACCESS_KEY')
+S3_SECRET_KEY = os.getenv('S3_SECRET_KEY')
+S3_BUCKET=os.getenv('S3_BUCKET')
+S3_FOLDER=os.getenv('S3_FOLDER')
+
+
 # directory to clone and zip git repositories (not used by jenkins)
 ecr_temp_dir = "/temp/ecr/"
 

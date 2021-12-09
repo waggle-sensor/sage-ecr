@@ -48,6 +48,8 @@ from prometheus_client import Counter, make_wsgi_app
 
 import subprocess
 import tempfile
+import boto3
+from botocore.exceptions import ClientError
 
 RAW_GITHUB_URL = 'https://raw.githubusercontent.com'
 DEFAULT_BRANCH = 'main'
@@ -234,7 +236,7 @@ def run_command_communicate(command, input_str=None, cwd=None):
 
 
 
-def preprocess_repository(url, branchOrTag):
+def preprocess_repository(url, branchOrTag, namespace, repository):
 
 
     version = ""
@@ -309,8 +311,45 @@ def preprocess_repository(url, branchOrTag):
         if len(git_hash_long) != 40:
             raise Exception(f"git hash has wrong format ({git_hash_long})")
 
-        # TODO zip
-        # TODO upload (and store link)
+
+        # tar -czvf file.tar.gz directory
+        target_gzip = f"{temp_dir}/{namespace}_{repository}_{version}.tgz"
+        command = ["tar", "-czvf", target_gzip, "."]
+        stdout, stderr , exit_code = run_command_communicate(command, cwd=tmpdirname)
+        stdout_str = ""
+        if stdout:
+            stdout_str = stdout.decode("utf-8")
+        if exit_code != 0 :
+
+            stderr_str = ""
+
+            if stderr:
+                stderr_str = stderr.decode("utf-8")
+            raise Exception(f"Creating archive failed (stdout={ stdout_str }, stderr={stderr_str}, tmpdirname={tmpdirname})")
+
+        # TODO upload (and store link (better: no link needed if filename is unique))
+
+        if config.S3_ENDPOINT:
+            s3_client = boto3.client(
+                's3',
+                endpoint_url=config.S3_ENDPOINT,
+                aws_access_key_id=config.S3_ACCESS_KEY,
+                aws_secret_access_key=config.S3_SECRET_KEY
+            )
+
+            object_name = f"{config.S3_FOLDER}/{namespace}/{repository}/{namespace}_{repository}_{version}.tgz"
+
+            try:
+                response = s3_client.upload_file(target_gzip, config.S3_BUCKET, object_name)
+            except ClientError as e:
+                logging.error(e)
+                return False
+            return True
+
+
+
+        # clean-up
+        os.remove(target_gzip)
 
 
     return version, git_hash_long
@@ -496,7 +535,7 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
 
 
     ### git clone, extract info, create archive, upload
-    extracted_version, git_commit_short = preprocess_repository(url, branch_or_tag)
+    extracted_version, git_commit_short = preprocess_repository(url, branch_or_tag, namespace, repository)
 
 
     existing_app_id = None
