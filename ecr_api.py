@@ -340,11 +340,11 @@ def preprocess_repository(url, branchOrTag, namespace, repository):
             object_name = f"{config.S3_FOLDER}/{namespace}/{repository}/{namespace}_{repository}_{version}.tgz"
 
             try:
-                response = s3_client.upload_file(target_gzip, config.S3_BUCKET, object_name)
-            except ClientError as e:
-                logging.error(e)
-                return False
-            return True
+                s3_client.upload_file(target_gzip, config.S3_BUCKET, object_name)
+            except Exception as e:
+                raise Exception(f"Upload to S3 failed ({str(e)})")
+
+
 
 
 
