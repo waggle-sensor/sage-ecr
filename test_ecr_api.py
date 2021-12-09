@@ -19,6 +19,7 @@ test_app_def_obj = yaml.load(open('example_app.yaml', 'r').read(), Loader=yaml.F
 
 test_app_def = json.dumps(test_app_def_obj)
 
+
 #app_namespace = test_app_def_obj["namespace"]
 #app_repository = test_app_def_obj["name"]
 #app_version = test_app_def_obj["version"]
@@ -75,7 +76,13 @@ def upload_and_build(client, test_failure=False):
 
     else:
         app_repository = "simple"
-        local_test_app_def = test_app_def
+        local_test_app = json.loads(json.dumps(test_app_def_obj))
+        local_test_app["name"] = app_repository
+        local_test_app["namespace"] = app_namespace
+
+        local_test_app_def = json.dumps(local_test_app)
+
+
 
     # delete app first
     rv = client.delete(f'/apps/{app_namespace}/{app_repository}/{app_version}', headers=admin_headers)
@@ -90,14 +97,16 @@ def upload_and_build(client, test_failure=False):
 
     print(f'local_test_app_def rv.data: {local_test_app_def}' , file=sys.stderr)
 
-    rv = client.post(f'/apps/{app_namespace}/{app_repository}/{app_version}', data = local_test_app_def, headers=headers)
+    #rv = client.post(f'/apps/{app_namespace}/{app_repository}/{app_version}', data = local_test_app_def, headers=headers)
+    rv = client.post(f'/submit/', data = local_test_app_def, headers=headers)
     print(f'upload_and_build rv.data: {rv.data}' , file=sys.stderr)
 
     result = rv.get_json()
 
     assert "error" not in result
 
-
+    assert "version" in result
+    new_version  = result["version"]
 
 
     assert result != None
@@ -110,7 +119,7 @@ def upload_and_build(client, test_failure=False):
 
     # build "default"
     if True:
-        rv = client.post(f'/builds/{app_namespace}/{app_repository}/{app_version}?skip_image_push=false', headers=headers)
+        rv = client.post(f'/builds/{app_namespace}/{app_repository}/{new_version}?skip_image_push=false', headers=headers)
 
         assert rv.data != ""
         print(f'rv.data: {rv.data}' , file=sys.stderr)
@@ -122,7 +131,7 @@ def upload_and_build(client, test_failure=False):
 
 
         while True:
-            rv = client.get(f'/builds/{app_namespace}/{app_repository}/{app_version}', headers=headers)
+            rv = client.get(f'/builds/{app_namespace}/{app_repository}/{new_version}', headers=headers)
 
             assert rv.data != ""
             print(f'rv.data: {rv.data}' , file=sys.stderr)
@@ -835,7 +844,7 @@ def test_meta_file_import(client, test_failure=False):
     # use a remote repo for testing meta import
     # todo: update hello-world-ml with meta and use that for testing instead
     app_def["source"]["url"] = "https://github.com/nconrad/Bird-Song-Classifier-Plugin.git"
-
+    app_def["source"]["branch"] = "main"
     app_def_str = json.dumps(app_def)
 
 

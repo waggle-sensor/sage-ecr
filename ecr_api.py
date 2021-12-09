@@ -46,6 +46,9 @@ from werkzeug.exceptions import HTTPException
 
 from prometheus_client import Counter, make_wsgi_app
 
+import subprocess
+import tempfile
+
 RAW_GITHUB_URL = 'https://raw.githubusercontent.com'
 DEFAULT_BRANCH = 'main'
 
@@ -212,6 +215,109 @@ def getValue(dict, key,  default):
 
     return dict[key]
 
+def run_command_communicate(command, input_str=None, cwd=None):
+
+
+    try:
+        p = subprocess.Popen(command, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    except Exception as e:
+        raise Exception(f"subprocess.Popen: {str(e)}")
+
+    # returns output_stdout,output_stderr
+    input=None
+    if input_str:
+        input=input_str.encode()
+
+    stdout, stderr =  p.communicate(input=input)
+    exit_code = p.wait()
+    return stdout, stderr , exit_code
+
+
+
+def preprocess_repository(url, branchOrTag):
+
+
+    version = ""
+    git_hash_long = ""
+
+    temp_dir = config.ecr_temp_dir
+
+    if not os.path.exists(temp_dir):
+        os.makedirs(temp_dir)
+
+    wait_count = 0
+    with tempfile.TemporaryDirectory(dir=temp_dir) as tmpdirname:
+        while not os.path.exists(tmpdirname):
+            wait_count += 1
+            if wait_count > 10:
+                raise Exception(f"Temp directory was not created")
+
+            time.sleep(0.5)
+
+        app.logger.debug(f"tmpdirname: {tmpdirname}")
+        command = ["git", "clone", "-b", branchOrTag,  url, tmpdirname]
+        stdout, stderr , exit_code = run_command_communicate(command, cwd=temp_dir)
+        if exit_code != 0 :
+            raise Exception(f"Cloning git repo failed (stdout={stdout}, stderr={stderr})")
+
+        #best solution, returns "0.0.0-0-g60c72a2" , or "g60c72a2"
+        command = ["git", "describe", "--always", "--tags", "--long"]
+        stdout, stderr , exit_code = run_command_communicate(command, cwd=tmpdirname)
+        stdout_str = ""
+        if stdout:
+            stdout_str = stdout.decode("utf-8")
+        if exit_code != 0 :
+
+            stderr_str = ""
+
+            if stderr:
+                stderr_str = stderr.decode("utf-8")
+            raise Exception(f"Extracting version number failed (stdout={ stdout_str }, stderr={stderr_str}, tmpdirname={tmpdirname})")
+
+
+        version  = stdout_str.split('\n')[0]
+        if len(version) == 8 or len(version) == 7:
+            #git_commit_short = version
+            pass
+        elif len(version) > 8:
+            # "0.0.0-0-g60c72a2"
+            version_ar  = version.split('-')
+            if len(version_ar) != 3:
+                raise Exception(f"Could not parse version string {version}")
+            version = version_ar[0] + "-" + version_ar[1]
+            #git_commit_short = version_ar[2]
+        else:
+            raise Exception(f"Could not parse version string {version}")
+
+
+        # git rev-parse HEAD for long git commit
+        command = ["git", "rev-parse", "HEAD"]
+        stdout, stderr , exit_code = run_command_communicate(command, cwd=tmpdirname)
+        stdout_str = ""
+        if stdout:
+            stdout_str = stdout.decode("utf-8")
+        if exit_code != 0 :
+
+            stderr_str = ""
+
+            if stderr:
+                stderr_str = stderr.decode("utf-8")
+            raise Exception(f"Extracting hash number failed (stdout={ stdout_str }, stderr={stderr_str}, tmpdirname={tmpdirname})")
+
+        git_hash_long = stdout_str.split('\n')[0]
+
+        if len(git_hash_long) != 40:
+            raise Exception(f"git hash has wrong format ({git_hash_long})")
+
+        # TODO zip
+        # TODO upload (and store link)
+
+
+    return version, git_hash_long
+
+
+
+
 
 def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, repository=None, version=None):
 
@@ -271,30 +377,18 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
 
     if not version:
         version = postData.get("version", "")
-    if not version:
-        raise Exception("version not specified")
 
-    try:
-        existing_app, found_app = ecr_db.listApps(user=requestUser, namespace=namespace, repository=repository, version=version)
-    except Exception as e:
-        raise Exception(f"ecr_db.listApps failed: {str(e)}")
+    if version:  # if not, version will be extracted from git repo
+        try:
+            existing_app, found_app = ecr_db.listApps(user=requestUser, namespace=namespace, repository=repository, version=version)
+        except Exception as e:
+            raise Exception(f"ecr_db.listApps failed: {str(e)}")
 
-    existing_app_id = None
-    if found_app:
-        if (existing_app.get("frozen", False) and (not isAdmin)):
-            raise Exception(f'App {namespace}/{repository}:{version} already exists and is frozen.')
+        if found_app:
+            raise Exception(f'App {namespace}/{repository}:{version} already exists.')
 
-        if not force_overwrite:
-            raise Exception(f'App {namespace}/{repository}:{version} already exists but is not frozen. Use query force=true to overwrite.')
 
-        existing_app_id = existing_app.get("id")
-
-    for key in postData:
-        if not key in config.valid_fields_set:
-            #return  {"error": f'Field {key} not supported'}
-            raise Exception(f'Field {key} not supported')
-
-    # if required
+    # check if required fields are there
 
     for key in config.required_fields:
         if not key in postData:
@@ -314,11 +408,11 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
             raise Exception(f'Required field {key} is missing')
 
 
-
-
-
-
-
+    # check for invalid fields
+    for key in postData:
+        if not key in config.valid_fields_set:
+            #return  {"error": f'Field {key} not supported'}
+            raise Exception(f'Field {key} not supported')
 
     ##### source
     # source
@@ -383,6 +477,51 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
 
     if not isinstance(appMetadata, dict):
         raise Exception("metadata has to be an object")
+
+    url = build_source.get("url", "")
+    if url == "":
+        raise Exception("url missing in source")
+
+    tag = getValue(build_source, "tag", "")
+    branch = getValue(build_source, "branch", "")
+
+    if branch == "" and tag == "":
+        raise Exception("Neither tag nor branch specified")
+
+    branch_or_tag = ""
+    if tag != "":
+        branch_or_tag = tag
+    else:
+        branch_or_tag = branch
+
+
+    ### git clone, extract info, create archive, upload
+    extracted_version, git_commit_short = preprocess_repository(url, branch_or_tag)
+
+
+    existing_app_id = None
+
+    if not version:
+        version = extracted_version
+
+        try:
+            existing_app, found_app = ecr_db.listApps(user=requestUser, namespace=namespace, repository=repository, version=version)
+        except Exception as e:
+            raise Exception(f"ecr_db.listApps failed: {str(e)}")
+
+
+        if found_app:
+            if (existing_app.get("frozen", False) and (not isAdmin)):
+                raise Exception(f'App {namespace}/{repository}:{version} already exists and is frozen.')
+
+            if not force_overwrite:
+                raise Exception(f'App {namespace}/{repository}:{version} already exists but is not frozen. Use query force=true to overwrite.')
+
+            existing_app_id = existing_app.get("id")
+
+
+
+
 
 
     ##### create dbObject
@@ -482,10 +621,6 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
 
     #for build_source in sourcesArray:
 
-
-    #source_name = build_source.get("name", "default")
-
-
     architectures_array = build_source.get("architectures", [])
 
     if len(architectures_array) == 0:
@@ -503,15 +638,7 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
 
     architectures = json.dumps(architectures_array)
 
-    url = build_source.get("url", "")
-    if url == "":
-        raise Exception("url missing in source")
 
-    tag = getValue(build_source, "tag", "")
-    branch = getValue(build_source, "branch", "")
-
-    if branch == "" and tag == "":
-        raise Exception("Neither tag nor branch specified")
 
 
     directory = build_source.get("directory", ".")

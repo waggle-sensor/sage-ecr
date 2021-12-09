@@ -150,8 +150,16 @@ spec:
         #     configMapKeyRef:
         #       name: ecr-api-config
         #       key: MYSQL_DATABASE
+        volumeMounts:
+        - mountPath: /temp/ecr
+          name: ecr-scratch
         ports:
           - name: api
             containerPort: 5000
 
       restartPolicy: Always
+      volumes:
+        - name: ecr-scratch
+          # this ugly, but emptyDir is worse
+          hostPath:
+            path: /media/local/ecr-scratch

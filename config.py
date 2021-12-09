@@ -9,8 +9,8 @@ mysql_password =  os.getenv('MYSQL_PASSWORD')
 #app.config['MYSQL_DATABASE_USER'] = os.getenv('MYSQL_USER')
 #app.config['MYSQL_DATABASE_PASSWORD'] = os.getenv('MYSQL_PASSWORD')
 
-
-
+# directory to clone and zip git repositories (not used by jenkins)
+ecr_temp_dir = "/temp/ecr/"
 
 
 # app definition , these are the app fields (as seen by user) that are stored in the tables Apps
