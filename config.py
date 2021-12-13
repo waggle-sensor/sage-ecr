@@ -66,6 +66,7 @@ mysql_Sources_fields = {
                 "url":"str",
                 "branch":"str",
                 "tag":"str",
+                "git_commit":"str",
                 "directory":"str",
                 "dockerfile":"str",
                 "build_args":"json"
@@ -77,7 +78,9 @@ architecture_valid = ["linux/amd64", "linux/arm64", "linux/arm/v6", "linux/arm/v
 
 
 # app input
-input_fields_valid = ["id", "type"]
+input_fields_expected = ["id", "type"]
+input_fields_valid = ["id", "type", "description", "default"]
+
 # "Directory" not suypported yet # ref: https://www.commonwl.org/v1.1/CommandLineTool.html#CWLType
 input_valid_types = ["boolean", "int", "long", "float", "double", "string", "File"]
 

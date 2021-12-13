@@ -236,7 +236,7 @@ def run_command_communicate(command, input_str=None, cwd=None):
 
 
 
-def preprocess_repository(url, branchOrTag, namespace, repository):
+def preprocess_repository(url, branchOrTag, custom_version, namespace, repository):
 
 
     version = ""
@@ -312,8 +312,14 @@ def preprocess_repository(url, branchOrTag, namespace, repository):
             raise Exception(f"git hash has wrong format ({git_hash_long})")
 
 
+        final_version = ""
+        if custom_version:
+            final_version = custom_version
+        else:
+            final_version = version
+
         # tar -czvf file.tar.gz directory
-        target_gzip = f"{temp_dir}/{namespace}_{repository}_{version}.tgz"
+        target_gzip = f"{temp_dir}/{namespace}_{repository}_{final_version}.tgz"
         command = ["tar", "-czvf", target_gzip, "."]
         stdout, stderr , exit_code = run_command_communicate(command, cwd=tmpdirname)
         stdout_str = ""
@@ -337,7 +343,7 @@ def preprocess_repository(url, branchOrTag, namespace, repository):
                 aws_secret_access_key=config.S3_SECRET_KEY
             )
 
-            object_name = f"{config.S3_FOLDER}/{namespace}/{repository}/{namespace}_{repository}_{version}.tgz"
+            object_name = f"{config.S3_FOLDER}/{namespace}/{repository}/{namespace}_{repository}_{final_version}.tgz"
 
             try:
                 s3_client.upload_file(target_gzip, config.S3_BUCKET, object_name)
@@ -490,7 +496,7 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
             if not  field in  config.input_fields_valid:
                 raise Exception(f'Input field {field} not supported')
 
-        for expected in config.input_fields_valid:
+        for expected in config.input_fields_expected:
             if not  expected in  app_input:
                 raise Exception(f'Expected field {expected} missing')
             input_type = app_input["type"]
@@ -535,7 +541,7 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
 
 
     ### git clone, extract info, create archive, upload
-    extracted_version, git_commit_short = preprocess_repository(url, branch_or_tag, namespace, repository)
+    extracted_version, git_commit = preprocess_repository(url, branch_or_tag, version, namespace, repository)
 
 
     existing_app_id = None
@@ -557,8 +563,6 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
                 raise Exception(f'App {namespace}/{repository}:{version} already exists but is not frozen. Use query force=true to overwrite.')
 
             existing_app_id = existing_app.get("id")
-
-
 
 
 
@@ -701,7 +705,7 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
 
     build_args_str = json.dumps(build_args_dict)
 
-    sources_values = [id_str, architectures , url, branch, tag, directory, dockerfile, build_args_str]
+    sources_values = [id_str, architectures , url, branch, tag, git_commit, directory, dockerfile, build_args_str]
 
     try:
         ecr_db.insertApp(col_names_str, values, variables_str, sources_values, resourcesArray)
