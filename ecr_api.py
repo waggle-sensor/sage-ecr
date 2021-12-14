@@ -728,7 +728,16 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
     if not ok:
         raise Exception(f'app not found after inserting, something went wrong')
 
+
+    # save meta files
+    try:
+        import_meta_files(returnObj, namespace=namespace, repository=repository, version=version)
+    except Exception as e:
+        raise Exception(f'import_meta_files failed: {str(e)}')
+
     app_submission_counter.inc(1)
+
+
 
     #args = parser.parse_args()
     return returnObj
@@ -897,13 +906,7 @@ class Apps(MethodView):
         except Exception as e:
             raise ErrorResponse(f'{str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
 
-        # save meta files
-        try:
-            import_meta_files(app_obj, namespace=namespace, repository=repository, version=version)
-        except ErrorResponse as e:
-            raise e
-        except Exception as e:
-            raise ErrorResponse(f'{str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+
 
         return jsonify(app_obj)
 

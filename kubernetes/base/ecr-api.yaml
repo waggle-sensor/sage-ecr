@@ -19,6 +19,7 @@ data:
     MYSQL_USER: "ecr-user"
     MYSQL_DATABASE: "SageECR"
 
+    GUNICORN_CMD_ARGS: "--workers=4"
 ---
 
 apiVersion: v1
@@ -76,7 +77,7 @@ spec:
               name: ecr-api-config
         resources:
           limits:
-            cpu: "250m"
+            cpu: "8"
             memory: 12Gi
 
         env:
