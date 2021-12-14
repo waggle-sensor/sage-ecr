@@ -254,12 +254,6 @@ def preprocess_repository(url, branchOrTag, custom_version, namespace, repositor
 
     wait_count = 0
     with tempfile.TemporaryDirectory(dir=temp_dir) as tmpdirname:
-        while not os.path.exists(tmpdirname):
-            wait_count += 1
-            if wait_count > 10:
-                raise Exception(f"Temp directory was not created")
-
-            time.sleep(0.5)
 
         app.logger.debug(f"tmpdirname: {tmpdirname}")
         command = ["git", "clone", "-b", branchOrTag,  url, tmpdirname]
