@@ -278,15 +278,14 @@ def preprocess_repository(url, branchOrTag, custom_version, namespace, repositor
 
         version  = stdout_str.split('\n')[0]
         if len(version) == 8 or len(version) == 7:
-            #git_commit_short = version
             pass
         elif len(version) > 8:
-            # "0.0.0-0-g60c72a2"
+            # example format "0.0.0-0-g60c72a2"
             version_ar  = version.split('-')
             if len(version_ar) != 3:
                 raise Exception(f"Could not parse version string {version}")
             version = version_ar[0] + "-" + version_ar[1]
-            #git_commit_short = version_ar[2]
+
         else:
             raise Exception(f"Could not parse version string {version}")
 
