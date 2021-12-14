@@ -10,7 +10,15 @@ mysql_password =  os.getenv('MYSQL_PASSWORD')
 #app.config['MYSQL_DATABASE_PASSWORD'] = os.getenv('MYSQL_PASSWORD')
 
 
+S3_ENDPOINT = os.getenv('S3_ENDPOINT')
+S3_ACCESS_KEY = os.getenv('S3_ACCESS_KEY')
+S3_SECRET_KEY = os.getenv('S3_SECRET_KEY')
+S3_BUCKET=os.getenv('S3_BUCKET')
+S3_FOLDER=os.getenv('S3_FOLDER')
 
+
+# directory to clone and zip git repositories (not used by jenkins)
+ecr_temp_dir = "/temp/ecr/"
 
 
 # app definition , these are the app fields (as seen by user) that are stored in the tables Apps
@@ -58,6 +66,7 @@ mysql_Sources_fields = {
                 "url":"str",
                 "branch":"str",
                 "tag":"str",
+                "git_commit":"str",
                 "directory":"str",
                 "dockerfile":"str",
                 "build_args":"json"
@@ -69,7 +78,9 @@ architecture_valid = ["linux/amd64", "linux/arm64", "linux/arm/v6", "linux/arm/v
 
 
 # app input
-input_fields_valid = ["id", "type"]
+input_fields_expected = ["id", "type"]
+input_fields_valid = ["id", "type", "description", "default"]
+
 # "Directory" not suypported yet # ref: https://www.commonwl.org/v1.1/CommandLineTool.html#CWLType
 input_valid_types = ["boolean", "int", "long", "float", "double", "string", "File"]
 

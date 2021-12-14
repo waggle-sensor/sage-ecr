@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS SageECR.Sources (
     url                 VARCHAR(256) NOT NULL,
     branch              VARCHAR(64),
     tag                 VARCHAR(64),
+    git_commit          VARCHAR(40), /* Typicall not set by user, but could be in the future */
     directory           VARCHAR(256),
     dockerfile          VARCHAR(256),
     build_args          VARCHAR(256),

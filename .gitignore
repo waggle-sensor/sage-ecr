@@ -110,7 +110,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-# .env # needed as default for docker-compose
+.env
 .venv
 env/
 venv/

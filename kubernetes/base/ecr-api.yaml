@@ -19,6 +19,7 @@ data:
     MYSQL_USER: "ecr-user"
     MYSQL_DATABASE: "SageECR"
 
+    GUNICORN_CMD_ARGS: "--workers=4"
 ---
 
 apiVersion: v1
@@ -76,7 +77,7 @@ spec:
               name: ecr-api-config
         resources:
           limits:
-            cpu: "250m"
+            cpu: "8"
             memory: 12Gi
 
         env:
@@ -150,8 +151,16 @@ spec:
         #     configMapKeyRef:
         #       name: ecr-api-config
         #       key: MYSQL_DATABASE
+        volumeMounts:
+        - mountPath: /temp/ecr
+          name: ecr-scratch
         ports:
           - name: api
             containerPort: 5000
 
       restartPolicy: Always
+      volumes:
+        - name: ecr-scratch
+          # this ugly, but emptyDir is worse
+          hostPath:
+            path: /media/local/ecr-scratch
