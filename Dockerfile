@@ -19,5 +19,6 @@ COPY  requirements.txt *.py /usr/src/app/
 RUN pip install -r requirements.txt
 
 #CMD ./ecr_api.py
-CMD gunicorn ecr_api:app --capture-output --enable-stdio-inheritance --log-level=debug --access-logfile - --error-logfile - --bind=0.0.0.0:5000
+# git clone has a timeout of 600 seconds
+CMD gunicorn ecr_api:app --graceful-timeout 630 --timeout 700 --capture-output --enable-stdio-inheritance --log-level=debug --access-logfile - --error-logfile - --bind=0.0.0.0:5000
 

@@ -217,7 +217,7 @@ def getValue(dict, key,  default):
 
     return dict[key]
 
-def run_command_communicate(command, input_str=None, cwd=None):
+def run_command_communicate(command, input_str=None, cwd=None, timeout=None):
 
 
     try:
@@ -230,7 +230,12 @@ def run_command_communicate(command, input_str=None, cwd=None):
     if input_str:
         input=input_str.encode()
 
-    stdout, stderr =  p.communicate(input=input)
+    try:
+        stdout, stderr =  p.communicate(input=input, timeout=timeout)
+    except subprocess.TimeoutExpired as e:
+        p.kill()
+        raise e
+
     exit_code = p.wait()
     return stdout, stderr , exit_code
 
@@ -258,7 +263,7 @@ def preprocess_repository(url, branchOrTag, custom_version, namespace, repositor
 
         app.logger.debug(f"tmpdirname: {tmpdirname}")
         command = ["git", "clone", "-b", branchOrTag,  url, tmpdirname]
-        stdout, stderr , exit_code = run_command_communicate(command, cwd=temp_dir)
+        stdout, stderr , exit_code = run_command_communicate(command, cwd=temp_dir, timeout=600)
         if exit_code != 0 :
             raise Exception(f"Cloning git repo failed (stdout={stdout}, stderr={stderr})")
 
@@ -753,6 +758,8 @@ class Submit(MethodView):
 
         try:
             return_obj = submit_app(requestUser, isAdmin, force_overwrite, postData)
+        except subprocess.TimeoutExpired as e:
+            raise ErrorResponse(f'{str(e)}', status_code=HTTPStatus.REQUEST_TIMEOUT)
         except ErrorResponse as e:
             raise e
         except Exception as e:

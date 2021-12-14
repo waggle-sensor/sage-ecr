@@ -102,6 +102,8 @@ def upload_and_build(client, test_failure=False):
     print(f'upload_and_build rv.data: {rv.data}' , file=sys.stderr)
 
     result = rv.get_json()
+    if rv.status_code != 200:
+         print(f'status_code: {rv.status_code}')
 
     assert "error" not in result
 
