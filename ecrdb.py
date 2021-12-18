@@ -486,8 +486,11 @@ class EcrDB():
         include_public = True
 
         for key in filter:
-            if not key in ["public", "owner", "shared"]:
+            if not key in ["public", "owner", "shared", "nopublic"]:
                 raise Exception(f"Unknown filter option {key}")
+
+        if filter.get("nopublic", False):
+            include_public = False
 
 
         owner_condition = ''

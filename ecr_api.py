@@ -1265,6 +1265,7 @@ class RepositoriesList(MethodView):
         filter["public"] = request.args.get('public', "") in ["true", "1"]
         filter["shared"] = request.args.get('shared', "") in ["true", "1"]
         filter["owner"] = request.args.get('owner', "") in ["true", "1"]
+        filter["nopublic"] = request.args.get('nopublic', "") in ["true", "1"]
 
         view = request.args.get('view', "")
 
