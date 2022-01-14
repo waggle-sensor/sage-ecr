@@ -1496,6 +1496,16 @@ class Healthy(MethodView):
 
         return jsonify({"status" : "ok"})
 
+# /archive/<string:namespace>/<string:repository>/<string:version>.tgz
+class CodeArchive(MethodView):
+
+
+    @has_resource_permission( "READ" )
+    def get(self, namespace, repository, filename):
+
+        #TODO implement method to download code archive file
+        return jsonify({"status" : "hello"})
+
 
 # /authz
 class AuthZ(MethodView):
@@ -1668,6 +1678,9 @@ app.add_url_rule('/permissions/<string:namespace>/<string:repository>', view_fun
 app.add_url_rule('/permissions/<string:namespace>', view_func=Permissions.as_view('permissionsAPI_3'), methods=['GET', 'PUT', 'DELETE'], strict_slashes=False)
 
 app.add_url_rule('/builds/<string:namespace>/<string:repository>/<string:version>', view_func=Builds.as_view('buildsAPI'))
+
+app.add_url_rule('/archive/<string:namespace>/<string:repository>/<string:version>.tgz', view_func=CodeArchive.as_view('codeArchiveAPI'))
+
 
 # endpoint used by docker_auth to verify access rights
 app.add_url_rule('/authz', view_func=AuthZ.as_view('authz'))

@@ -335,9 +335,12 @@ class EcrDB():
         # this makes sure only apps for which user has permission are returned
         permissions_stmt=f'( ({user_condition}) OR {public_stmt} ) AND ( permission in ("READ", "WRITE", "FULL_CONTROL") )'
 
+        # AND (NOT (Permissions.resourceType="namespace" AND granteeType="GROUP" AND grantee="AllUsers"))
+        # this above is to make sure that a public namespace does not imply public repo
+
 
         # INNER JOIN Permissions : makes sure App disappear if the user does not have any permission
-        stmt = f'SELECT DISTINCT {dbAppsFields_str},{dbSourcesFields_str} FROM Apps LEFT JOIN Sources s ON s.id = Apps.id INNER JOIN Permissions ON {sub_stmt} {owner_condition} {appID_condition} {namespace_condition} {repo_condition} {version_condition} AND {permissions_stmt} {token_stmt} ORDER BY `namespace`, `name`, `version` ASC {limit_stmt}'
+        stmt = f'SELECT DISTINCT {dbAppsFields_str},{dbSourcesFields_str} FROM Apps LEFT JOIN Sources s ON s.id = Apps.id INNER JOIN Permissions ON {sub_stmt} {owner_condition} {appID_condition} {namespace_condition} {repo_condition} {version_condition} AND {permissions_stmt} {token_stmt} AND (NOT (Permissions.resourceType="namespace" AND granteeType="GROUP" AND grantee="AllUsers")) ORDER BY `namespace`, `name`, `version` ASC {limit_stmt}'
 
 
         debug_stmt = stmt
