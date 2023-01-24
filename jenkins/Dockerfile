@@ -1,15 +1,10 @@
 FROM moby/buildkit:latest as buildkit
+# buildkit is used as a convinient way to copy builtctl into the main image
 
-# docker build -t sagecontinuum/ecr-jenkins .
+FROM jenkins/jenkins:2.375.2-lts-jdk11
 
-FROM jenkins/jenkins:2.289.1-lts-jdk11
-#FROM jenkins/jenkins:2.299-alpine
-#FROM jenkins/jenkins:2.263.4-lts-alpine
-#FROM jenkins/jenkins:2.289.1-lts-alpine
-
-#FROM jenkins/jenkins:alpine
-
-RUN install-plugins.sh \
+RUN jenkins-plugin-cli \
+    --plugins \
     build-timeout \
     timestamper \
     workflow-aggregator \
@@ -24,13 +19,6 @@ RUN install-plugins.sh \
     ws-cleanup \
     credentials-binding                 # required for ecr-registry credentials
 
-COPY ./get_docker_binary.sh /
-COPY ./buildx.config /
-
-# Jenkins: Configuration as Code
-#COPY casc_jenkins.yaml /     # this config should better be mounted into container as is contains passwords
-ENV CASC_JENKINS_CONFIG /config/casc_jenkins.yaml
-
 # Jenkins: groovy, create token
 #COPY init.groovy /var/jenkins_home/ # Volumes would overwrite this
 COPY init.groovy /
@@ -40,21 +28,10 @@ USER root
 
 RUN sed -i '2icp /init.groovy /var/jenkins_home/' /usr/local/bin/jenkins.sh
 
-
 RUN apt-get update && apt-get install -y jq curl file
-#RUN apk update && apk add jq curl file
 
-#ENV JAVA_OPTS="-Djenkins.install.runSetupWizard=false"
-
-ENV DOCKER_BUILDKIT 1
-
-RUN mkdir -p ~/.docker/cli-plugins/
-RUN curl --silent -L -o ~/.docker/cli-plugins/docker-buildx https://github.com/docker/buildx/releases/download/v0.4.1/buildx-v0.4.1.linux-amd64
-RUN chmod a+x ~/.docker/cli-plugins/docker-buildx
-
-RUN echo '{ "experimental":"enabled" } ' > /root/config.json
-
-COPY --from=buildkit /usr/bin/buildctl /usr/bin/buildctl
+# copy all buildkit tools into jenkins image
+COPY --from=buildkit /usr/bin/buildkit* /usr/bin/buildctl* /usr/bin/
 
 # buildkit cmds:
 # buildctl                buildkit-qemu-arm       buildkit-qemu-mips64    buildkit-qemu-ppc64le   buildkit-qemu-s390x     buildkit-runc

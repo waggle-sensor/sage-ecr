@@ -1,5 +1,6 @@
 version: '3.7'
 services:
+
   sage-ecr:
     image: waggle/sage-ecr:latest
     build:
@@ -47,7 +48,7 @@ services:
     cap_add:
       - SYS_NICE  # CAP_SYS_NICE
 
-  registry.local:
+  registry:
     restart: always
     image: registry:2
     networks:
@@ -61,15 +62,32 @@ services:
       - "127.0.0.1:8082:8080"
       - "127.0.0.1:50000:50000"
     environment:
-      - USE_HOST_DOCKER=${USE_HOST_DOCKER}
       - DOCKER_REGISTRY_INSECURE=1
       - JAVA_OPTS=-Dhudson.footerURL=http://localhost:8082
+      - CASC_JENKINS_CONFIG=/config/casc_jenkins.yaml
     volumes:
       - ./jenkins/casc_jenkins.yaml:/config/casc_jenkins.yaml:ro
     networks:
       - sage-ecr
     # converting from
     # --env -p 8082:8080  -p 50000:50000 -v `pwd`/jenkins/casc_jenkins.yaml:/config/casc_jenkins.yaml:ro -v `pwd`/temp:/docker:rw -v /var/run/docker.sock:/var/run/docker.sock ${DOCKER_MOUNT} waggle/ecr-jenkins
+
+  buildkitd:
+    image: moby/buildkit:latest
+    command:
+      - --addr
+      - tcp://0.0.0.0:1234
+    # double check the actual capabilities needed
+    privileged: true
+    networks:
+      - sage-ecr
+
+# test commands... should perform this as as unit test?
+# cd /root && git clone https://github.com/waggle-sensor/plugin-test-pipeline
+#
+# buildctl --addr tcp://buildkitd:1234 build --frontend=dockerfile.v0 --opt platform=linux/amd64,linux/arm64 --local context=. --local dockerfile=. --output type=image,name=test-pipeline
+# buildctl --addr tcp://buildkitd:1234 build --frontend=dockerfile.v0 --opt platform=linux/amd64,linux/arm64 --local context=. --local dockerfile=. --output type=image,name=registry:5000/x/test-pipeline,push=true
+# buildctl --addr tcp://buildkitd:1234 build --frontend=dockerfile.v0 --opt platform=linux/amd64,linux/arm64 --local context=. --local dockerfile=. --output type=image,name=registry.sagecontinuum.org/x/test-pipeline,push=true
 
 volumes:
   sage-ecr-db:
