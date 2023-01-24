@@ -13,7 +13,6 @@ services:
     volumes:
       - ./:/usr/src/app  # for development only
     restart: always
-    env_file: mysql.env
     networks:
       - sage-ecr
     environment:
@@ -23,12 +22,19 @@ services:
       tokenInfoUser: ${SageTokenInfoUser}
       tokenInfoPassword: ${SageTokenInfoPassword}
 
+      # database config
+      MYSQL_HOST: db
+      MYSQL_DATABASE: SageECR
+      MYSQL_PASSWORD: test
+      MYSQL_USER: sage
+
+      # jenkins config
       JENKINS_SERVER: ${JENKINS_SERVER}
       JENKINS_USER: ecrdb
       JENKINS_TOKEN: ${JENKINS_TOKEN}
 
       DOCKER_REGISTRY_PASSWORD: ${DOCKER_REGISTRY_PASSWORD}
-      DOCKER_REGISTRY_URL: "registry.local:5002"
+      DOCKER_REGISTRY_URL: "registry:5002"
 
       ADD_USER: ${ADD_USER}
       S3_ENDPOINT: ${S3_ENDPOINT}
@@ -39,7 +45,12 @@ services:
 
   db:
     image: mysql
-    env_file: mysql.env
+    environment:
+      MYSQL_HOST: db
+      MYSQL_ROOT_PASSWORD: testtest
+      MYSQL_DATABASE: SageECR
+      MYSQL_PASSWORD: test
+      MYSQL_USER: sage
     volumes:
       - ./schema.sql:/docker-entrypoint-initdb.d/init.sql
       - sage-ecr-db:/var/lib/mysql
