@@ -1,11 +1,5 @@
 version: '3.7'
-
-# to start this enviornment with a jenkins instance, use run.sh instead of this docker-compose file directly
-
-
-
 services:
-
   sage-ecr:
     image: waggle/sage-ecr:latest
     build:
@@ -14,23 +8,27 @@ services:
     depends_on:
       - db
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"
     volumes:
-      - ${PWD}:/usr/src/app  # for development only
+      - ./:/usr/src/app  # for development only
     restart: always
     env_file: mysql.env
     networks:
       - sage-ecr
     environment:
       AUTH_METHOD: ${AUTH_METHOD}
+
       tokenInfoEndpoint: ${SageTokenInfoEndpoint}
       tokenInfoUser: ${SageTokenInfoUser}
       tokenInfoPassword: ${SageTokenInfoPassword}
+
       JENKINS_SERVER: ${JENKINS_SERVER}
       JENKINS_USER: ecrdb
       JENKINS_TOKEN: ${JENKINS_TOKEN}
+
       DOCKER_REGISTRY_PASSWORD: ${DOCKER_REGISTRY_PASSWORD}
       DOCKER_REGISTRY_URL: "registry.local:5002"
+
       ADD_USER: ${ADD_USER}
       S3_ENDPOINT: ${S3_ENDPOINT}
       S3_ACCESS_KEY: ${S3_ACCESS_KEY}
@@ -39,10 +37,10 @@ services:
       S3_FOLDER: ${S3_FOLDER}
 
   db:
-    image: mysql:8.0.20
+    image: mysql
     env_file: mysql.env
     volumes:
-      - ${PWD}/schema.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./schema.sql:/docker-entrypoint-initdb.d/init.sql
       - sage-ecr-db:/var/lib/mysql
     networks:
       - sage-ecr
@@ -51,17 +49,31 @@ services:
 
   registry.local:
     restart: always
-    image: registry:2.7
-    ports:
-      - 5002:5000
+    image: registry:2
     networks:
       - sage-ecr
+
+  jenkins:
+    image: waggle/ecr-jenkins
+    build: jenkins
+    restart: always
+    ports:
+      - "127.0.0.1:8082:8080"
+      - "127.0.0.1:50000:50000"
+    environment:
+      - USE_HOST_DOCKER=${USE_HOST_DOCKER}
+      - DOCKER_REGISTRY_INSECURE=1
+      - JAVA_OPTS=-Dhudson.footerURL=http://localhost:8082
+    volumes:
+      - ./jenkins/casc_jenkins.yaml:/config/casc_jenkins.yaml:ro
+    networks:
+      - sage-ecr
+    # converting from
+    # --env -p 8082:8080  -p 50000:50000 -v `pwd`/jenkins/casc_jenkins.yaml:/config/casc_jenkins.yaml:ro -v `pwd`/temp:/docker:rw -v /var/run/docker.sock:/var/run/docker.sock ${DOCKER_MOUNT} waggle/ecr-jenkins
 
 volumes:
   sage-ecr-db:
 
-
 networks:
   sage-ecr:
    name: sage-ecr
-

@@ -1,4 +1,4 @@
-
+FROM moby/buildkit:latest as buildkit
 
 # docker build -t sagecontinuum/ecr-jenkins .
 
@@ -24,8 +24,6 @@ RUN install-plugins.sh \
     ws-cleanup \
     credentials-binding                 # required for ecr-registry credentials
 
-
-
 COPY ./get_docker_binary.sh /
 COPY ./buildx.config /
 
@@ -48,7 +46,6 @@ RUN apt-get update && apt-get install -y jq curl file
 
 #ENV JAVA_OPTS="-Djenkins.install.runSetupWizard=false"
 
-
 ENV DOCKER_BUILDKIT 1
 
 RUN mkdir -p ~/.docker/cli-plugins/
@@ -56,3 +53,10 @@ RUN curl --silent -L -o ~/.docker/cli-plugins/docker-buildx https://github.com/d
 RUN chmod a+x ~/.docker/cli-plugins/docker-buildx
 
 RUN echo '{ "experimental":"enabled" } ' > /root/config.json
+
+COPY --from=buildkit /usr/bin/buildctl /usr/bin/buildctl
+
+# buildkit cmds:
+# buildctl                buildkit-qemu-arm       buildkit-qemu-mips64    buildkit-qemu-ppc64le   buildkit-qemu-s390x     buildkit-runc
+# buildctl-daemonless.sh  buildkit-qemu-i386      buildkit-qemu-mips64el  buildkit-qemu-riscv64   buildkit-qemu-x86_64    buildkitd
+# / # /usr/bin/buildctl -h
