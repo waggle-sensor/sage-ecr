@@ -29,12 +29,12 @@ services:
       MYSQL_USER: sage
 
       # jenkins config
-      JENKINS_SERVER: ${JENKINS_SERVER}
+      JENKINS_SERVER: http://jenkins:8080
       JENKINS_USER: ecrdb
-      JENKINS_TOKEN: ${JENKINS_TOKEN}
+      JENKINS_TOKEN: 114df297873d76b7865486b00e28afa881
 
       DOCKER_REGISTRY_PASSWORD: ${DOCKER_REGISTRY_PASSWORD}
-      DOCKER_REGISTRY_URL: "registry:5002"
+      DOCKER_REGISTRY_URL: "registry:5000"
 
       ADD_USER: ${ADD_USER}
       S3_ENDPOINT: ${S3_ENDPOINT}
@@ -74,8 +74,9 @@ services:
       - "127.0.0.1:50000:50000"
     environment:
       - DOCKER_REGISTRY_INSECURE=1
-      - JAVA_OPTS=-Dhudson.footerURL=http://localhost:8082
+      - JAVA_OPTS=-Dhudson.footerURL=http://localhost:8082 -Djenkins.install.runSetupWizard=false
       - CASC_JENKINS_CONFIG=/config/casc_jenkins.yaml
+      - JENKINS_TOKEN=114df297873d76b7865486b00e28afa881
     volumes:
       - ./jenkins/casc_jenkins.yaml:/config/casc_jenkins.yaml:ro
     networks:
