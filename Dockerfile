@@ -1,24 +1,13 @@
-
-
-# docker build -t waggle/sage-ecr .
-# docker run -ti --rm -p 5000:5000 -v `pwd`:/usr/src/app waggle/sage-ecr /bin/ash
-
 FROM python:3.8-alpine
 
 WORKDIR /usr/src/app
 
 # required for python library mysqlclient
-RUN apk add  mariadb-connector-c-dev gcc musl-dev git
+RUN apk add linux-headers mariadb-connector-c-dev gcc musl-dev git
 
-# required for wsgi
-RUN apk add linux-headers
+COPY requirements.txt /usr/src/app/
+RUN /usr/local/bin/python -m pip install --upgrade pip && pip install -r requirements.txt
 
-RUN /usr/local/bin/python -m pip install --upgrade pip
+COPY *.py /usr/src/app/
 
-COPY  requirements.txt *.py /usr/src/app/
-RUN pip install -r requirements.txt
-
-#CMD ./ecr_api.py
-# git clone has a timeout of 600 seconds
-CMD gunicorn ecr_api:app --graceful-timeout 630 --timeout 700 --capture-output --enable-stdio-inheritance --log-level=debug --access-logfile - --error-logfile - --bind=0.0.0.0:5000
-
+CMD gunicorn ecr_api:app --log-level=debug --bind=0.0.0.0:5000 --reload
