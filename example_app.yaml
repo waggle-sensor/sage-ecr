@@ -30,4 +30,3 @@ metadata: # custom key-value pairs
 testing:
   mask_entrypoint: true  # recommended, masks ENTRYPOINT defined in Dockerfile
   command: ["echo", "test is successful"]
-

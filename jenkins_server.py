@@ -13,72 +13,23 @@ import requests
 import sys
 from string import Template
 
-class JenkinsServer():
-    def __init__ ( self , host, username, password, retries=5) :
 
-
-        if not host:
-            raise Exception("Jenkins host not defined")
-
-        #self.host = host
-        #self.username = username
-        #self.password = password
-        count = 0
-        while True:
-            try:
-                self.server = jenkins.Jenkins(host, username=username, password=password)
-
-                user = self.server.get_whoami()
-                version = self.server.get_version()
-
-            except Exception as e: # pragma: no cover
-                if count > retries:
-                    raise
-                print(f'Could not connnect to Jenkins ({host}), error={e}, retry in 2 seconds', file=sys.stderr)
-                time.sleep(2)
-                count += 1
-                continue
-            break
-
-
-        return
+class JenkinsServer:
+    def __init__ (self , host, username, password, retries=5) :
+        self.server = jenkins.Jenkins(host, username=username, password=password)
 
     def hasJenkinsJob(self, id):
-
-
-        try:
-            job_exists = self.server.job_exists(id)
-        except Exception as e:
-            raise
-            #raise ErrorResponse(f'(server.get_job_config) got exception: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-        return job_exists
-
+        return self.server.job_exists(id)
 
     def build_job(self, job_id):
-
-
         # https://python-jenkins.readthedocs.io/en/latest/api.html#jenkins.Jenkins.build_job
-        queue_item_number = self.server.build_job(job_id)
-        return queue_item_number
-
+        return self.server.build_job(job_id)
 
     def get_job_info(self, job_id):
-
-
         return self.server.get_job_info(job_id, depth=0, fetch_all_builds=False)
 
-
-
-
-
     def createJob(self, id, app_spec, overwrite=False, skip_image_push=False):
-
-
-
         # format https://github.com/user/repo.git#v1.0
-
-
         version = app_spec["version"]
 
         source=app_spec.get("source", None)
@@ -158,17 +109,8 @@ class JenkinsServer():
 
 
 
-
-        # The registry user credentials are defined in the casc_jenkins.yaml file.
-        docker_login='''withCredentials([usernamePassword(credentialsId: 'registry-user', passwordVariable: 'REGISTRY_USER_PWD', usernameVariable: 'REGISTRY_USERNAME')]) {
-                sh 'echo $REGISTRY_USER_PWD | docker login -u $REGISTRY_USERNAME --password-stdin ''' +docker_registry_url +''''
-            }
-        '''
-
-
         do_push="--push"
         if skip_image_push:
-            docker_login = ""
             do_push =""
 
         name = app_spec["name"]
@@ -194,7 +136,6 @@ class JenkinsServer():
                                                 build_args_command_line=build_args_command_line,
                                                 docker_run_args=docker_run_args,
                                                 docker_registry_url=docker_registry_url,
-                                                docker_login=docker_login,
                                                 command = run_test,
                                                 platforms_list = platforms,
                                                 platform = platforms_str,

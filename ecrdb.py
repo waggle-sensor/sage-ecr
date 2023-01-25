@@ -18,9 +18,9 @@ import bleach
 #logger = logging.getLogger('__name__')
 logger=None
 
-class EcrDB():
-    def __init__ ( self , retries=60) :
+class EcrDB:
 
+    def __init__ (self, retries=60):
         if not config.mysql_host:
             raise Exception("mysql_host is not defined")
 
@@ -40,6 +40,28 @@ class EcrDB():
 
         self.cur=self.db.cursor()
         return
+    
+    def execute(self, query, values):
+        print(f'ecrdb.execute: {query}', file=sys.stderr)
+        self.cur.execute(query, values)
+    
+    def deleteAllData(self):
+        tables = [
+            "Apps",
+            "Sources",
+            "Namespaces",
+            "Repositories",
+            "MetaFiles",
+            "Permissions",
+            "Builds",
+            "Certifications",
+            "Profiles",
+            "Resources",
+            "TokenCache",
+        ]
+
+        for table in tables:
+            self.cur.execute(f"TRUNCATE TABLE {table}")
 
     # returns true if user has the permissions
     # TODO if resourceType  = repository, also check namespace
@@ -82,10 +104,7 @@ class EcrDB():
             debug_stmt = debug_stmt.replace("%s", p, 1)
 
 
-        print(f'(hasPermission) debug stmt: {debug_stmt}', file=sys.stderr)
-
-
-        self.cur.execute(stmt, (resourceType, resourceName, granteeType, grantee,  *permissions ))
+        self.execute(stmt, (resourceType, resourceName, granteeType, grantee,  *permissions))
         row = self.cur.fetchone()
         if row == None:
             return False
@@ -96,12 +115,10 @@ class EcrDB():
         return False
 
     def insertApp(self, col_names_str, values, variables_str, sources_values, resourcesArray):
-
-
         stmt = f'REPLACE INTO Sources ( id, architectures , url, branch, tag, git_commit, directory, dockerfile, build_args ) VALUES (%s , %s, %s, %s, %s, %s, %s, %s, %s)'
-        print(f"replace statement: {stmt}", file=sys.stderr)
+        # print(f"replace statement: {stmt}", file=sys.stderr)
         #print(f"build_args_str: {build_args_str}", file=sys.stderr)
-        self.cur.execute(stmt, sources_values)
+        self.execute(stmt, sources_values)
 
         id_str = sources_values[0]
         for res in resourcesArray:
@@ -110,11 +127,11 @@ class EcrDB():
             self.cur.execute(stmt, (id_str, res_str,))
 
 
-        print(f'values: {values}', file=sys.stderr)
+        # print(f'values: {values}', file=sys.stderr)
 
 
         stmt = f'REPLACE INTO Apps ( {col_names_str}) VALUES ({variables_str})'
-        print(f'stmt: {stmt}', file=sys.stderr)
+        # print(f'stmt: {stmt}', file=sys.stderr)
         self.cur.execute(stmt, values)
 
         self.db.commit()
@@ -123,8 +140,6 @@ class EcrDB():
 
 
     def deleteApp(self, user, isAdmin, namespace, repository, version, force=False):
-
-
         app, ok = self.listApps(user=user, isAdmin=isAdmin, namespace=namespace, repository=repository, version=version)
 
         if not ok:
@@ -145,7 +160,7 @@ class EcrDB():
 
         # also cleanup metafiles
         stmt_apps = f'DELETE FROM MetaFiles WHERE `app_id` = %s'
-        print(f'stmt: {stmt_apps} app_id={app_id}', file=sys.stderr)
+        # print(f'stmt: {stmt_apps} app_id={app_id}', file=sys.stderr)
         self.cur.execute(stmt_apps, (app_id, ))
 
         self.db.commit()
@@ -761,9 +776,7 @@ class EcrDB():
     # returns owner, otherwise empty string
     def getNamespace(self, name):
         stmt = 'SELECT id, owner_id FROM Namespaces WHERE id = %s'
-        print(f'stmt: {stmt} id=name', file=sys.stderr)
-
-        self.cur.execute(stmt, (name,))
+        self.execute(stmt, (name,))
 
 
         row = self.cur.fetchone()
@@ -931,4 +944,3 @@ class EcrDB():
             content = bleach.clean(content.decode('utf-8'))
 
         return content
-

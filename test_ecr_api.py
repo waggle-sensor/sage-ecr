@@ -12,6 +12,7 @@ import time
 
 import requests
 import yaml
+from ecrdb import EcrDB
 
 
 
@@ -30,21 +31,18 @@ test_app_def = json.dumps(test_app_def_obj)
 # from https://flask.palletsprojects.com/en/1.1.x/testing/
 @pytest.fixture
 def client():
-    db_fd, app.config['DATABASE'] = tempfile.mkstemp()
-    app.config['TESTING'] = True
+    # WARNING! DO NOT RUN IN PRODUCTION AS DEFAULT CONFIG USES PRODUCTION DATABASE!!!
+    db = EcrDB()
+    db.deleteAllData()
 
     with app.test_client() as client:
         #with app.app_context():
         #    init_db()
         yield client
 
-    os.close(db_fd)
-    os.unlink(app.config['DATABASE'])
-
 
 def test_connect(client):
     """Start with a blank database."""
-
     rv = client.get('/')
     assert b'SAGE Edge Code Repository' in rv.data
 
@@ -52,8 +50,6 @@ def test_connect(client):
 def upload_and_build(client, test_failure=False):
     headers = {"Authorization" : "sage token1"}
     admin_headers = {"Authorization" : "sage admin_token"}
-
-
     #global test_app_def
 
     app_namespace = "sagebuildtest"
@@ -415,11 +411,10 @@ def test_app_upload_and_download(client):
 
 
 
-def test_listApps(client):
+def test_list_apps(client):
     headers = {"Authorization" : "sage token1"}
     admin_headers = {"Authorization" : "sage admin_token"}
     headers_testuser2 = {"Authorization" : "sage token2"}
-
 
     mars_namespace = "planetmars"
 
@@ -896,7 +891,6 @@ def test_authz(client):
     app_namespace = "sage"
     app_repository = "simple"
 
-
     sample_request = {
         "account": "testuser",
         "type": "repository",
@@ -905,30 +899,27 @@ def test_authz(client):
         "actions": ["pull"]
     }
 
-
-    rv = client.post(f'/authz', headers=headers,  data = json.dumps(sample_request) )
-
-
+    rv = client.post(f'/authz', headers=headers,  data=json.dumps(sample_request))
     print(f'rv.data: {rv.data}', file=sys.stderr)
-
     assert rv.status_code == 200
 
 
-def test_health(client):
-
+def test_homepage(client):
     rv = client.get('/')
+    assert rv.status_code == 200
     assert rv.data == b"SAGE Edge Code Repository"
 
+
+def test_health(client):
     rv = client.get('/healthy')
+    assert rv.status_code == 200
     result = rv.get_json()
     assert "error" not in result
     assert "status" in result
-
     assert result["status"] == "ok"
 
 
 def test_error(client):
-
     rv = client.get('/apps/test/test/test')
     result = rv.get_json()
     print(f'Test result: {json.dumps(result)}', file=sys.stderr)
@@ -936,7 +927,3 @@ def test_error(client):
 
     # this fails because app "test" does not exist and there is no permission
     assert "Not authorized" in result["error"]
-
-
-
-

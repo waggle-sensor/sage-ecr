@@ -10,4 +10,4 @@ RUN /usr/local/bin/python -m pip install --upgrade pip && pip install -r require
 
 COPY *.py /usr/src/app/
 
-CMD gunicorn ecr_api:app --log-level=debug --bind=0.0.0.0:5000 --reload
+CMD gunicorn ecr_api:app --log-level=info --bind=0.0.0.0:5000 --reload --graceful-timeout 630 --timeout 700

@@ -1,5 +1,3 @@
-
-
 CREATE DATABASE IF NOT EXISTS SageECR;
 
 /* App Specification */
@@ -152,5 +150,3 @@ EVERY 1 HOUR
 COMMENT 'TokenCleanup'
 DO
 DELETE FROM `SageECR`.`TokenCache` WHERE `expires` < NOW();
-
-

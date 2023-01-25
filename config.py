@@ -1,7 +1,8 @@
 import os, sys
+
 # https://mysqlclient.readthedocs.io/user_guide.html#mysqldb-mysql
 mysql_host = os.getenv('MYSQL_HOST')
-mysql_db =os.getenv('MYSQL_DATABASE')
+mysql_db = os.getenv('MYSQL_DATABASE')
 mysql_user =  os.getenv('MYSQL_USER')
 mysql_password =  os.getenv('MYSQL_PASSWORD')
 #app.config['MYSQL_DATABASE_HOST'] = os.getenv('MYSQL_HOST')
@@ -149,10 +150,8 @@ if docker_registry_url == "":
 
 docker_registry_push_allowed = os.environ.get("DOCKER_REGISTRY_PUSH_ALLOWED", "0") == "1"
 
-
-
+# TODO(sean) allow insecure flag to depend on env vars
 jenkinsfileTemplatePrefix = ''' pipeline{
-
     agent any
     stages {
         stage ("checkout") {
@@ -174,20 +173,21 @@ jenkinsfileTemplatePrefix = ''' pipeline{
                             //git branch: '${branch}',
                             //url: '${url}'
 
-
                             dir("$${env.WORKSPACE}/${directory}"){
                                 echo "########### Building for architecture $$arch"
-                                sh "docker version"
-                                sh "docker buildx version"
-                                ${docker_login}
-                                sh "docker buildx build --pull --load --builder sage --platform $$arch ${build_args_command_line} -t ${docker_registry_url}/${namespace}/${name}:${version} -f ${dockerfile} ."
-
+                                sh "buildctl --addr tcp://buildkitd:1234 build --frontend=dockerfile.v0 --opt platform=$$arch --local context=. --local dockerfile=. --output type=image,name=${docker_registry_url}/${namespace}/${name}:${version},push=true,registry.insecure=true"
                             }
 
                         }
 
 
 '''
+
+# sh "buildctl --addr tcp://buildkitd:1234 build --frontend=dockerfile.v0 --opt platform=$$arch --local context=. --local dockerfile=${dockerfile} --output type=image,name=${docker_registry_url}/${namespace}/${name}:${version},push=true"
+# sh "docker buildx build --pull --load --builder sage --platform $$arch ${build_args_command_line} -t ${docker_registry_url}/${namespace}/${name}:${version} -f ${dockerfile} ."
+# buildctl --addr tcp://buildkitd:1234 build --frontend=dockerfile.v0 --opt platform=linux/amd64,linux/arm64 --local context=. --local dockerfile=. --output type=image,name=registry.sagecontinuum.org/x/test-pipeline,push=true
+
+# TODO(sean) figure out how to restore a test phase if we want to separate out running a container's test command.
 
 jenkinsfileTemplateTestStage = '''
 
@@ -200,18 +200,16 @@ jenkinsfileTemplateTestStage = '''
                             dir("$${env.WORKSPACE}/${directory}"){
                                 echo "########### Testing for architecture $$arch"
 
-                                ${docker_login}
-
                                 script{
                                         if ( "${command}" == "''" ){
                                             ;
                                         }
                                         else{
-                                            sh "docker run -i ${docker_run_args} --rm ${entrypoint} ${docker_registry_url}/${namespace}/${name}:${version} \'${command}\'"
+                                            echo "...run tests..."
+                                            //sh "docker run -i ${docker_run_args} --rm ${entrypoint} ${docker_registry_url}/${namespace}/${name}:${version} \'${command}\'"
                                         }
                                 }
                             }
-
                         }
 '''
 
@@ -222,10 +220,8 @@ jenkinsfileTemplateSuffix = '''
                         //url: '${url}'
                         dir("$${env.WORKSPACE}/${directory}"){
                             echo "########### Final build for multi-arch docker image"
-
-                            ${docker_login}
-                            sh "docker buildx build --pull --builder sage --platform ${platforms} ${build_args_command_line} ${do_push} -t ${docker_registry_url}/${namespace}/${name}:${version} -f ${dockerfile} ."
-
+                            //sh "docker buildx build --pull --builder sage --platform ${platforms} ${build_args_command_line} ${do_push} -t ${docker_registry_url}/${namespace}/${name}:${version} -f ${dockerfile} ."
+                            echo "...should be in registry at this point..."
                         }
                     }
 

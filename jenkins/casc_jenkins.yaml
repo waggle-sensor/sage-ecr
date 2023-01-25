@@ -24,5 +24,3 @@ credentials:
               id: registry-user
               username: sage-ecr
               password: 123
-
-
