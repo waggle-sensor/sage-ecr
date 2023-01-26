@@ -9,8 +9,6 @@ import time
 import xmltodict
 import json
 from config import *
-import requests
-import sys
 from string import Template
 
 
@@ -88,8 +86,6 @@ class JenkinsServer:
             raise Exception("No architectures specified")
         platforms_str = ",".join(platforms)
 
-        platforms_list = " ".join(platforms)
-
         build_args = source.get("build_args", {})
         build_args_command_line = ""
         for key in build_args:
@@ -107,49 +103,59 @@ class JenkinsServer:
         else:
             actual_namespace = app_spec.get("owner", "")
 
-
-
-        do_push="--push"
-        if skip_image_push:
-            do_push =""
-
         name = app_spec["name"]
 
+        # TODO(sean) allow insecure flag to depend on env vars
+        # TODO(sean) decide if / host to restore test feature and understand its relationship to profiling. we should consider a unified approach to those.
+        # TODO(sean) clone submodules recursively
+        template = Template('''pipeline {
+    agent any
+    stages {
+        stage ("Checkout") {
+            steps {
+                checkout scm: [$$class: 'GitSCM', userRemoteConfigs: [[url: '${url}']], branches: [[name: '${branch}']]], poll: false
+            }
+        }
+        stage ("Build") {
+            steps {
+                script {
+                    stage("Build") {
+                        currentBuild.displayName = "${version}"
+                        dir("$${env.WORKSPACE}/${directory}") {
+                            sh "buildctl --addr tcp://buildkitd:1234 build --frontend=dockerfile.v0 --opt platform=${platform} --local context=. --local dockerfile=. --output type=image,name=${docker_registry_url}/${namespace}/${name}:${version},push=true,registry.insecure=true"
+                        }
+                    }
+                }
+            }
+        }
+    }
+    post {
+        always {
+            cleanWs(cleanWhenNotBuilt: true)
+        }
+    }
+}
+''')
 
-        jenkinsfileTemplate = ""
-
-        if test:
-            jenkinsfileTemplate = jenkinsfileTemplatePrefix + jenkinsfileTemplateTestStage + jenkinsfileTemplateSuffix
-        else:
-            jenkinsfileTemplate = jenkinsfileTemplatePrefix + jenkinsfileTemplateSuffix
-
-        template = Template(jenkinsfileTemplate)
         try:
-            jenkinsfile = template.substitute(  url=git_url,
-                                                branch=git_branch,
-                                                directory=git_directory,
-                                                dockerfile=git_dockerfile,
-                                                namespace=actual_namespace,
-                                                name=name,
-                                                version=version,
-                                                platforms=platforms_str,
-                                                build_args_command_line=build_args_command_line,
-                                                docker_run_args=docker_run_args,
-                                                docker_registry_url=docker_registry_url,
-                                                command = run_test,
-                                                platforms_list = platforms,
-                                                platform = platforms_str,
-                                                entrypoint =run_entrypoint,
-                                                do_push=do_push)
+            jenkinsfile = template.substitute(
+                url=git_url,
+                branch=git_branch,
+                directory=git_directory,
+                dockerfile=git_dockerfile, # add this back in
+                platform=",".join(platforms),
+                namespace=actual_namespace,
+                name=name,
+                version=version,
+                build_args_command_line=build_args_command_line, # add this back in
+                docker_registry_url=docker_registry_url,
+            )
         except Exception as e:
-            raise Exception(f'template failed: url={git_url}, branch={git_branch}, directory={git_directory},   e={str(e)}')
+            raise Exception(f'template failed: url={git_url}, branch={git_branch}, directory={git_directory}, e={str(e)}')
 
         #print(jenkins.EMPTY_CONFIG_XML)
         newJob = createPipelineJobConfig(jenkinsfile, f'{actual_namespace}/{name}')
         print(newJob)
-
-
-
 
         newJob_xml = xmltodict.unparse(newJob) #.decode("utf-8")
         #print("------")
@@ -217,8 +223,6 @@ def createPipelineJobConfig(jenkinsfile, displayName):
     </flow-definition>
     '''
 
-
-
     job = xmltodict.parse(jenkins_job_example_xml)
 
     #jenkinsfile = 'pipeline {}'
@@ -227,7 +231,6 @@ def createPipelineJobConfig(jenkinsfile, displayName):
     job["flow-definition"]["definition"]["script"] = jenkinsfile # cgi.escape(jenkinsfile)
     job["flow-definition"]["displayName"] = displayName
     #job["project"]["scm"]["userRemoteConfigs"]["hudson.plugins.git.UserRemoteConfig"]["url"] = 'https://github.com/sagecontinuum/sage-cli.git'
-
 
     print(json.dumps(job, indent=4))
     return job

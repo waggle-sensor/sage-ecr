@@ -26,6 +26,9 @@ test_app_def = json.dumps(test_app_def_obj)
 #app_version = test_app_def_obj["version"]
 
 
+def load_app_def(filename):
+    with open(filename) as f:
+        return yaml.safe_load(f.read())
 
 
 # from https://flask.palletsprojects.com/en/1.1.x/testing/
@@ -41,211 +44,184 @@ def client():
         yield client
 
 
-def test_connect(client):
-    """Start with a blank database."""
+def test_homepage(client):
     rv = client.get('/')
-    assert b'SAGE Edge Code Repository' in rv.data
+    assert rv.status_code == 200
+    assert rv.data == b"SAGE Edge Code Repository"
 
 
-def upload_and_build(client, test_failure=False):
+def test_upload_and_build_success(client):
+    """
+    Test that successful builds correctly report back to users.
+    """
     headers = {"Authorization" : "sage token1"}
-    admin_headers = {"Authorization" : "sage admin_token"}
-    #global test_app_def
+    app_yaml = """
+name: simple
+description: "very important app"
+version: "1.0.0"
+namespace: sagebuildtest
+authors: "Princess Zelda <zelda@hyrule.org>, King Rhoam <rhoam@hyrule.org> (https://hyrule.org)"
+keywords: "machine learning, audio, birds, some keyword"
+license: "MIT license"
+collaborators: "link <link@hyrule.org>"
+funding: 'NSF'
+homepage: "https://github.com/waggle-sensor/edge-plugins.git"
+source:
+  url: "https://github.com/waggle-sensor/edge-plugins.git"   # required
+  branch: "master"  # optional, default: main  (better use tag instead)
+  architectures:
+  - "linux/amd64"
+  - "linux/arm64"
+  #tag: "v0.5"  # recommended
+  directory : "plugin-simple"  # optional, default: root of git repository
+  dockerfile : "Dockerfile"   # optional, default: Dockerfile , relative to context directory
+  build_args: # optional, key-value pairs for docker build
+    VARIABLE1: "value1"
+resources:  # future feature
+- type: "RGB_image_producer"
+  view: "top"
+  min_resolution: "600x800"
+# future feature
+inputs:
+- id: "speed"
+  type: "int"
+# custom key-value pairs
+metadata:
+  my-science-data: 12345
+"""
 
-    app_namespace = "sagebuildtest"
-
-    app_version = "1.0"
-
-    local_test_app_def = None
-
-    if test_failure:
-        app_repository = "test_app_fail"
-        # make copy
-        test_app_def_failure_obj  = json.loads(json.dumps(test_app_def_obj))
-
-        test_app_def_failure_obj["name"] = app_repository
-
-        test_app_def_failure_obj["source"]["url"] = "https://github.com/waggle-sensor/does_not_exist.git"
-
-
-        local_test_app_def = json.dumps(test_app_def_failure_obj)
-
-    else:
-        app_repository = "simple"
-        local_test_app = json.loads(json.dumps(test_app_def_obj))
-        local_test_app["name"] = app_repository
-        local_test_app["namespace"] = app_namespace
-
-        local_test_app_def = json.dumps(local_test_app)
-
-
-
-    # delete app first
-    rv = client.delete(f'/apps/{app_namespace}/{app_repository}/{app_version}', headers=admin_headers)
-    result = rv.get_json()
-
-    if "error" in result:
-        assert "App not found" in result["error"]
-    else:
-        assert rv.status_code == 200
-
-
-
-    print(f'local_test_app_def rv.data: {local_test_app_def}' , file=sys.stderr)
-
-    #rv = client.post(f'/apps/{app_namespace}/{app_repository}/{app_version}', data = local_test_app_def, headers=headers)
-    rv = client.post(f'/submit/', data = local_test_app_def, headers=headers)
-    print(f'upload_and_build rv.data: {rv.data}' , file=sys.stderr)
-
-    result = rv.get_json()
-    if rv.status_code != 200:
-         print(f'status_code: {rv.status_code}')
-
+    # submit app
+    r = client.post("/submit/", data=app_yaml, headers=headers)
+    assert r.status_code == 200
+    result = r.get_json()
     assert "error" not in result
-
     assert "version" in result
-    new_version  = result["version"]
 
-
-    assert result != None
-
-    if test_failure:
-        assert result["source"]["url"] == "https://github.com/waggle-sensor/does_not_exist.git"
-
-
-
-
-    # build "default"
-    if True:
-        rv = client.post(f'/builds/{app_namespace}/{app_repository}/{new_version}?skip_image_push=false', headers=headers)
-
-        assert rv.data != ""
-        print(f'rv.data: {rv.data}' , file=sys.stderr)
-
-        result = rv.get_json()
-
-        assert "error" not in result
-        assert "build_number" in result
-
-
-        while True:
-            rv = client.get(f'/builds/{app_namespace}/{app_repository}/{new_version}', headers=headers)
-
-            assert rv.data != ""
-            print(f'rv.data: {rv.data}' , file=sys.stderr)
-
-            result = rv.get_json()
-
-            assert "error" not in result
-            assert "result" in result
-
-            result_status = result["result"]
-
-            if result_status == None:
-                time.sleep(2)
-                continue
-
-            print(f'result_status: {result_status}' , file=sys.stderr)
-
-            if not test_failure:
-                if not result_status == "SUCCESS":
-                    assert "url" in result
-                    build_log_url = result["url"]
-                    consoleTextURL = f'{build_log_url}/consoleText'
-                    r = requests.get(consoleTextURL)
-                    print("consoleText:", file=sys.stderr)
-                    print("--------------------------------------", file=sys.stderr)
-                    print(r.text, file=sys.stderr)
-                    print("--------------------------------------", file=sys.stderr)
-
-
-                    assert result_status == "SUCCESS"
-
-            break
-
-
-    if test_failure:
-        # extract build log
-        assert "url" in result
-        build_log_url = result["url"]
-        consoleTextURL = f'{build_log_url}/consoleText'
-        r = requests.get(consoleTextURL)
-        print("consoleText:", file=sys.stderr)
-        print("--------------------------------------", file=sys.stderr)
-        print(r.text, file=sys.stderr)
-        print("--------------------------------------", file=sys.stderr)
-        assert not "Finished: SUCCESS" in r.text
-        assert ("ERROR: Error cloning remote repo 'origin'" in r.text) or ("ERROR: Error fetching remote repo 'origin'" in r.text)
-        assert result_status == "FAILURE"
-
-    rv = client.delete(f'/builds/{app_namespace}/{app_repository}/{app_version}', headers=headers)
-
-
-
-
-
-    return
-    # build "armv7"
-
-    rv = client.post(f'/builds/{app_namespace}/{app_repository}/{app_version}?source=armv7', headers=headers)
-
-    assert rv.data != ""
-    print(f'rv.data: {rv.data}' , file=sys.stderr)
-
-    result = rv.get_json()
-
+    # start build
+    r = client.post("/builds/sagebuildtest/simple/1.0.0?skip_image_push=false", headers=headers)
+    assert r.status_code == 200
+    result = r.get_json()
+    assert "error" not in result
     assert "build_number" in result
 
-
+    # wait for build to finish
     while True:
-        rv = client.get(f'/builds/{app_namespace}/{app_repository}/{app_version}?source=armv7', headers=headers)
-
-        assert rv.data != ""
-        print(f'rv.data: {rv.data}' , file=sys.stderr)
-
-        result = rv.get_json()
-
+        r = client.get("/builds/sagebuildtest/simple/1.0.0", headers=headers)
+        assert r.status_code == 200
+        result = r.get_json()
+        assert "error" not in result
         assert "result" in result
-
         result_status = result["result"]
+        if result_status is not None:
+            break
+        time.sleep(1)
 
-        if result_status == None:
-            time.sleep(2)
-            continue
+    # build should succeed
+    assert result_status == "SUCCESS"
 
-        print(f'result_status: {result_status}' , file=sys.stderr)
-
-        if not result_status == "SUCCESS":
-            assert "url" in result
-            build_log_url = result["url"]
-            consoleTextURL = f'{build_log_url}/consoleText'
-            r = requests.get(consoleTextURL)
-            print("consoleText:", file=sys.stderr)
-            print("--------------------------------------", file=sys.stderr)
-            print(r.text, file=sys.stderr)
-            print("--------------------------------------", file=sys.stderr)
+    # build log should indicate success
+    assert "url" in result
+    build_log_url = result["url"]
+    consoleTextURL = f'{build_log_url}/consoleText'
+    r = requests.get(consoleTextURL)
+    assert "Finished: SUCCESS" in r.text
 
 
+def test_upload_and_build_failure(client):
+    """
+    Test that failed builds correctly report back to users.
 
-        assert result_status == "SUCCESS"
-        break
+    We are intentionally using a missing directory to cause the build to fail.
+    """
+    headers = {"Authorization" : "sage token1"}
+    app_yaml = """
+name: failure
+description: "very unimportant app"
+version: "1.0.0"
+namespace: sagebuildtest
+source:
+  url: "https://github.com/waggle-sensor/edge-plugins.git"
+  branch: "master"  # optional, default: main  (better use tag instead)
+  architectures:
+  - "linux/amd64"
+  - "linux/arm64"
+  directory : "plugin-should-not-exist-1234123"
+"""
+
+    # submit app
+    r = client.post("/submit/", data=app_yaml, headers=headers)
+    assert r.status_code == 200
+    result = r.get_json()
+    assert "error" not in result
+    assert "version" in result
+
+    # start build
+    r = client.post("/builds/sagebuildtest/failure/1.0.0?skip_image_push=false", headers=headers)
+    assert r.status_code == 200
+    result = r.get_json()
+    assert "error" not in result
+    assert "build_number" in result
+
+    # wait for build to finish
+    while True:
+        r = client.get("/builds/sagebuildtest/failure/1.0.0", headers=headers)
+        assert r.status_code == 200
+        result = r.get_json()
+        assert "error" not in result
+        assert "result" in result
+        result_status = result["result"]
+        if result_status is not None:
+            break
+        time.sleep(1)
+
+    # build should fail
+    assert result_status == "FAILURE"
+
+    # build log should indicate failure
+    assert "url" in result
+    build_log_url = result["url"]
+    consoleTextURL = f'{build_log_url}/consoleText'
+    r = requests.get(consoleTextURL)
+    assert "Finished: FAILURE" in r.text
 
 
-@pytest.mark.slow
-def test_upload_and_build(client):
-    return upload_and_build(client)
+def test_upload_fail_on_invalid_url(client):
+    headers = {"Authorization" : "sage token1"}
+    app_yaml = """
+name: test_app_fail
+description: "an app with an invalid url"
+version: "1.0.0"
+namespace: sagebuildtest
+source:
+  url: "https://github.com/waggle-sensor/does_not_exist.git"
+  branch: "main"
+  architectures:
+  - "linux/amd64"
+  - "linux/arm64"
+"""
 
+    # submit app
+    r = client.post("/submit/", data=app_yaml, headers=headers)
+    assert r.status_code == 500
 
-# not sure why this test still uses the correct git url
-#@pytest.mark.slow
-#def test_upload_and_build_failure(client):
-#    return upload_and_build(client, test_failure=True)
+    # extract build log
+    # assert "url" in result
+    # build_log_url = result["url"]
+    # consoleTextURL = f'{build_log_url}/consoleText'
+    # r = requests.get(consoleTextURL)
+    # print("consoleText:", file=sys.stderr)
+    # print("--------------------------------------", file=sys.stderr)
+    # print(r.text, file=sys.stderr)
+    # print("--------------------------------------", file=sys.stderr)
+    # assert not "Finished: SUCCESS" in r.text
+    # assert ("ERROR: Error cloning remote repo 'origin'" in r.text) or ("ERROR: Error fetching remote repo 'origin'" in r.text)
+    # assert result_status == "FAILURE"
+
+    # assert ("ERROR: Error cloning remote repo 'origin'" in r.text) or ("ERROR: Error fetching remote repo 'origin'" in r.text)
+    # assert result_status == "FAILURE"
 
 
 def test_app_upload_multiple(client):
-    """Start with a blank database."""
-
-
     headers = {"Authorization" : "sage token1"}
     admin_headers = {"Authorization" : "sage admin_token"}
 
@@ -888,13 +864,16 @@ def test_meta_file_import(client, test_failure=False):
 def test_authz(client):
     headers = {"Authorization" : "sage token3"}
 
-    app_namespace = "sage"
-    app_repository = "simple"
+    # wait... shouldn't the api handle the data???
+    # app_def = load_app_def("example_app.yaml")
+
+    # r = client.post(f'/submit/', data=app_def, headers=headers)
+    # assert rv.status_code == 200
 
     sample_request = {
         "account": "testuser",
         "type": "repository",
-        "name": f"{app_namespace}/{app_repository}",
+        "name": "sage/simple",
         "service": "Docker registry",
         "actions": ["pull"]
     }
@@ -902,12 +881,6 @@ def test_authz(client):
     rv = client.post(f'/authz', headers=headers,  data=json.dumps(sample_request))
     print(f'rv.data: {rv.data}', file=sys.stderr)
     assert rv.status_code == 200
-
-
-def test_homepage(client):
-    rv = client.get('/')
-    assert rv.status_code == 200
-    assert rv.data == b"SAGE Edge Code Repository"
 
 
 def test_health(client):

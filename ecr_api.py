@@ -230,8 +230,6 @@ def run_command_communicate(command, input_str=None, cwd=None, timeout=None):
 
 
 def preprocess_repository(url, branchOrTag, custom_version, namespace, repository):
-
-
     version = ""
     git_hash_long = ""
 
@@ -241,13 +239,11 @@ def preprocess_repository(url, branchOrTag, custom_version, namespace, repositor
         os.makedirs(temp_dir)
 
     wait_count = 0
-    with tempfile.TemporaryDirectory(dir=temp_dir) as tmpdirname:
 
+    with tempfile.TemporaryDirectory(dir=temp_dir) as tmpdirname:
         app.logger.debug(f"tmpdirname: {tmpdirname}")
-        command = ["git", "clone", "-b", branchOrTag,  url, tmpdirname]
-        stdout, stderr , exit_code = run_command_communicate(command, cwd=temp_dir, timeout=600)
-        if exit_code != 0 :
-            raise Exception(f"Cloning git repo failed (stdout={stdout}, stderr={stderr})")
+
+        subprocess.run(["git", "clone", "--recursive", "-b", branchOrTag, url, str(tmpdirname)], env={"GIT_TERMINAL_PROMPT": "0"}, timeout=600, check=True)
 
         #best solution, returns "0.0.0-0-g60c72a2" , or "g60c72a2"
         command = ["git", "describe", "--always", "--tags", "--long"]
@@ -529,7 +525,6 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
     ### git clone, extract info, create archive, upload
     extracted_version, git_commit = preprocess_repository(url, branch_or_tag, version, namespace, repository)
 
-
     existing_app_id = None
 
     if not version:
@@ -739,9 +734,8 @@ class Submit(MethodView):
         if not postData:
             app.logger.info("submit: trying to load app spec as yaml")
             # try yaml
-            yaml_str = request.get_data().decode("utf-8")
-            print(f"yaml_str: {yaml_str} ", file=sys.stderr)
-            postData = yaml.load(yaml_str , Loader=yaml.FullLoader)
+            yaml_str = request.get_data().decode()
+            postData = yaml.safe_load(yaml_str)
 
         if not postData:
             app.logger.info("submit: could not load app spec")
@@ -1630,24 +1624,6 @@ def handle_invalid_usage(error):
     response.headers.add("Access-Control-Allow-Origin", "*")
     response.content_type = "application/json"
     return response
-
-
-
-#@app.errorhandler(ErrorResponse)
-#@app.errorhandler(Exception)
-#def handle_invalid_usage(error):
-#    print(f"HELLO ***********************************", file=sys.stderr)
-#    response = error.get_response()
-    #response.data = jsonify(error.to_dict())
-    #response.status_code = error.status_code
-    #response.content_type = "application/json"
-#    return response
-
-
-#@app.errorhandler(ErrorResponse)
-#def resource_not_found(e):
-#    return jsonify(error=str(e)), 404
-
 
 
 app.add_url_rule('/', view_func=Base.as_view('appsBase'))
