@@ -50,7 +50,7 @@ def test_homepage(client):
     assert rv.data == b"SAGE Edge Code Repository"
 
 
-def test_upload_and_build_success(client):
+def test_build_success_report(client):
     """
     Test that successful builds correctly report back to users.
     """
@@ -127,7 +127,7 @@ metadata:
     assert "Finished: SUCCESS" in r.text
 
 
-def test_upload_and_build_failure(client):
+def test_build_failure_report(client):
     """
     Test that failed builds correctly report back to users. We are intentionally using a missing directory to cause the build to fail.
     """
@@ -183,7 +183,10 @@ source:
     assert "Finished: FAILURE" in r.text
 
 
-def test_upload_fail_on_invalid_url(client):
+def test_submit_fails_on_invalid_url(client):
+    """
+    Test that app submissions fail on invalid URLs.
+    """
     headers = {"Authorization" : "sage token1"}
     app_yaml = """
 name: test_app_fail
@@ -198,28 +201,14 @@ source:
   - "linux/arm64"
 """
 
-    # submit app
     r = client.post("/submit/", data=app_yaml, headers=headers)
     assert r.status_code == 500
 
-    # extract build log
-    # assert "url" in result
-    # build_log_url = result["url"]
-    # consoleTextURL = f'{build_log_url}/consoleText'
-    # r = requests.get(consoleTextURL)
-    # print("consoleText:", file=sys.stderr)
-    # print("--------------------------------------", file=sys.stderr)
-    # print(r.text, file=sys.stderr)
-    # print("--------------------------------------", file=sys.stderr)
-    # assert not "Finished: SUCCESS" in r.text
-    # assert ("ERROR: Error cloning remote repo 'origin'" in r.text) or ("ERROR: Error fetching remote repo 'origin'" in r.text)
-    # assert result_status == "FAILURE"
-
-    # assert ("ERROR: Error cloning remote repo 'origin'" in r.text) or ("ERROR: Error fetching remote repo 'origin'" in r.text)
-    # assert result_status == "FAILURE"
-
 
 def test_app_upload_multiple(client):
+    """
+    Test that multiple app submissions work.
+    """
     headers = {"Authorization" : "sage token1"}
     admin_headers = {"Authorization" : "sage admin_token"}
 
