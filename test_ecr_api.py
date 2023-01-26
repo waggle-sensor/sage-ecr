@@ -129,9 +129,7 @@ metadata:
 
 def test_upload_and_build_failure(client):
     """
-    Test that failed builds correctly report back to users.
-
-    We are intentionally using a missing directory to cause the build to fail.
+    Test that failed builds correctly report back to users. We are intentionally using a missing directory to cause the build to fail.
     """
     headers = {"Authorization" : "sage token1"}
     app_yaml = """
