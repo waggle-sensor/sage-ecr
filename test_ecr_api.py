@@ -50,11 +50,54 @@ def test_homepage(client):
     assert rv.data == b"SAGE Edge Code Repository"
 
 
+# TODO(sean) add a fuzz test version of this test
+def test_submit_app_and_view(client):
+    """
+    Test that app works.
+    """
+    headers = {"Authorization" : "sage token1"}
+
+    # submit app
+    app_yaml = """
+name: simple
+description: "a simple app"
+version: "1.2.3"
+namespace: sage
+source:
+  url: "https://github.com/waggle-sensor/edge-plugins.git"
+  branch: "master"
+  architectures:
+  - "linux/amd64"
+  - "linux/arm64"
+  directory : "plugin-simple"
+"""
+    r = client.post("/submit/", headers=headers, data=app_yaml)
+    assert r.status_code == 200
+    result = r.get_json()
+    assert "error" not in result
+    assert "version" in result
+
+    # check that submitted app data matches
+    r = client.get("/apps/sage/simple/1.2.3", headers=headers)
+    assert r.status_code == 200
+    result = r.get_json()
+    assert result["name"] == "simple"
+    assert result["description"] == "a simple app"
+    assert result["version"] == "1.2.3"
+    assert result["namespace"] == "sage"
+    assert result["source"]["url"] == "https://github.com/waggle-sensor/edge-plugins.git"
+    assert result["source"]["branch"] == "master"
+    assert result["source"]["architectures"] == ["linux/amd64", "linux/arm64"]
+    assert result["source"]["directory"] == "plugin-simple"
+
+
 def test_build_success_report(client):
     """
     Test that successful builds correctly report back to users.
     """
     headers = {"Authorization" : "sage token1"}
+
+    # submit app
     app_yaml = """
 name: simple
 description: "very important app"
@@ -89,9 +132,7 @@ inputs:
 metadata:
   my-science-data: 12345
 """
-
-    # submit app
-    r = client.post("/submit/", data=app_yaml, headers=headers)
+    r = client.post("/submit/", headers=headers, data=app_yaml)
     assert r.status_code == 200
     result = r.get_json()
     assert "error" not in result
@@ -132,9 +173,11 @@ def test_build_failure_report(client):
     Test that failed builds correctly report back to users. We are intentionally using a missing directory to cause the build to fail.
     """
     headers = {"Authorization" : "sage token1"}
+
+    # submit app
     app_yaml = """
 name: failure
-description: "very unimportant app"
+description: "very nonexistant app"
 version: "1.0.0"
 namespace: sagebuildtest
 source:
@@ -145,9 +188,7 @@ source:
   - "linux/arm64"
   directory : "plugin-should-not-exist-1234123"
 """
-
-    # submit app
-    r = client.post("/submit/", data=app_yaml, headers=headers)
+    r = client.post("/submit/", headers=headers, data=app_yaml)
     assert r.status_code == 200
     result = r.get_json()
     assert "error" not in result
@@ -188,6 +229,7 @@ def test_submit_fails_on_invalid_url(client):
     Test that app submissions fail on invalid URLs.
     """
     headers = {"Authorization" : "sage token1"}
+
     app_yaml = """
 name: test_app_fail
 description: "an app with an invalid url"
@@ -200,74 +242,57 @@ source:
   - "linux/amd64"
   - "linux/arm64"
 """
-
-    r = client.post("/submit/", data=app_yaml, headers=headers)
+    r = client.post("/submit/", headers=headers, data=app_yaml)
     assert r.status_code == 500
 
 
-def test_app_upload_multiple(client):
+def test_submit_multiple(client):
     """
     Test that multiple app submissions work.
     """
     headers = {"Authorization" : "sage token1"}
-    admin_headers = {"Authorization" : "sage admin_token"}
 
-    app_namespace = "sageother"
-    app_repository = "simple_other"
-    app_version = "1.0"
-
-    #this_test_app = json.dumps(test_app_def_obj)
-    this_test_app_obj = json.loads(json.dumps(test_app_def_obj))
-    del this_test_app_obj["metadata"]
-
-
-    # delete app in case app already exists and is frozen
-    rv = client.delete(f'/apps/{app_namespace}/{app_repository}/{app_version}', headers=admin_headers)
-    result = rv.get_json()
-
-    if "error" in result:
-        assert "App not found" in result["error"]
-    else:
-        assert rv.status_code == 200
-
-    # delete repository:
-    rv = client.delete(f'/repositories/{app_namespace}/{app_repository}', headers=admin_headers)
-    print(f'rv.data: {rv.data}' , file=sys.stderr)
-    assert rv.status_code == 200
-
-    # delete namespace
-    rv = client.get(f'/namespaces/{app_namespace}', headers=admin_headers)
-    if rv.status_code == 200:
-        rv = client.delete(f'/namespaces/{app_namespace}', headers=admin_headers)
-        print(f'rv.data: {rv.data}' , file=sys.stderr)
-        assert rv.status_code == 200
-        result = rv.get_json()
-        assert result != None
-        assert "error"  not in result
-
-    # create namespace (not needed, but increases test coverage)
-    rv = client.put(f'/namespaces', data = json.dumps({"id":app_namespace}), headers=headers)
-    print(f'(create namespace) rv.data: {rv.data}' , file=sys.stderr)
-    assert rv.data != ""
-    assert rv.status_code == 200
-    result = rv.get_json()
-    assert result != None
-    assert "error"  not in result
-
-
-    # submit
-    rv = client.post(f'/apps/{app_namespace}/{app_repository}/{app_version}', data = json.dumps(this_test_app_obj), headers=headers)
-    assert rv.data != ""
-    print(f'rv.data: {rv.data}' , file=sys.stderr)
-
-    result = rv.get_json()
-
-
-    assert result != None
+    # submit first app
+    app_yaml = """
+name: first
+description: "the first app"
+version: "1.0.0"
+namespace: sagefirst
+source:
+  url: "https://github.com/waggle-sensor/edge-plugins.git"   # required
+  branch: "master"  # optional, default: main  (better use tag instead)
+  architectures:
+  - "linux/amd64"
+  - "linux/arm64"
+  directory : "plugin-simple"  # optional, default: root of git repository
+"""
+    r = client.post("/submit/", headers=headers, data=app_yaml)
+    assert r.status_code == 200
+    result = r.get_json()
     assert "error" not in result
-    assert "name" in result
-    assert result["name"] ==  app_repository
+    assert "version" in result
 
+    # submit second app
+    app_yaml = """
+name: second
+description: "the first app"
+version: "2.0.0"
+namespace: sagesecond
+source:
+  url: "https://github.com/waggle-sensor/edge-plugins.git"   # required
+  branch: "master"  # optional, default: main  (better use tag instead)
+  architectures:
+  - "linux/amd64"
+  - "linux/arm64"
+  directory : "plugin-simple"  # optional, default: root of git repository
+"""
+    r = client.post("/submit/", headers=headers, data=app_yaml)
+    assert r.status_code == 200
+    result = r.get_json()
+    assert "error" not in result
+    assert "version" in result
+
+    # what do we actually check here???
 
 
 def test_app_upload_and_download(client):
