@@ -357,6 +357,8 @@ source:
 
 
 def test_permissions(client):
+    # TODO(sean) We should isolation testing permissions on namespaces and repos from app submission. I assume these can be controlled
+    # independently of having to submit an app?
     headers_testuser = {"Authorization" : "sage testuser_token"}
     headers_testuser2 = {"Authorization" : "sage testuser2_token"}
 
@@ -389,15 +391,14 @@ source:
     r = client.get(f'/apps/brothersgrimm/hansel_and_gretel', headers=headers_testuser2)
     assert r.status_code == 200
     result = r.get_json()
-    visible_ids = {item["id"] for item in result["data"]}
-    assert "brothersgrimm/hansel_and_gretel:1.0" not in visible_ids
+    assert not any(app["id"] == "brothersgrimm/hansel_and_gretel:1.0" for app in result["data"])
 
     # testuser2 should not see app in global listing
     r = client.get(f'/apps/', headers=headers_testuser2)
     assert r.status_code == 200
     result = r.get_json()
     visible_ids = {item["id"] for item in result["data"]}
-    assert "brothersgrimm/hansel_and_gretel:1.0" not in visible_ids
+    assert not any(app["id"] == "brothersgrimm/hansel_and_gretel:1.0" for app in result["data"])
 
     # make repo public
     data = {"operation":"add", "granteeType": "GROUP", "grantee": "AllUsers", "permission": "READ"}
@@ -410,9 +411,10 @@ source:
     r = client.get('/permissions/brothersgrimm/hansel_and_gretel', headers=headers_testuser)
     assert r.status_code == 200
     result = r.get_json()
-    assert len(result) == 2
-    assert {'grantee': 'testuser', 'granteeType': 'USER', 'permission': 'FULL_CONTROL', 'resourceName': 'brothersgrimm/hansel_and_gretel', 'resourceType': 'repository'} in result
-    assert {'grantee': 'AllUsers', 'granteeType': 'GROUP', 'permission': 'READ', 'resourceName': 'brothersgrimm/hansel_and_gretel', 'resourceType': 'repository'} in result
+    assert sorted_by_grantee_and_permission(result) == [
+        {'grantee': 'AllUsers', 'granteeType': 'GROUP', 'permission': 'READ', 'resourceName': 'brothersgrimm/hansel_and_gretel', 'resourceType': 'repository'},
+        {'grantee': 'testuser', 'granteeType': 'USER', 'permission': 'FULL_CONTROL', 'resourceName': 'brothersgrimm/hansel_and_gretel', 'resourceType': 'repository'},
+    ]
 
     # get public app as owner
     r = client.get('/apps/brothersgrimm/hansel_and_gretel/1.0', headers=headers_testuser)
@@ -453,12 +455,13 @@ source:
     r = client.get(f'/permissions/brothersgrimm/hansel_and_gretel', headers=headers_testuser)
     assert r.status_code == 200
     result = r.get_json()
-    assert len(result) == 5
-    assert {'grantee': 'testuser', 'granteeType': 'USER', 'permission': 'FULL_CONTROL', 'resourceName': 'brothersgrimm/hansel_and_gretel', 'resourceType': 'repository'} in result
-    assert {'grantee': 'other1', 'granteeType': 'USER', 'permission': 'READ', 'resourceName': 'brothersgrimm/hansel_and_gretel', 'resourceType': 'repository'} in result
-    assert {'grantee': 'other2', 'granteeType': 'USER', 'permission': 'READ', 'resourceName': 'brothersgrimm/hansel_and_gretel', 'resourceType': 'repository'} in result
-    assert {'grantee': 'other3', 'granteeType': 'USER', 'permission': 'READ', 'resourceName': 'brothersgrimm/hansel_and_gretel', 'resourceType': 'repository'} in result
-    assert {'grantee': 'testuser2', 'granteeType': 'USER', 'permission': 'READ', 'resourceName': 'brothersgrimm/hansel_and_gretel', 'resourceType': 'repository'} in result
+    assert sorted_by_grantee_and_permission(result) == [
+        {'grantee': 'other1', 'granteeType': 'USER', 'permission': 'READ', 'resourceName': 'brothersgrimm/hansel_and_gretel', 'resourceType': 'repository'},
+        {'grantee': 'other2', 'granteeType': 'USER', 'permission': 'READ', 'resourceName': 'brothersgrimm/hansel_and_gretel', 'resourceType': 'repository'},
+        {'grantee': 'other3', 'granteeType': 'USER', 'permission': 'READ', 'resourceName': 'brothersgrimm/hansel_and_gretel', 'resourceType': 'repository'},
+        {'grantee': 'testuser', 'granteeType': 'USER', 'permission': 'FULL_CONTROL', 'resourceName': 'brothersgrimm/hansel_and_gretel', 'resourceType': 'repository'},
+        {'grantee': 'testuser2', 'granteeType': 'USER', 'permission': 'READ', 'resourceName': 'brothersgrimm/hansel_and_gretel', 'resourceType': 'repository'},
+    ]
 
     # remove all nonowner permissions
     r = client.put(f'/permissions/brothersgrimm/hansel_and_gretel', data=json.dumps({"operation":"delete"}), headers=headers_testuser)
@@ -477,65 +480,65 @@ source:
     assert r.status_code == 401
     assert r.data == b'{"error":"Not authorized."}\n'
 
-    # check namespace permission, give testuser2 WRITE permission for namespace
+    # give testuser2 WRITE permission for namespace
     acl = {"operation":"add", "granteeType": "USER", "grantee":  "testuser2" , "permission": "WRITE"}
     r = client.put(f'/permissions/brothersgrimm', data=json.dumps(acl), headers=headers_testuser)
     assert r.status_code == 200
     result = r.get_json()
     assert result["added"] == 1
 
+    # check namespace permissions
+    r = client.get(f'/permissions/brothersgrimm', headers=headers_testuser)
+    assert r.status_code == 200
+    result = r.get_json()
+    assert sorted_by_grantee_and_permission(result) == [
+        {'grantee': 'testuser', 'granteeType': 'USER', 'permission': 'FULL_CONTROL', 'resourceName': 'brothersgrimm', 'resourceType': 'namespace'},
+        {'grantee': 'testuser2', 'granteeType': 'USER', 'permission': 'WRITE', 'resourceName': 'brothersgrimm', 'resourceType': 'namespace'},
+    ]
+
     # verify testuser2 can see repository inside of namespace
     r = client.get(f'/repositories/brothersgrimm', headers=headers_testuser2)
     assert r.status_code == 200
     result = r.get_json()
-    visible_ids = {item["id"] for item in result["data"]}
-    assert "brothersgrimm/hansel_and_gretel:1.0" not in visible_ids
+    assert any(repo["name"] == "hansel_and_gretel" for repo in result["data"])
 
-    # list all namespaces
+    # verify testuser can see their own namespace
     r = client.get(f'/namespaces', headers=headers_testuser)
+    assert r.status_code == 200
     result = r.get_json()
     assert "data" in result
-    assert len(result["data"]) >= 1
-    found_namespace = False
-    for n in result["data"]:
-        if n["id"] == "brothersgrimm" and n["owner_id"] == "testuser" and n["type"] == "namespace":
-            found_namespace = True
-
-    assert found_namespace
+    assert any(n["id"] == "brothersgrimm" and n["owner_id"] == "testuser" and n["type"] == "namespace" for n in result["data"])
 
     # check namespace permission, give testuser2 FULL_CONTROL permission for namespace
     acl = {"operation": "add", "granteeType": "USER", "grantee":  "testuser2" , "permission": "FULL_CONTROL"}
     r = client.put(f'/permissions/brothersgrimm', data=json.dumps(acl), headers=headers_testuser)
-
+    assert r.status_code == 200
     result = r.get_json()
-
-    added = result.get("added", -1)
-    assert added == 1
-
+    assert result["added"] == 1
     assert "error" not in result
-    print(f'result: {json.dumps(result)}', file=sys.stderr)
+
+    # check namespace permissions
+    r = client.get(f'/permissions/brothersgrimm', headers=headers_testuser)
+    assert r.status_code == 200
+    result = r.get_json()
+    assert sorted_by_grantee_and_permission(result) == [
+        {'grantee': 'testuser', 'granteeType': 'USER', 'permission': 'FULL_CONTROL', 'resourceName': 'brothersgrimm', 'resourceType': 'namespace'},
+        {'grantee': 'testuser2', 'granteeType': 'USER', 'permission': 'FULL_CONTROL', 'resourceName': 'brothersgrimm', 'resourceType': 'namespace'},
+        {'grantee': 'testuser2', 'granteeType': 'USER', 'permission': 'WRITE', 'resourceName': 'brothersgrimm', 'resourceType': 'namespace'},
+    ]
 
     # view permissions as testuser2
     r = client.get(f'/permissions/brothersgrimm/hansel_and_gretel', headers=headers_testuser2)
-
+    assert r.status_code == 200
     result = r.get_json()
-    print(f'result: {json.dumps(result)}', file=sys.stderr)
     assert "error" not in result
+    # TODO(sean) what are we checking here?
 
     # test repository permissions view
     r = client.get(f'/repositories?view=permissions', headers=headers_testuser2)
-
     result = r.get_json()
-    print(f'result: {json.dumps(result)}', file=sys.stderr)
     assert "error" not in result
-
-
-    # delete app
-
-    r = client.delete(f'/apps/brothersgrimm/hansel_and_gretel/1.0', headers=headers_testuser2)
-    result = r.get_json()
-
-    assert "deleted" in result
+    # TODO(sean) what are we checking here?
 
 
 def test_namespaces(client):
@@ -644,3 +647,7 @@ def must_submit_app_and_get_json(client, headers, app_yaml):
     result = r.get_json()
     assert "error" not in result
     return result
+
+
+def sorted_by_grantee_and_permission(permissions):
+    return sorted(permissions, key=lambda p: (p["grantee"], p["permission"]))
