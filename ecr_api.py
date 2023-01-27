@@ -243,7 +243,7 @@ def preprocess_repository(url, branchOrTag, custom_version, namespace, repositor
     with tempfile.TemporaryDirectory(dir=temp_dir) as tmpdirname:
         app.logger.debug(f"tmpdirname: {tmpdirname}")
 
-        subprocess.run(["git", "clone", "--recursive", "-b", branchOrTag, url, str(tmpdirname)], env={"GIT_TERMINAL_PROMPT": "0"}, timeout=600, check=True)
+        subprocess.run(["git", "clone", "--recursive", "-b", branchOrTag, url, str(tmpdirname)], env={"GIT_TERMINAL_PROMPT": "0"}, timeout=600, check=True, capture_output=True)
 
         #best solution, returns "0.0.0-0-g60c72a2" , or "g60c72a2"
         command = ["git", "describe", "--always", "--tags", "--long"]

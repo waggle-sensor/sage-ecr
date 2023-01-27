@@ -10,7 +10,7 @@ cd sage-ecr
 ## Define ECR_API, SAGE_USER_TOKEN variables
 ```bash
 export ECR_API="localhost:5000"
-export SAGE_USER_TOKEN="token1"
+export SAGE_USER_TOKEN="testuser_token"
 ```
 
 Optional: Use `jq` for pretty formatting of json output. [jq installation instructions](https://stedolan.github.io/jq/download/)
@@ -41,7 +41,7 @@ curl ${ECR_API}/permissions/sage/simple -H "Authorization: sage ${SAGE_USER_TOKE
 
 verify (view app as testuser2)
 ```bash
-curl ${ECR_API}/apps/sage/simple/1.0 -H "Authorization: sage token2"  | jq .
+curl ${ECR_API}/apps/sage/simple/1.0 -H "Authorization: sage testuser2_token"  | jq .
 ```
 
 ## share namespace sage with testuser2

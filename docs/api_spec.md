@@ -4,7 +4,7 @@ Please define these variables to be able to copy-and-paste the curl examples bel
 
 ```bash
 export ECR_API="localhost:5000"
-export SAGE_USER_TOKEN="token1"
+export SAGE_USER_TOKEN="testuser_token"
 export APP_NAMESPACE="sage"
 export APP_REPOSITORY="simple"
 export APP_VERSION="1.0"
@@ -218,14 +218,14 @@ curl -X PUT ${ECR_API}/permissions/${APP_NAMESPACE}/${APP_REPOSITORY} -H "Author
 ## POST /builds/{namespace}/{repository}/{version}
 trigger build for specific app
 ```bash
-curl -X POST ${ECR_API}/builds/sage/simple/1.0 -H "Authorization: sage token1"
+curl -X POST ${ECR_API}/builds/sage/simple/1.0 -H "Authorization: sage testuser_token"
 ```
 
 ## GET /builds/{namespace}/{repository}/{version}
 Get build status
 
 ```bash
-curl -X GET ${ECR_API}/builds/sage/simple/1.0 -H "Authorization: sage token1"
+curl -X GET ${ECR_API}/builds/sage/simple/1.0 -H "Authorization: sage testuser_token"
 ```
 
 Example repsonse:
