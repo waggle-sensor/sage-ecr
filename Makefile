@@ -12,3 +12,6 @@ testx:
 
 dbshell:
 	docker-compose exec db mysql -u sage --password=test SageECR
+
+registryshell:
+	docker-compose exec registry sh
