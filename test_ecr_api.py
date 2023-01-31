@@ -592,7 +592,7 @@ source:
 
 def test_authz(client):
     headers_testuser = {"Authorization" : "sage testuser_token"}
-    headers_sage_docker_auth = {"Authorization" : "sage sage_docker_auth"}
+    headers_sage_docker_auth = {"Authorization" : "sage sage_docker_auth_token"}
 
     # submit app as testuser
     must_submit_app_and_get_json(client, headers=headers_testuser, app_yaml="""
