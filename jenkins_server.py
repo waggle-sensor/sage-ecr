@@ -10,6 +10,7 @@ import xmltodict
 import json
 from config import *
 from string import Template
+import shlex
 
 
 class JenkinsServer:
@@ -108,6 +109,7 @@ class JenkinsServer:
         # TODO(sean) allow insecure flag to depend on env vars
         # TODO(sean) decide if / host to restore test feature and understand its relationship to profiling. we should consider a unified approach to those.
         # TODO(sean) clone submodules recursively
+        # fix dockerfile support
         template = Template('''pipeline {
     agent any
     stages {
@@ -122,7 +124,7 @@ class JenkinsServer:
                     stage("Build") {
                         currentBuild.displayName = "${version}"
                         dir("$${env.WORKSPACE}/${directory}") {
-                            sh "buildctl --addr tcp://buildkitd:1234 build --frontend=dockerfile.v0 --opt platform=${platform} --local context=. --local dockerfile=. --output type=image,name=${docker_registry_url}/${namespace}/${name}:${version},push=true,registry.insecure=true"
+                            sh "${build_command}"
                         }
                     }
                 }
@@ -137,18 +139,43 @@ class JenkinsServer:
 }
 ''')
 
+        # add validation here!!!
+
+        output_args = [
+            "type=image",
+            f"name={docker_registry_url}/{actual_namespace}/{name}:{version}",
+        ]
+
+        if docker_registry_push_allowed:
+            output_args += ["push=true"]
+
+        if docker_registry_insecure:
+            output_args += ["registry.insecure=true"]
+
+        build_command = shlex.join([
+            "buildctl",
+            "--addr",
+            "tcp://buildkitd:1234",
+            "build",
+            "--frontend=dockerfile.v0",
+            "--opt",
+            f"platform={','.join(platforms)}",
+            "--local",
+            "context=.",
+            "--local",
+            "dockerfile=.",
+            "--output",
+            ','.join(output_args),
+        ])
+
         try:
             jenkinsfile = template.substitute(
                 url=git_url,
                 branch=git_branch,
                 directory=git_directory,
-                dockerfile=git_dockerfile, # add this back in
-                platform=",".join(platforms),
-                namespace=actual_namespace,
-                name=name,
+                # dockerfile=git_dockerfile, # add this back in
                 version=version,
-                build_args_command_line=build_args_command_line, # add this back in
-                docker_registry_url=docker_registry_url,
+                build_command=build_command,
             )
         except Exception as e:
             raise Exception(f'template failed: url={git_url}, branch={git_branch}, directory={git_directory}, e={str(e)}')

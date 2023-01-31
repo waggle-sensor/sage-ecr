@@ -1,5 +1,14 @@
 import os, sys
 
+
+def parsebool(s):
+    if s.lower() in ["1", "t", "true"]:
+        return True
+    if s.lower() in ["0", "f", "false"]:
+        return False
+    raise ValueError("invalid boolean flag")
+
+
 # https://mysqlclient.readthedocs.io/user_guide.html#mysqldb-mysql
 mysql_host = os.getenv('MYSQL_HOST')
 mysql_db = os.getenv('MYSQL_DATABASE')
@@ -134,18 +143,15 @@ if add_user:
     print(f'added token {x_token} for user {x_user_id}', file=sys.stderr)
 
 
-
 # jenkins
 jenkins_user = os.environ.get("JENKINS_USER", "ecrdb")
 jenkins_token = os.environ.get("JENKINS_TOKEN", "")
 jenkins_server = os.getenv('JENKINS_SERVER', default="http://localhost:8082")
 
-docker_build_args= os.environ.get("DOCKER_BUILD_ARGS", "")
-docker_run_args=os.environ.get("DOCKER_RUN_ARGS", "")
+docker_build_args = os.environ.get("DOCKER_BUILD_ARGS", "")
+docker_run_args =os.environ.get("DOCKER_RUN_ARGS", "")
 
 # docker registry
-docker_registry_url = os.environ.get("DOCKER_REGISTRY_URL", "")
-if docker_registry_url == "":
-        sys.exit("docker_registry_url not defined")
-
-docker_registry_push_allowed = os.environ.get("DOCKER_REGISTRY_PUSH_ALLOWED", "0") == "1"
+docker_registry_url = os.environ["DOCKER_REGISTRY_URL"]
+docker_registry_push_allowed = parsebool(os.environ.get("DOCKER_REGISTRY_PUSH_ALLOWED", "0"))
+docker_registry_insecure = parsebool(os.environ.get("DOCKER_REGISTRY_INSECURE", "0"))

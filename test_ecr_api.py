@@ -15,6 +15,8 @@ def client():
     db = EcrDB()
     db.deleteAllData()
 
+    delete_all_docker_registry_manifests()
+
     with app.test_client() as client:
         #with app.app_context():
         #    init_db()
@@ -131,6 +133,10 @@ metadata:
   my-science-data: 12345
 """)
 
+    # confirm that image is not in registry before build
+    r = requests.head("http://registry:5000/v2/sagebuildtest/simple/manifests/1.0.0")
+    assert r.status_code == 404
+
     # start build
     r = client.post("/builds/sagebuildtest/simple/1.0.0?skip_image_push=false", headers=headers)
     assert r.status_code == 200
@@ -159,6 +165,10 @@ metadata:
     consoleTextURL = f'{build_log_url}/consoleText'
     r = requests.get(consoleTextURL)
     assert "Finished: SUCCESS" in r.text
+
+    # confirm that image is in registry after build
+    r = requests.head("http://registry:5000/v2/sagebuildtest/simple/manifests/1.0.0")
+    assert r.status_code == 200
 
 
 def test_app_build_on_failure(client):
@@ -207,6 +217,10 @@ source:
     consoleTextURL = f'{build_log_url}/consoleText'
     r = requests.get(consoleTextURL)
     assert "Finished: FAILURE" in r.text
+
+    # confirm that image is not in registry on failure
+    r = requests.head("http://registry:5000/v2/sagebuildtest/failure/manifests/1.0.0")
+    assert r.status_code == 404
 
 
 def test_app_submit_fails_on_invalid_url(client):
@@ -651,3 +665,38 @@ def must_submit_app_and_get_json(client, headers, app_yaml):
 
 def sorted_by_grantee_and_permission(permissions):
     return sorted(permissions, key=lambda p: (p["grantee"], p["permission"]))
+
+
+def delete_all_docker_registry_manifests():
+    for name, tag in list_docker_registry_manifests():
+        delete_docker_registry_manifest(name, tag)
+
+
+def list_docker_registry_manifests():
+    r = requests.get("http://registry:5000/v2/_catalog")
+    r.raise_for_status()
+    data = r.json()
+    # example: {"repositories":["sagebuildtest/simple"]}
+
+    for name in data["repositories"]:
+        r = requests.get(f"http://registry:5000/v2/{name}/tags/list")
+        r.raise_for_status()
+        data = r.json()
+        # exampe: {"name":"sagebuildtest/simple","tags":["1.0.0"]}
+
+        for tag in data["tags"]:
+            yield name, tag
+
+
+def delete_docker_registry_manifest(name, tag):
+    # ref: https://docs.docker.com/registry/spec/api/#deleting-an-image
+    # note the accept header! you will get the digest without it
+    r = requests.head(f"http://registry:5000/v2/{name}/manifests/{tag}", headers={"Accept": "application/vnd.docker.distribution.manifest.v2+json"})
+
+    # nothing to do if already deleted    
+    if r.status_code == 404:
+        return
+
+    digest = r.headers["Docker-Content-Digest"]
+    r = requests.delete(f"http://registry:5000/v2/{name}/manifests/{digest}")
+    assert r.status_code == 202

@@ -35,6 +35,8 @@ services:
 
       DOCKER_REGISTRY_PASSWORD: ${DOCKER_REGISTRY_PASSWORD}
       DOCKER_REGISTRY_URL: "registry:5000"
+      DOCKER_REGISTRY_PUSH_ALLOWED: "1"
+      DOCKER_REGISTRY_INSECURE: "1"
 
       ADD_USER: ${ADD_USER}
       S3_ENDPOINT: ${S3_ENDPOINT}
@@ -62,6 +64,8 @@ services:
   registry:
     restart: always
     image: registry:2
+    environment:
+      - REGISTRY_STORAGE_DELETE_ENABLED=true # allows us to delete manifests between unit tests
     networks:
       - sage-ecr
 
