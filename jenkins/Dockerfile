@@ -26,8 +26,4 @@ RUN apt-get update && apt-get install -y jq curl file
 # copy all buildkit tools into jenkins image
 COPY --from=buildkit /usr/bin/buildkit* /usr/bin/buildctl* /usr/bin/
 
-RUN sed -i '2icp /init.groovy /var/jenkins_home/' /usr/local/bin/jenkins.sh
-
-# Jenkins: groovy, create token
-#COPY init.groovy /var/jenkins_home/ # Volumes would overwrite this
-COPY init.groovy /
+USER jenkins

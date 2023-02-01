@@ -34,7 +34,7 @@ services:
       # jenkins config
       JENKINS_SERVER: http://jenkins:8080
       JENKINS_USER: ecrdb
-      JENKINS_TOKEN: 114df297873d76b7865486b00e28afa881
+      JENKINS_TOKEN: test
 
       DOCKER_REGISTRY_PASSWORD: ${DOCKER_REGISTRY_PASSWORD}
       DOCKER_REGISTRY_URL: "registry:5000"
@@ -62,15 +62,7 @@ services:
     networks:
       - sage-ecr
     cap_add:
-      - SYS_NICE  # CAP_SYS_NICE
-
-  registry:
-    restart: always
-    image: registry:2
-    environment:
-      - REGISTRY_STORAGE_DELETE_ENABLED=true # allows us to delete manifests between unit tests
-    networks:
-      - sage-ecr
+      - SYS_NICE
 
   jenkins:
     image: waggle/ecr-jenkins
@@ -80,16 +72,20 @@ services:
       - "127.0.0.1:8082:8080"
       - "127.0.0.1:50000:50000"
     environment:
-      - DOCKER_REGISTRY_INSECURE=1
-      - JAVA_OPTS=-Dhudson.footerURL=http://localhost:8082 -Djenkins.install.runSetupWizard=false
       - CASC_JENKINS_CONFIG=/config/casc_jenkins.yaml
-      - JENKINS_TOKEN=114df297873d76b7865486b00e28afa881
+      - JAVA_OPTS=-Dhudson.footerURL=http://localhost:8082 -Djenkins.install.runSetupWizard=false
     volumes:
       - ./jenkins/casc_jenkins.yaml:/config/casc_jenkins.yaml:ro
     networks:
       - sage-ecr
-    # converting from
-    # --env -p 8082:8080  -p 50000:50000 -v `pwd`/jenkins/casc_jenkins.yaml:/config/casc_jenkins.yaml:ro -v `pwd`/temp:/docker:rw -v /var/run/docker.sock:/var/run/docker.sock ${DOCKER_MOUNT} waggle/ecr-jenkins
+
+  registry:
+    restart: always
+    image: registry:2
+    environment:
+      - REGISTRY_STORAGE_DELETE_ENABLED=true # allows us to delete manifests between unit tests
+    networks:
+      - sage-ecr
 
   buildkitd:
     image: moby/buildkit:latest
@@ -100,13 +96,6 @@ services:
     privileged: true
     networks:
       - sage-ecr
-
-# test commands... should perform this as as unit test?
-# cd /root && git clone https://github.com/waggle-sensor/plugin-test-pipeline
-#
-# buildctl --addr tcp://buildkitd:1234 build --frontend=dockerfile.v0 --opt platform=linux/amd64,linux/arm64 --local context=. --local dockerfile=. --output type=image,name=test-pipeline
-# buildctl --addr tcp://buildkitd:1234 build --frontend=dockerfile.v0 --opt platform=linux/amd64,linux/arm64 --local context=. --local dockerfile=. --output type=image,name=registry:5000/x/test-pipeline,push=true
-# buildctl --addr tcp://buildkitd:1234 build --frontend=dockerfile.v0 --opt platform=linux/amd64,linux/arm64 --local context=. --local dockerfile=. --output type=image,name=registry.sagecontinuum.org/x/test-pipeline,push=true
 
 volumes:
   sage-ecr-db:

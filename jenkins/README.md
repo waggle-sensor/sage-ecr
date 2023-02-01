@@ -1,2 +1,4 @@
+This Jenkins is for testing purposes only.
 
-This Jenkins is for testing purposes only. See `./run.sh` in the root directory of this repository for more details.
+In production, you may want to manage Jenkins as its own service and simply provide ECR
+with a username / password you have created.
