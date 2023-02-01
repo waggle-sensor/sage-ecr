@@ -19,8 +19,10 @@ RUN jenkins-plugin-cli \
     ws-cleanup \
     credentials-binding                 # required for ecr-registry credentials
 
+# the follow steps require root permission to perform
 USER root
 
+# install additional system utils
 RUN apt-get update && apt-get install -y jq curl file
 
 # copy all buildkit tools into jenkins image

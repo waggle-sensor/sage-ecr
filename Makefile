@@ -7,8 +7,9 @@ stop:
 test:
 	@docker-compose exec sage-ecr /bin/ash -c 'coverage run -m pytest -v; coverage report -m; coverage html'
 
-testx:
-	@docker-compose exec sage-ecr /bin/ash -c 'coverage run -m pytest -v -x; coverage report -m; coverage html'
+# TODO(sean) unify this with make test so it's oblivious to whether it has a tty or not.
+test-no-tty:
+	@docker-compose exec -T sage-ecr /bin/ash -c 'coverage run -m pytest -v; coverage report -m; coverage html'
 
 dbshell:
 	@docker-compose exec db mysql -u sage --password=test SageECR

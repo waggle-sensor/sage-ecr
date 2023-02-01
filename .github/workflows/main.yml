@@ -23,5 +23,5 @@ jobs:
       run: sleep 10
 
     - name: run tests and coverage
-      run: make test
+      run: make test-no-tty
 
