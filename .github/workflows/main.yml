@@ -20,7 +20,7 @@ jobs:
       run: make start
 
     - name: wait for environment
-      run: while [ $(curl -s localhost:5000/healthy)_ != "ok_"  ] ; do echo waiting... ; docker-compose logs --tail=20 ; echo "jenkins log:" ; docker logs jenkins --tail=20 ; sleep 2 ; done
+      run: while [ $(curl -s localhost:5000/healthy)_ != "ok_"  ] ; do echo waiting... ; docker-compose logs --tail=20 ; echo "jenkins log:" ; docker-compose logs jenkins --tail=20 ; sleep 2 ; done
 
     - name: run tests and coverage
       run: make test
