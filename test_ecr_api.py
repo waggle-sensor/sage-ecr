@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import pytest
 import sys
+import os
 from ecr_api import app
 import json
 import time
@@ -12,6 +13,9 @@ from ecrdb import EcrDB
 @pytest.fixture
 def client():
     # WARNING! DO NOT RUN IN PRODUCTION AS DEFAULT CONFIG USES PRODUCTION DATABASE!!!
+    if os.getenv("TESTING") != "true":
+        raise RuntimeError("To prevent accidentally wiping the production database and registry, you must set the env var TESTING=true to run the test suite.")
+
     db = EcrDB()
     db.deleteAllData()
 

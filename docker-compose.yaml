@@ -16,6 +16,9 @@ services:
     networks:
       - sage-ecr
     environment:
+      # test suite requires this to be set to prevent accidentally wiping production database and registry
+      TESTING: "true"
+
       AUTH_METHOD: ${AUTH_METHOD}
 
       tokenInfoEndpoint: ${SageTokenInfoEndpoint}
