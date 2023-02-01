@@ -141,14 +141,22 @@ class JenkinsServer:
 
         # add validation here!!!
 
+        options = ["--opt", f"platform={','.join(platforms)}"]
+
+        # specifies an alternative dockerfile filename
+        if git_dockerfile and git_dockerfile != "":
+            options += ["--opt", f"filename={git_dockerfile}"]
+
         output_args = [
             "type=image",
             f"name={docker_registry_url}/{actual_namespace}/{name}:{version}",
         ]
 
+        # specifies that we should push the image to the registry
         if docker_registry_push_allowed:
             output_args += ["push=true"]
 
+        # specifies that the registry is insecure (served over http instead of https). should only be used for local testing!
         if docker_registry_insecure:
             output_args += ["registry.insecure=true"]
 
@@ -158,12 +166,11 @@ class JenkinsServer:
             "tcp://buildkitd:1234",
             "build",
             "--frontend=dockerfile.v0",
-            "--opt",
-            f"platform={','.join(platforms)}",
             "--local",
             "context=.",
             "--local",
             "dockerfile=.",
+            *options,
             "--output",
             ','.join(output_args),
         ])

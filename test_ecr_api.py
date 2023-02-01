@@ -175,6 +175,63 @@ metadata:
     assert r.status_code == 200
 
 
+def test_app_build_alternative_dockerfile(client):
+    headers = {"Authorization" : "sage testuser_token"}
+
+    # submit app
+    must_submit_app_and_get_json(client, headers=headers, app_yaml="""
+name: alternative_dockerfile
+description: "an app with an alternative dockerfile"
+version: "1.2.3"
+namespace: sagebuildtest
+source:
+  url: "https://github.com/waggle-sensor/edge-plugins.git"   # required
+  branch: "master"  # optional, default: main  (better use tag instead)
+  architectures:
+  - "linux/amd64"
+  - "linux/arm64"
+  directory : "plugin-test-dockerfile"
+  dockerfile : "Dockerfile.other"
+""")
+
+    # confirm that image is not in registry before build
+    r = requests.head("http://registry:5000/v2/sagebuildtest/alternative_dockerfile/manifests/1.2.3")
+    assert r.status_code == 404
+
+    # start build
+    r = client.post("/builds/sagebuildtest/alternative_dockerfile/1.2.3?skip_image_push=false", headers=headers)
+    assert r.status_code == 200
+    result = r.get_json()
+    assert "error" not in result
+    assert "build_number" in result
+
+    # wait for build to finish
+    while True:
+        r = client.get("/builds/sagebuildtest/alternative_dockerfile/1.2.3", headers=headers)
+        assert r.status_code == 200
+        result = r.get_json()
+        assert "error" not in result
+        assert "result" in result
+        result_status = result["result"]
+        if result_status is not None:
+            break
+        time.sleep(1)
+
+    # build should succeed
+    assert result_status == "SUCCESS"
+
+    # build log should indicate success
+    assert "url" in result
+    build_log_url = result["url"]
+    consoleTextURL = f'{build_log_url}/consoleText'
+    r = requests.get(consoleTextURL)
+    assert "Finished: SUCCESS" in r.text
+
+    # confirm that image is in registry after build
+    r = requests.head("http://registry:5000/v2/sagebuildtest/alternative_dockerfile/manifests/1.2.3")
+    assert r.status_code == 200
+
+
 def test_app_build_on_failure(client):
     headers = {"Authorization" : "sage testuser_token"}
 
