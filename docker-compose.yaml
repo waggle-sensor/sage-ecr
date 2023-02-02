@@ -3,9 +3,7 @@ services:
 
   sage-ecr:
     image: waggle/sage-ecr:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     depends_on:
       - db
     ports:
@@ -65,8 +63,7 @@ services:
       - SYS_NICE
 
   jenkins:
-    image: waggle/ecr-jenkins
-    build: jenkins
+    image: waggle/ecr-jenkins:1.0.0
     restart: always
     ports:
       - "127.0.0.1:8082:8080"
