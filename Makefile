@@ -13,7 +13,7 @@ test: initdb
 	@docker-compose exec sage-ecr /bin/ash -c 'coverage run -m pytest -v; coverage report -m; coverage html'
 
 # TODO(sean) unify this with make test so it's oblivious to whether it has a tty or not.
-test-no-tty:
+test-no-tty: initdb
 	@docker-compose exec -T sage-ecr /bin/ash -c 'coverage run -m pytest -v; coverage report -m; coverage html'
 
 dbshell:
