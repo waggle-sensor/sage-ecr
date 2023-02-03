@@ -155,3 +155,6 @@ docker_run_args =os.environ.get("DOCKER_RUN_ARGS", "")
 docker_registry_url = os.environ["DOCKER_REGISTRY_URL"]
 docker_registry_push_allowed = parsebool(os.environ.get("DOCKER_REGISTRY_PUSH_ALLOWED", "0"))
 docker_registry_insecure = parsebool(os.environ.get("DOCKER_REGISTRY_INSECURE", "0"))
+
+# buildkitd settings
+buildkitd_address = os.environ["BUILDKITD_ADDR"]

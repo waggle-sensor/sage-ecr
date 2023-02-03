@@ -163,7 +163,7 @@ class JenkinsServer:
         build_command = shlex.join([
             "buildctl",
             "--addr",
-            "tcp://buildkitd:1234",
+            buildkitd_address,
             "build",
             "--frontend=dockerfile.v0",
             "--local",

@@ -17,28 +17,33 @@ services:
       # test suite requires this to be set to prevent accidentally wiping production database and registry
       TESTING: "true"
 
-      AUTH_METHOD: ${AUTH_METHOD}
-
-      tokenInfoEndpoint: ${SageTokenInfoEndpoint}
-      tokenInfoUser: ${SageTokenInfoUser}
-      tokenInfoPassword: ${SageTokenInfoPassword}
-
-      # database config
+      # database settings
       MYSQL_HOST: db
       MYSQL_DATABASE: SageECR
       MYSQL_USER: sage
       MYSQL_PASSWORD: test
 
-      # jenkins config
+      # jenkins settings
       JENKINS_SERVER: http://jenkins:8080
       JENKINS_USER: ecrdb
       JENKINS_TOKEN: test
 
+      # registry settings
       DOCKER_REGISTRY_PASSWORD: ${DOCKER_REGISTRY_PASSWORD}
       DOCKER_REGISTRY_URL: "registry:5000"
       DOCKER_REGISTRY_PUSH_ALLOWED: "1"
       DOCKER_REGISTRY_INSECURE: "1"
 
+      # buildkit settings
+      BUILDKITD_ADDR: "tcp://buildkitd:1234"
+
+      # auth settings (not used for local testing)
+      AUTH_METHOD: ${AUTH_METHOD}
+      tokenInfoEndpoint: ${SageTokenInfoEndpoint}
+      tokenInfoUser: ${SageTokenInfoUser}
+      tokenInfoPassword: ${SageTokenInfoPassword}
+
+      # s3 settings (not used in local testing)
       ADD_USER: ${ADD_USER}
       S3_ENDPOINT: ${S3_ENDPOINT}
       S3_ACCESS_KEY: ${S3_ACCESS_KEY}
