@@ -11,6 +11,12 @@ To start the dev environment run:
 make start
 ```
 
+After starting the dev environment, you'll need to perform a one time database initialization:
+
+```sh
+make initdb
+```
+
 To stop the dev environment run:
 
 ```bash

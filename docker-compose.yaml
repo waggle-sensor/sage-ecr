@@ -26,8 +26,8 @@ services:
       # database config
       MYSQL_HOST: db
       MYSQL_DATABASE: SageECR
-      MYSQL_PASSWORD: test
       MYSQL_USER: sage
+      MYSQL_PASSWORD: test
 
       # jenkins config
       JENKINS_SERVER: http://jenkins:8080
@@ -54,13 +54,8 @@ services:
       MYSQL_DATABASE: SageECR
       MYSQL_PASSWORD: test
       MYSQL_USER: sage
-    volumes:
-      - ./schema.sql:/docker-entrypoint-initdb.d/init.sql
-      - sage-ecr-db:/var/lib/mysql
     networks:
       - sage-ecr
-    cap_add:
-      - SYS_NICE
 
   jenkins:
     image: waggle/ecr-jenkins:1.0.0
@@ -93,9 +88,6 @@ services:
     privileged: true
     networks:
       - sage-ecr
-
-volumes:
-  sage-ecr-db:
 
 networks:
   sage-ecr:
