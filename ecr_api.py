@@ -1612,7 +1612,7 @@ def createJenkinsName(app_spec):
 
 
 app = Flask(__name__)
-# CORS(app)
+CORS(app)
 app.config["PROPAGATE_EXCEPTIONS"] = True
 app.wsgi_app = ecr_middleware(app.wsgi_app)
 
