@@ -18,6 +18,7 @@ def client():
 
     db = EcrDB()
     db.deleteAllData()
+    db.initdb()
 
     delete_all_docker_registry_manifests()
 
