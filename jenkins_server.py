@@ -106,16 +106,24 @@ class JenkinsServer:
 
         name = app_spec["name"]
 
-        # TODO(sean) allow insecure flag to depend on env vars
-        # TODO(sean) decide if / host to restore test feature and understand its relationship to profiling. we should consider a unified approach to those.
-        # TODO(sean) clone submodules recursively
+        # TODO(sean) Decide if / host to restore test feature and understand its relationship to profiling. We should consider a unified approach to those.
+        # TODO(sean) Add test case for submodule clone.
         # fix dockerfile support
         template = Template('''pipeline {
     agent any
     stages {
         stage ("Checkout") {
             steps {
-                checkout scm: [$$class: 'GitSCM', userRemoteConfigs: [[url: '${url}']], branches: [[name: '${branch}']]], poll: false
+                checkout scmGit(
+                    branches: [[name: '${branch}']],
+                    extensions: [cloneOption(shallow: true)],
+                    userRemoteConfigs: [[url: '${url}']],
+                    poll: false)
+                script {
+                    dir("$${env.WORKSPACE}") {
+                        sh "git submodule update --init --recursive"
+                    }
+                }
             }
         }
         stage ("Build") {
