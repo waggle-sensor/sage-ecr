@@ -1,13 +1,23 @@
 # Tutorial
 
-## Start ECR
-```bash
+## Start and Initialize ECR
+
+First, clone the repo:
+
+```sh
 git clone https://github.com/sagecontinuum/sage-ecr.git
 cd sage-ecr
-./run.sh -d
+```
+
+Now start ECR and initialize the database.
+
+```sh
+make start
+make initdb
 ```
 
 ## Define ECR_API, SAGE_USER_TOKEN variables
+
 ```bash
 export ECR_API="localhost:5000"
 export SAGE_USER_TOKEN="testuser_token"
