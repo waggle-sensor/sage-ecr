@@ -22,35 +22,35 @@ def login_required(func):
     return wrapper2
 
 
-
-def has_permission(*permission):
-    def real_decorator(func):
-        def wrapper(self, app_id):
-
-
-            authenticated = request.environ['authenticated']
-
-            ecr_db = ecrdb.EcrDB()
+# dead code: commenting out for coverage
+# def has_permission(*permission):
+#     def real_decorator(func):
+#         def wrapper(self, app_id):
 
 
-            if not authenticated:
-                if not (ecr_db.hasPermission(app_id, "GROUP", "AllUsers" , permission)):
-                    raise ErrorResponse(f'Not authorized.', status_code=HTTPStatus.UNAUTHORIZED)
+#             authenticated = request.environ['authenticated']
 
-            requestUser = request.environ.get('user', "")
-            isAdmin = request.environ.get('admin', False)
+#             ecr_db = ecrdb.EcrDB()
 
 
-            if (isAdmin or ecr_db.hasPermission(app_id, "USER", requestUser ,permission)):
-                return func(self, app_id)
+#             if not authenticated:
+#                 if not (ecr_db.hasPermission(app_id, "GROUP", "AllUsers" , permission)):
+#                     raise ErrorResponse(f'Not authorized.', status_code=HTTPStatus.UNAUTHORIZED)
 
-            raise ErrorResponse(f'Not authorized.', status_code=HTTPStatus.UNAUTHORIZED)
+#             requestUser = request.environ.get('user', "")
+#             isAdmin = request.environ.get('admin', False)
+
+
+#             if (isAdmin or ecr_db.hasPermission(app_id, "USER", requestUser ,permission)):
+#                 return func(self, app_id)
+
+#             raise ErrorResponse(f'Not authorized.', status_code=HTTPStatus.UNAUTHORIZED)
 
 
 
 
-        return wrapper
-    return real_decorator
+#         return wrapper
+#     return real_decorator
 
 
 

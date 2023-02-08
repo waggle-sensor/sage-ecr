@@ -34,6 +34,27 @@ def test_homepage(client):
     assert r.data == b"SAGE Edge Code Repository"
 
 
+# NOTE The following test_auth_header_* tests simply use /apps/sage/simple/1.2.3 as an example
+# endpoint which requires auth. They do not assume an actual app has been populated.
+
+def test_auth_header_incomplete(client):
+    r = client.get("/apps/sage/simple/1.2.3", headers={"Authorization": "sage"})
+    assert r.status_code == 401
+    assert r.get_json() == {"error": "Authorization failed (could not parse Authorization header)"}
+
+
+def test_auth_header_invalid_bearer(client):
+    r = client.get("/apps/sage/simple/1.2.3", headers={"Authorization": "xyz testuser_token"})
+    assert r.status_code == 401
+    assert r.get_json() == {"error": "Authorization failed (Authorization bearer not supported)"}
+
+
+def test_auth_header_token_not_found(client):
+    r = client.get("/apps/sage/simple/1.2.3", headers={"Authorization": "sage doesnotexist"})
+    assert r.status_code == 401
+    assert r.get_json() == {"error": "Token not found"}
+
+
 def test_app_submit_view_delete_lifecycle(client):
     headers = {"Authorization" : "sage testuser_token"}
 
@@ -47,7 +68,7 @@ def test_app_submit_view_delete_lifecycle(client):
         assert data["source"]["url"] == "https://github.com/waggle-sensor/edge-plugins.git"
         assert data["source"]["branch"] == "master"
         assert data["source"]["architectures"] == ["linux/amd64", "linux/arm64"]
-        assert data["source"]["directory"] == "plugin-simple"
+        assert data["source"]["directory"] == "plugin-test-success"
         assert data["frozen"] is False
 
     # submit app and check response
@@ -62,7 +83,7 @@ source:
   architectures:
   - "linux/amd64"
   - "linux/arm64"
-  directory : "plugin-simple"
+  directory : "plugin-test-success"
 """)
     assert_matches_app(result)
 
@@ -96,6 +117,22 @@ source:
     assert "error" not in result
     assert len(result["data"]) == 0
 
+    # check that repository exists
+    r = client.get("/repositories/sage/simple", headers=headers)
+    assert r.status_code == 200
+
+    # delete repository
+    r = client.delete("/repositories/sage/simple", headers=headers)
+    assert r.status_code == 200
+
+    # check that namespace exists
+    r = client.get("/namespaces/sage", headers=headers)
+    assert r.status_code == 200
+
+    # delete namespace
+    r = client.delete("/namespaces/sage", headers=headers)
+    assert r.status_code == 200
+
     # consider splitting these into tests of the individual list and detail views
 
 
@@ -105,7 +142,7 @@ def test_app_build_on_success(client):
     # submit app
     must_submit_app_and_get_json(client, headers=headers, app_yaml="""
 name: simple
-description: "very important app"
+description: "this app should build correctly"
 version: "1.0.0"
 namespace: sagebuildtest
 authors: "Princess Zelda <zelda@hyrule.org>, King Rhoam <rhoam@hyrule.org> (https://hyrule.org)"
@@ -121,7 +158,7 @@ source:
   - "linux/amd64"
   - "linux/arm64"
   #tag: "v0.5"  # recommended
-  directory : "plugin-simple"  # optional, default: root of git repository
+  directory : "plugin-test-success"  # optional, default: root of git repository
   dockerfile : "Dockerfile"   # optional, default: Dockerfile , relative to context directory
   build_args: # optional, key-value pairs for docker build
     VARIABLE1: "value1"
@@ -182,7 +219,7 @@ def test_app_build_alternative_dockerfile(client):
     # submit app
     must_submit_app_and_get_json(client, headers=headers, app_yaml="""
 name: alternative_dockerfile
-description: "an app with an alternative dockerfile"
+description: "this app uses a different dockerfile"
 version: "1.2.3"
 namespace: sagebuildtest
 source:
@@ -239,7 +276,7 @@ def test_app_build_on_failure(client):
     # submit app
     must_submit_app_and_get_json(client, headers=headers, app_yaml="""
 name: failure
-description: "very nonexistant app"
+description: "this app should fail to build"
 version: "1.0.0"
 namespace: sagebuildtest
 source:
@@ -248,7 +285,7 @@ source:
   architectures:
   - "linux/amd64"
   - "linux/arm64"
-  directory : "plugin-should-not-exist-1234123"
+  directory : "plugin-test-failure"
 """)
 
     # start build

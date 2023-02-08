@@ -35,36 +35,6 @@ class JenkinsServer:
         if not source :
             raise Exception("field source empty")
 
-        ###
-        run_test = "\'echo No test defined\'"
-        run_entrypoint = ""
-        test = app_spec.get("testing")
-        if test:
-
-
-            test_command = test.get("command")
-
-            if "mask_entrypoint" in test.keys() and test.get("mask_entrypoint"):
-                    run_entrypoint = ' --entrypoint=\'\''
-
-
-            #if entrypoint_command:
-            #    all_entrypoint_command = " ".join(entrypoint_command)
-            #    run_entrypoint = "\'" + all_entrypoint_command + "\'"
-            if test_command:
-                all_test_command = " ".join(test_command)
-                run_test = "\'" +  all_test_command + "\'"
-
-
-
-
-        # t = " \' rm -rf \' "
-
-
-
-
-        #sourceArray = source.split("#", 3)
-
         git_url = source.get("url", "")
 
         git_branch = source.get("tag", "")
@@ -216,25 +186,16 @@ class JenkinsServer:
 
         while True:
             try:
-
-                my_job = self.server.get_job_config(id)
-                return my_job
+                return self.server.get_job_config(id)
             except jenkins.NotFoundException as e: # pragma: no cover
                 pass
             except Exception as e: # pragma: no cover
                 raise
 
-            if True: # pragma: no cover
-                time.sleep(2)
-                timeout -= 2
-
-                if timeout <= 0:
-                    raise Exception(f'timout afer job creation')
-                continue
-
-
-        return 1
-        #print("jobs: "+server.jobs_count())
+            time.sleep(2)
+            timeout -= 2
+            if timeout <= 0:
+                raise Exception(f'timout afer job creation')
 
 
 def createPipelineJobConfig(jenkinsfile, displayName):

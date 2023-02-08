@@ -91,24 +91,20 @@ class ecr_middleware:
             app.logger.info("auth middleware: no auth header")
             return self.app(environ, start_response)
 
-        authHeaderArray = authHeader.split(" ", 2)
+        authHeaderArray = authHeader.split(maxsplit=2)
+
         if len(authHeaderArray) != 2:
-            app.logger.info("bad size")
+            app.logger.info("bad auth header size")
             #res = Response(f'Authorization failed (could not parse Authorization header)', mimetype= 'text/plain', status=401)
             res= ErrorWResponse(f'Authorization failed (could not parse Authorization header)', status_code=HTTPStatus.UNAUTHORIZED)
             return res(environ, start_response)
 
-        if authHeaderArray[0].lower() != "sage" and authHeaderArray[0].lower() != "static":
+        bearer, token = authHeaderArray
+
+        if bearer not in ["sage", "static"]:
             app.logger.info("bad realm")
             #res = Response(f'Authorization failed (Authorization bearer not supported)', mimetype= 'text/plain', status=401)
             res= ErrorWResponse(f'Authorization failed (Authorization bearer not supported)', status_code=HTTPStatus.UNAUTHORIZED)
-            return res(environ, start_response)
-
-        token = authHeaderArray[1]
-        if token == "":
-            app.logger.info("auth middleware: empty token")
-            #res = Response(f'Authorization failed (token empty)', mimetype= 'text/plain', status=401)
-            res= ErrorWResponse(f'Authorization failed (token empty)', status_code=HTTPStatus.UNAUTHORIZED)
             return res(environ, start_response)
 
         # example: curl -X POST -H 'Accept: application/json; indent=4' -H "Authorization: Basic c2FnZS1hcGktc2VydmVyOnRlc3Q=" -d 'token=<SAGE-USER-TOKEN>'  <sage-ui-hostname>:80/token_info/
@@ -195,19 +191,7 @@ class ecr_middleware:
         return self.app(environ, start_response)
 
 
-
-def getValue(dict, key,  default):
-    if not key in dict:
-        return default
-
-    if dict[key] == None:
-        return default
-
-    return dict[key]
-
 def run_command_communicate(command, input_str=None, cwd=None, timeout=None):
-
-
     try:
         p = subprocess.Popen(command, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     except Exception as e:
@@ -505,12 +489,12 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
     if not isinstance(appMetadata, dict):
         raise Exception("metadata has to be an object")
 
-    url = build_source.get("url", "")
+    url = build_source.get("url") or ""
     if url == "":
         raise Exception("url missing in source")
 
-    tag = getValue(build_source, "tag", "")
-    branch = getValue(build_source, "branch", "")
+    tag = build_source.get("tag") or ""
+    branch = build_source.get("branch") or ""
 
     if branch == "" and tag == "":
         raise Exception("Neither tag nor branch specified")
@@ -588,34 +572,34 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
     #    test_data = {"command": [""], "entrypoint": [""]}
     #    dbObject["testing"] = json.dumps(test_data)
     #else:
-    if postData.get("testing"):
-        testing = postData.get("testing")
-        p = re.compile(f'[a-zA-Z0-9_. -]+', re.ASCII)
+    # if postData.get("testing"):
+    #     testing = postData.get("testing")
+    #     p = re.compile(f'[a-zA-Z0-9_. -]+', re.ASCII)
 
-        for field in testing.keys():
-            if field not in  ["command","mask_entrypoint"]:
-                raise Exception(f'Input field {field} not supported')
+    #     for field in testing.keys():
+    #         if field not in  ["command","mask_entrypoint"]:
+    #             raise Exception(f'Input field {field} not supported')
 
-        if not "command" in testing.keys():
-            raise Exception(f'testing specified but command missing')
+    #     if not "command" in testing.keys():
+    #         raise Exception(f'testing specified but command missing')
 
-        if not isinstance(testing.get("command"), list):
-                raise Exception(f'{field} has to be an array')
+    #     if not isinstance(testing.get("command"), list):
+    #             raise Exception(f'{field} has to be an array')
 
-        for argument in testing.get("command"):
-            if not p.fullmatch(argument):
-                raise Exception (f'command contains invalid characters')
+    #     for argument in testing.get("command"):
+    #         if not p.fullmatch(argument):
+    #             raise Exception (f'command contains invalid characters')
 
-        if "mask_entrypoint" in testing.keys():
-            if not isinstance(testing.get("mask_entrypoint"), bool):
-                raise Exception(f'Field mask_entrypoint has to be a boolean')
-
-
-        #if field in ["command","entrypoint"]:
+    #     if "mask_entrypoint" in testing.keys():
+    #         if not isinstance(testing.get("mask_entrypoint"), bool):
+    #             raise Exception(f'Field mask_entrypoint has to be a boolean')
 
 
-        test_str = json.dumps(testing)
-        dbObject["testing"] = test_str
+    #     #if field in ["command","entrypoint"]:
+
+
+    #     test_str = json.dumps(testing)
+    #     dbObject["testing"] = test_str
 
 
 
@@ -665,13 +649,8 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
 
 
 
-    directory = build_source.get("directory", ".")
-    if directory == "":
-        directory = "."
-
-    dockerfile = build_source.get("dockerfile", "Dockerfile")
-    if dockerfile == "":
-        dockerfile = "Dockerfile"
+    directory = build_source.get("directory") or "."
+    dockerfile = build_source.get("dockerfile") or "Dockerfile"
 
 
     build_args_dict = build_source.get("build_args", {})
@@ -682,7 +661,6 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
         value = build_args_dict[key]
         if not isinstance(value, str):
             raise Exception(f'build_args values have to be strings')
-
 
     build_args_str = json.dumps(build_args_dict)
 
