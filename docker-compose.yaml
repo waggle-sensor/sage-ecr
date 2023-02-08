@@ -67,7 +67,6 @@ services:
     restart: always
     ports:
       - "127.0.0.1:8082:8080"
-      - "127.0.0.1:50000:50000"
     environment:
       - CASC_JENKINS_CONFIG=/config/casc_jenkins.yaml
       - JAVA_OPTS=-Dhudson.footerURL=http://localhost:8082 -Djenkins.install.runSetupWizard=false

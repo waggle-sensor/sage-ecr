@@ -1,4 +1,4 @@
-FROM python:3.8-alpine
+FROM python:3.11-alpine
 
 WORKDIR /usr/src/app
 
@@ -6,7 +6,8 @@ WORKDIR /usr/src/app
 RUN apk add linux-headers mariadb-connector-c-dev gcc musl-dev git
 
 COPY requirements.txt /usr/src/app/
-RUN /usr/local/bin/python -m pip install --upgrade pip && pip install -r requirements.txt
+# RUN /usr/local/bin/python -m pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install -r requirements.txt
 
 COPY *.py /usr/src/app/
 
