@@ -1,7 +1,17 @@
 import os, sys
+
+
+def parsebool(s):
+    if s.lower() in ["1", "t", "true"]:
+        return True
+    if s.lower() in ["0", "f", "false"]:
+        return False
+    raise ValueError("invalid boolean flag")
+
+
 # https://mysqlclient.readthedocs.io/user_guide.html#mysqldb-mysql
 mysql_host = os.getenv('MYSQL_HOST')
-mysql_db =os.getenv('MYSQL_DATABASE')
+mysql_db = os.getenv('MYSQL_DATABASE')
 mysql_user =  os.getenv('MYSQL_USER')
 mysql_password =  os.getenv('MYSQL_PASSWORD')
 #app.config['MYSQL_DATABASE_HOST'] = os.getenv('MYSQL_HOST')
@@ -114,11 +124,12 @@ if auth_method == "sage":
 
 
 # static_tokens: only used for testing
-static_tokens = {   "token1" : { "id": "testuser"} ,
-                    "admin_token" : { "id":"admin", "is_admin": True} ,
-                    "token3" : { "id": "sage_docker_auth", "scopes":"ecr_authz_introspection"} ,
-                    "token2" : { "id": "testuser2"}
-                }
+static_tokens = {
+    "testuser_token": {"id": "testuser"},
+    "testuser2_token": {"id": "testuser2"},
+    "admin_token": {"id":"admin", "is_admin": True},
+    "sage_docker_auth_token": {"id": "sage_docker_auth", "scopes":"ecr_authz_introspection"},
+}
 
 add_user=os.getenv('ADD_USER', default="")
 if add_user:
@@ -132,121 +143,18 @@ if add_user:
     print(f'added token {x_token} for user {x_user_id}', file=sys.stderr)
 
 
-
 # jenkins
 jenkins_user = os.environ.get("JENKINS_USER", "ecrdb")
 jenkins_token = os.environ.get("JENKINS_TOKEN", "")
 jenkins_server = os.getenv('JENKINS_SERVER', default="http://localhost:8082")
 
-docker_build_args= os.environ.get("DOCKER_BUILD_ARGS", "")
-docker_run_args=os.environ.get("DOCKER_RUN_ARGS", "")
+docker_build_args = os.environ.get("DOCKER_BUILD_ARGS", "")
+docker_run_args =os.environ.get("DOCKER_RUN_ARGS", "")
 
 # docker registry
-docker_registry_url = os.environ.get("DOCKER_REGISTRY_URL", "")
-if docker_registry_url == "":
-        sys.exit("docker_registry_url not defined")
+docker_registry_url = os.environ["DOCKER_REGISTRY_URL"]
+docker_registry_push_allowed = parsebool(os.environ.get("DOCKER_REGISTRY_PUSH_ALLOWED", "0"))
+docker_registry_insecure = parsebool(os.environ.get("DOCKER_REGISTRY_INSECURE", "0"))
 
-
-docker_registry_push_allowed = os.environ.get("DOCKER_REGISTRY_PUSH_ALLOWED", "0") == "1"
-
-
-
-jenkinsfileTemplatePrefix = ''' pipeline{
-
-    agent any
-    stages {
-        stage ("checkout") {
-            steps{
-                checkout scm: [$$class: 'GitSCM', userRemoteConfigs: [[url: '${url}']], branches: [[name: '${branch}']]], poll: false
-            }
-        }
-        stage ('Write') {
-            steps{
-
-                script{
-
-                    for (arch in ${platforms_list}){
-
-                        stage('Build') {
-
-                            currentBuild.displayName = "${version}"
-
-                            //git branch: '${branch}',
-                            //url: '${url}'
-
-
-                            dir("$${env.WORKSPACE}/${directory}"){
-                                echo "########### Building for architecture $$arch"
-                                sh "docker version"
-                                sh "docker buildx version"
-                                ${docker_login}
-                                sh "docker buildx build --pull --load --builder sage --platform $$arch ${build_args_command_line} -t ${docker_registry_url}/${namespace}/${name}:${version} -f ${dockerfile} ."
-
-                            }
-
-                        }
-
-
-'''
-
-jenkinsfileTemplateTestStage = '''
-
-                        stage('Test') {
-
-                            currentBuild.displayName = "${version}"
-
-                            //git branch: '${branch}',
-                            //url: '${url}'
-                            dir("$${env.WORKSPACE}/${directory}"){
-                                echo "########### Testing for architecture $$arch"
-
-                                ${docker_login}
-
-                                script{
-                                        if ( "${command}" == "''" ){
-                                            ;
-                                        }
-                                        else{
-                                            sh "docker run -i ${docker_run_args} --rm ${entrypoint} ${docker_registry_url}/${namespace}/${name}:${version} \'${command}\'"
-                                        }
-                                }
-                            }
-
-                        }
-'''
-
-jenkinsfileTemplateSuffix = '''
-                    }
-                    stage ('Multi Arch Build'){
-                        //git branch: '${branch}',
-                        //url: '${url}'
-                        dir("$${env.WORKSPACE}/${directory}"){
-                            echo "########### Final build for multi-arch docker image"
-
-                            ${docker_login}
-                            sh "docker buildx build --pull --builder sage --platform ${platforms} ${build_args_command_line} ${do_push} -t ${docker_registry_url}/${namespace}/${name}:${version} -f ${dockerfile} ."
-
-                        }
-                    }
-
-
-
-                }
-
-
-
-
-            }
-
-        }
-
-
-}
-post {
-                       always {
-                            cleanWs(cleanWhenNotBuilt: true)
-                        }
-                    }
-
-    }
-'''
+# buildkitd settings
+buildkitd_address = os.environ["BUILDKITD_ADDR"]

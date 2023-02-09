@@ -1,6 +1,4 @@
-
 # Kubernetes deployment of ECR
-
 
 WARNING: this is currently not working with a local docker registry. It will work with a local docker registry only if the registry can be reached by a unique global url (hostname or domain) that can be reached from the docker engine as well as the docker client (engine and client run in different networks in kubernetes).
 

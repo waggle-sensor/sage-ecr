@@ -18,9 +18,9 @@ import bleach
 #logger = logging.getLogger('__name__')
 logger=None
 
-class EcrDB():
-    def __init__ ( self , retries=60) :
+class EcrDB:
 
+    def __init__ (self, retries=60):
         if not config.mysql_host:
             raise Exception("mysql_host is not defined")
 
@@ -40,6 +40,178 @@ class EcrDB():
 
         self.cur=self.db.cursor()
         return
+
+    def execute(self, query, values=None):
+        self.cur.execute(query, values)
+
+    def initdb(self):
+        # TODO(sean) This should eventually be replaced with an actual database migration. Otherwise, we
+        # will have to manually run any table alterations out of band to sync up to the tables below.
+
+        self.cur.execute("""
+CREATE TABLE IF NOT EXISTS Apps (
+    id                  VARCHAR(194) UNIQUE NOT NULL,
+    namespace           VARCHAR(64),
+    name                VARCHAR(64),
+    version             VARCHAR(64),
+    frozen              BOOLEAN DEFAULT FALSE,
+    description         TEXT,
+    authors             TEXT,
+    collaborators       TEXT,
+    keywords            TEXT,
+    homepage            TEXT,
+    funding             TEXT,
+    license             VARCHAR(256),
+    depends_on          VARCHAR(128),
+    baseCommand         VARCHAR(64),
+    arguments           VARCHAR(256),
+    inputs              TEXT,
+    metadata            TEXT,
+    testing             VARCHAR(256),
+    schema_version      VARCHAR(64),
+    time_created        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    time_last_updated   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    owner               VARCHAR(64) NOT NULL,
+    INDEX(id, namespace, name, version)
+);
+""")
+
+        self.cur.execute("""
+CREATE TABLE IF NOT EXISTS Sources (
+    id                  VARCHAR(194) NOT NULL,
+    architectures       VARCHAR(256),
+    url                 VARCHAR(256) NOT NULL,
+    branch              VARCHAR(64),
+    tag                 VARCHAR(64),
+    git_commit          VARCHAR(40), /* Typicall not set by user, but could be in the future */
+    directory           VARCHAR(256),
+    dockerfile          VARCHAR(256),
+    build_args          VARCHAR(256),
+    PRIMARY KEY (id)
+);
+""")
+
+        self.cur.execute("""
+CREATE TABLE IF NOT EXISTS Namespaces (
+    id                  VARCHAR(32) NOT NULL,
+    owner_id            VARCHAR(64) NOT NULL,
+    PRIMARY KEY (id)
+);
+""")
+
+        self.cur.execute("""
+CREATE TABLE IF NOT EXISTS Repositories (
+    namespace             VARCHAR(32) NOT NULL,
+    name                  VARCHAR(256) NOT NULL,
+    owner_id              VARCHAR(64) NOT NULL,
+    description           TEXT,
+    external_link         VARCHAR(256),
+    PRIMARY KEY (namespace,name)
+);
+""")
+
+        self.cur.execute("""
+CREATE TABLE IF NOT EXISTS MetaFiles (
+    app_id                VARCHAR(194) NOT NULL,
+    namespace             VARCHAR(64),
+    name                  VARCHAR(64),
+    version               VARCHAR(64),
+    file_name             VARCHAR(256),
+    file                  MEDIUMBLOB,
+    kind                  ENUM('thumb', 'image', 'science_description'),
+    description           TEXT,  /* maybe useful for alt text, but not currently used */
+    PRIMARY KEY (app_id, file_name),
+    INDEX(app_id, namespace, name, version)
+);
+""")
+
+        self.cur.execute("""
+CREATE TABLE IF NOT EXISTS Permissions (
+    resourceType        VARCHAR(64),
+    resourceName        VARCHAR(64),
+    granteeType         ENUM('USER', 'GROUP'),
+    grantee             VARCHAR(64),
+    permission          ENUM('READ', 'WRITE', 'READ_ACP', 'WRITE_ACP', 'FULL_CONTROL'),
+    PRIMARY KEY (resourceType, resourceName, granteeType, grantee, permission)
+);
+""")
+
+        self.cur.execute("""
+CREATE TABLE IF NOT EXISTS Builds (
+    id                  VARCHAR(194) NOT NULL,
+    build_name          VARCHAR(64),
+    build_number        INT NOT NULL,
+    architectures       VARCHAR(256),
+    time_created        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    time_last_updated   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id, build_name, build_number)
+);
+""")
+
+        self.cur.execute("""
+CREATE TABLE IF NOT EXISTS Certifications (
+    id                  VARCHAR(194) NOT NULL PRIMARY KEY,
+    profile             VARCHAR(64),
+    certifiedBy         VARCHAR(64),
+    certifiedDate       TIMESTAMP
+);
+""")
+
+        self.cur.execute("""
+CREATE TABLE IF NOT EXISTS Profiles (
+    id                  VARCHAR(194) NOT NULL PRIMARY KEY,
+    number              INT DEFAULT '-1',
+    profile             VARCHAR(64),
+    certifiedBy         VARCHAR(64),
+    certifiedDate       TIMESTAMP
+);
+""")
+
+        self.cur.execute("""
+CREATE TABLE IF NOT EXISTS Resources (
+   id                  VARCHAR(194) NOT NULL,
+    resource            VARCHAR(256),
+    PRIMARY KEY(`id`, `resource`)
+);
+""")
+
+        self.cur.execute("""
+CREATE TABLE IF NOT EXISTS TokenCache (
+    token               VARCHAR(256) NOT NULL,
+    user                VARCHAR(256) NOT NULL,
+    scopes              VARCHAR(512) NOT NULL,
+    is_admin            BOOLEAN,
+    expires             TIMESTAMP,  /* this is the cache expiration (1hour), not real token expiration (weeks) */
+    PRIMARY KEY (token)
+);
+""")
+
+        self.cur.execute("""
+CREATE EVENT IF NOT EXISTS AuthNCacheEvent
+ON SCHEDULE
+EVERY 1 HOUR
+COMMENT 'TokenCleanup'
+DO
+DELETE FROM `SageECR`.`TokenCache` WHERE `expires` < NOW();
+""")
+
+    def deleteAllData(self):
+        tables = [
+            "Apps",
+            "Sources",
+            "Namespaces",
+            "Repositories",
+            "MetaFiles",
+            "Permissions",
+            "Builds",
+            "Certifications",
+            "Profiles",
+            "Resources",
+            "TokenCache",
+        ]
+
+        for table in tables:
+            self.cur.execute(f"TRUNCATE TABLE {table}")
 
     # returns true if user has the permissions
     # TODO if resourceType  = repository, also check namespace
@@ -69,7 +241,6 @@ class EcrDB():
             permissionsPublicRead='(granteeType="GROUP" AND grantee="Allusers")'
 
         stmt = f'SELECT * FROM Permissions WHERE resourceType = %s AND resourceName = %s AND ((  granteeType = %s AND grantee = %s AND ({permissionIN}) ) OR {permissionsPublicRead}  )'
-        #print(f'stmt: {stmt}  resourceType={resourceType} resourceName={resourceName} granteeType={granteeType} grantee={grantee} permissions={json.dumps(permissions)}', file=sys.stderr)
 
         debug_stmt = stmt
 
@@ -82,10 +253,7 @@ class EcrDB():
             debug_stmt = debug_stmt.replace("%s", p, 1)
 
 
-        print(f'(hasPermission) debug stmt: {debug_stmt}', file=sys.stderr)
-
-
-        self.cur.execute(stmt, (resourceType, resourceName, granteeType, grantee,  *permissions ))
+        self.execute(stmt, (resourceType, resourceName, granteeType, grantee,  *permissions))
         row = self.cur.fetchone()
         if row == None:
             return False
@@ -96,26 +264,17 @@ class EcrDB():
         return False
 
     def insertApp(self, col_names_str, values, variables_str, sources_values, resourcesArray):
-
-
         stmt = f'REPLACE INTO Sources ( id, architectures , url, branch, tag, git_commit, directory, dockerfile, build_args ) VALUES (%s , %s, %s, %s, %s, %s, %s, %s, %s)'
-        print(f"replace statement: {stmt}", file=sys.stderr)
-        #print(f"build_args_str: {build_args_str}", file=sys.stderr)
-        self.cur.execute(stmt, sources_values)
+        self.execute(stmt, sources_values)
 
         id_str = sources_values[0]
         for res in resourcesArray:
             res_str = json.dumps(res)
             stmt = f'REPLACE INTO Resources ( id, resource) VALUES (%s , %s)'
-            self.cur.execute(stmt, (id_str, res_str,))
-
-
-        print(f'values: {values}', file=sys.stderr)
-
+            self.execute(stmt, (id_str, res_str,))
 
         stmt = f'REPLACE INTO Apps ( {col_names_str}) VALUES ({variables_str})'
-        print(f'stmt: {stmt}', file=sys.stderr)
-        self.cur.execute(stmt, values)
+        self.execute(stmt, values)
 
         self.db.commit()
 
@@ -123,8 +282,6 @@ class EcrDB():
 
 
     def deleteApp(self, user, isAdmin, namespace, repository, version, force=False):
-
-
         app, ok = self.listApps(user=user, isAdmin=isAdmin, namespace=namespace, repository=repository, version=version)
 
         if not ok:
@@ -140,13 +297,11 @@ class EcrDB():
 
         for table in ["Apps", "Sources", "Certifications", "Profiles"]:
             stmt_apps = f'DELETE FROM {table} WHERE `id` = %s'
-            print(f'stmt: {stmt_apps} app_id={app_id}', file=sys.stderr)
-            self.cur.execute(stmt_apps, (app_id, ))
+            self.execute(stmt_apps, (app_id, ))
 
         # also cleanup metafiles
         stmt_apps = f'DELETE FROM MetaFiles WHERE `app_id` = %s'
-        print(f'stmt: {stmt_apps} app_id={app_id}', file=sys.stderr)
-        self.cur.execute(stmt_apps, (app_id, ))
+        self.execute(stmt_apps, (app_id, ))
 
         self.db.commit()
 
@@ -156,8 +311,7 @@ class EcrDB():
 
     def getAppField(self, app_id, field):
         stmt = f'SELECT  id, {field} FROM Apps WHERE `id` = %s'
-        print(f'stmt: {stmt} app_id={app_id}', file=sys.stderr)
-        self.cur.execute(stmt, (app_id, ))
+        self.execute(stmt, (app_id, ))
 
         returnFields = ["id", field]
         returnObj={}
@@ -197,7 +351,7 @@ class EcrDB():
 
         logger.debug(f'(setAppField) debug_stmt: {debug_stmt}')
 
-        self.cur.execute(stmt, values)
+        self.execute(stmt, values)
         self.db.commit()
         return int(self.cur.rowcount)
 
@@ -212,7 +366,7 @@ class EcrDB():
 
         logger.debug(f'(countApps) debug stmt: {debug_stmt}')
 
-        self.cur.execute(stmt , (namespace, repository,))
+        self.execute(stmt , (namespace, repository,))
         result=self.cur.fetchone()
 
         return result[0]
@@ -227,7 +381,7 @@ class EcrDB():
 
         logger.debug(f'(countApps) debug stmt: {debug_stmt}')
 
-        self.cur.execute(stmt , (namespace,))
+        self.execute(stmt , (namespace,))
         result=self.cur.fetchone()
 
         return result[0]
@@ -349,9 +503,7 @@ class EcrDB():
 
         logger.debug(f'(listApps) debug stmt: {debug_stmt}')
 
-
-        #print(f'stmt: {stmt}', file=sys.stderr)
-        self.cur.execute(stmt , query_data)
+        self.execute(stmt , query_data)
 
         #self.cur.rowcount
 
@@ -418,17 +570,17 @@ class EcrDB():
 
         # get thumbnails  # todo(nc): write as join without subqueries?
         stmt = f'SELECT app_id, namespace, name, version, file_name FROM MetaFiles WHERE kind = "thumb" AND app_id IN ({format_strings});'
-        self.cur.execute(stmt, tuple(app_ids))
+        self.execute(stmt, tuple(app_ids))
         thumbs = self.cur.fetchall()
 
         # images
         stmt = f'SELECT app_id, namespace, name, version, file_name FROM MetaFiles WHERE kind = "image" AND app_id IN ({format_strings});'
-        self.cur.execute(stmt, tuple(app_ids))
+        self.execute(stmt, tuple(app_ids))
         images = self.cur.fetchall()
 
         # science markdown
         stmt = f'SELECT app_id, namespace, name, version, file_name FROM MetaFiles WHERE kind = "science_description" AND app_id IN ({format_strings});'
-        self.cur.execute(stmt, tuple(app_ids))
+        self.execute(stmt, tuple(app_ids))
         sci_descripts = self.cur.fetchall()
 
         # (hacky) joining of the meta paths
@@ -457,18 +609,7 @@ class EcrDB():
 
 
         stmt = f'SELECT DISTINCT id , owner_id FROM Namespaces INNER JOIN Permissions  ON Permissions.resourceType="namespace" AND Permissions.resourceName=Namespaces.id  AND ( ({user_condition}) OR (granteeType="GROUP" AND grantee="AllUsers")) AND (permission in ("READ", "WRITE", "FULL_CONTROL"))'
-
-
-        print(f'stmt: {stmt}', file=sys.stderr)
-
-        debug_stmt = stmt
-        if user != "" :
-            debug_stmt = debug_stmt.replace("%s", f'"{user}"', 1)
-        print(f'(listNamespaces) debug stmt: {debug_stmt}', file=sys.stderr)
-
-        self.cur.execute(stmt , query_data)
-
-
+        self.execute(stmt , query_data)
 
         rows = self.cur.fetchall()
 
@@ -554,11 +695,9 @@ class EcrDB():
 
 
         logger.debug(f'(listRepositories) debug stmt: {debug_stmt}')
-        #print(f'stmt: {stmt}', file=sys.stderr)
-        #print(f'query_data: {query_data}', file=sys.stderr)
-        self.cur.execute(stmt , query_data)
-        #self.cur.execute(stmt , (namespace, user))
-        #self.cur.execute(debug_stmt )
+        self.execute(stmt , query_data)
+        #self.execute(stmt , (namespace, user))
+        #self.execute(debug_stmt )
 
 
         rows = self.cur.fetchall()
@@ -566,7 +705,6 @@ class EcrDB():
         rep_list = []
         logger.debug(f'len(rows): {len(rows)}')
         for row in rows:
-            #print(f'row: {row}', file=sys.stderr)
             obj = {}
 
             #obj = dict(zip(fields, row))
@@ -584,15 +722,13 @@ class EcrDB():
 
     def getPermissions(self, resourceType, resourceName):
         stmt = f'SELECT  resourceType, resourceName, granteeType , grantee, permission FROM Permissions WHERE resourceType = %s AND resourceName = %s'
-        print(f'stmt: {stmt} resourceType={resourceType}, resourceName={resourceName}', file=sys.stderr)
-        self.cur.execute(stmt, (resourceType, resourceName ))
+        self.execute(stmt, (resourceType, resourceName ))
 
         rows = self.cur.fetchall()
 
         perm_list = []
 
         for row in rows:
-            #print(f'row: {row}', file=sys.stderr)
 
             perm_list.append({"resourceType": row[0], "resourceName": row[1], "granteeType": row[2], "grantee":row[3], "permission":row[4]})
 
@@ -618,14 +754,13 @@ class EcrDB():
         logger.debug(f'getRepoPermissionsByOwner: {debug_stmt}')
 
 
-        self.cur.execute(stmt, (owner_id, owner_id, ))
+        self.execute(stmt, (owner_id, owner_id, ))
 
         rows = self.cur.fetchall()
 
         perm_list = []
 
         for row in rows:
-            #print(f'row: {row}', file=sys.stderr)
             obj = {}
             for pos, field in enumerate(fields):
                 obj[field] = row[pos]
@@ -646,10 +781,9 @@ class EcrDB():
         for key in [resourceType, resourceName, granteeType , grantee , permission]:
             debug_stmt = debug_stmt.replace("%s", f'"{key}"', 1)
 
-        print(f'(addPermission) debug stmt: {debug_stmt}', file=sys.stderr)
 
 
-        self.cur.execute(stmt, (resourceType, resourceName, granteeType, grantee , permission))
+        self.execute(stmt, (resourceType, resourceName, granteeType, grantee , permission))
 
         self.db.commit()
 
@@ -683,30 +817,22 @@ class EcrDB():
         stmt_delete_permissions +=  ' AND NOT (granteeType="USER" AND grantee=%s AND permission="FULL_CONTROL")'
         params.append(owner)
 
-        print(f'delete stmt: {stmt_delete_permissions} params='+json.dumps(params), file=sys.stderr)
-        self.cur.execute(stmt_delete_permissions, params)
+        self.execute(stmt_delete_permissions, params)
         self.db.commit()
-
 
         return int(self.cur.rowcount)
 
 
     def getBuildInfo(self, app_id, name):
-
-
-
         stmt = f'SELECT  id, build_number , architectures FROM Builds WHERE id = %s AND build_name=%s ORDER BY time_created DESC LIMIT 1'
-        print(f'stmt: {stmt} app_id={app_id}', file=sys.stderr)
-        self.cur.execute(stmt, (app_id, name))
+        self.execute(stmt, (app_id, name))
 
         row = self.cur.fetchone()
         if row == None:
             raise Exception("No build id found in database")
 
-
         number = row[1]
         architectures = json.loads(row[2])
-
 
         return (number, architectures)
 
@@ -718,7 +844,7 @@ class EcrDB():
         stmt = 'REPLACE INTO Builds ( id, build_name, build_number, architectures)  VALUES (%s , %s,  %s, %s) '
 
 
-        self.cur.execute(stmt, (app_id, build_name, build_number, architectures_str))
+        self.execute(stmt, (app_id, build_name, build_number, architectures_str))
 
         self.db.commit()
 
@@ -729,9 +855,7 @@ class EcrDB():
     # return user id if token found, empty string otherwise
     def getTokenInfo(self, token):
         stmt = 'SELECT user, scopes, is_admin FROM TokenCache WHERE SHA2(%s, 512) = token'
-        print(f'stmt: {stmt} token={token[:4]}...', file=sys.stderr)
-
-        self.cur.execute(stmt, (token,))
+        self.execute(stmt, (token,))
 
 
         row = self.cur.fetchone()
@@ -752,7 +876,7 @@ class EcrDB():
 
         expires = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
 
-        self.cur.execute(stmt, (token, user_id, scopes, is_admin, expires))
+        self.execute(stmt, (token, user_id, scopes, is_admin, expires))
 
         self.db.commit()
 
@@ -761,9 +885,7 @@ class EcrDB():
     # returns owner, otherwise empty string
     def getNamespace(self, name):
         stmt = 'SELECT id, owner_id FROM Namespaces WHERE id = %s'
-        print(f'stmt: {stmt} id=name', file=sys.stderr)
-
-        self.cur.execute(stmt, (name,))
+        self.execute(stmt, (name,))
 
 
         row = self.cur.fetchone()
@@ -784,10 +906,7 @@ class EcrDB():
         stmt = f'DELETE FROM Namespaces WHERE id = %s'
         debug_stmt = stmt
         debug_stmt = debug_stmt.replace("%s", f'"{namespace}"', 1)
-
-        print(f'debug_stmt: {debug_stmt}', file=sys.stderr)
-
-        self.cur.execute(stmt, (namespace,))
+        self.execute(stmt, (namespace,))
 
 
         self.db.commit()
@@ -807,15 +926,11 @@ class EcrDB():
             raise Exception("Namespace must be between 4 and 30 characters long")
 
         stmt = 'INSERT INTO Namespaces (id, owner_id) VALUES (%s, %s)'
-        print(f'stmt: {stmt} id=name', file=sys.stderr)
-
-        self.cur.execute(stmt, (name, owner_id))
+        self.execute(stmt, (name, owner_id))
 
 
         stmt = 'REPLACE INTO Permissions (resourceType, resourceName, granteeType, grantee, permission) VALUES (%s, %s, %s, %s, %s)'
-        print(f'stmt: {stmt} id={name}', file=sys.stderr)
-
-        self.cur.execute(stmt, ("namespace", name, "USER", owner_id, "FULL_CONTROL"))
+        self.execute(stmt, ("namespace", name, "USER", owner_id, "FULL_CONTROL"))
 
 
         self.db.commit()
@@ -834,9 +949,7 @@ class EcrDB():
         #full_name = f'{namespace}/{name}'
 
         stmt = 'SELECT namespace, name, owner_id FROM Repositories WHERE namespace = %s AND name = %s'
-        print(f'stmt: {stmt} namespace={namespace} name={name}', file=sys.stderr)
-
-        self.cur.execute(stmt, (namespace,name))
+        self.execute(stmt, (namespace,name))
 
 
         row = self.cur.fetchone()
@@ -854,22 +967,12 @@ class EcrDB():
         return returnObj, True
 
     def deleteRepository(self, namespace, name):
-
         stmt = f'DELETE FROM Repositories WHERE namespace = %s AND name = %s'
-        debug_stmt = stmt
-        debug_stmt = debug_stmt.replace("%s", f'"{namespace}"', 1)
-        debug_stmt = debug_stmt.replace("%s", f'"{name}"', 1)
-
-        print(f'debug_stmt: {debug_stmt}', file=sys.stderr)
-
-        self.cur.execute(stmt, (namespace, name))
+        self.execute(stmt, (namespace, name))
 
         resourceName = f'{namespace}/{name}'
         stmt = f'DELETE FROM Permissions WHERE resourceType = "repository" AND resourceName =%s'
-        debug_stmt = stmt
-        debug_stmt = debug_stmt.replace("%s", f'"{resourceName}"', 1)
-        print(f'debug_stmt: {debug_stmt}', file=sys.stderr)
-        self.cur.execute(stmt, (resourceName,))
+        self.execute(stmt, (resourceName,))
 
         self.db.commit()
         return 1
@@ -884,51 +987,31 @@ class EcrDB():
         if not p.fullmatch(name):
             raise Exception("Repository can only contain numbers and lowercase letters")
 
-        if len(name) < 2 or len(name) > 255 :
+        if len(name) < 2 or len(name) > 255:
             raise Exception("Repository must be between 2 and 255 characters long")
 
-
-
         stmt = 'INSERT INTO Repositories (namespace, name, owner_id) VALUES (%s, %s, %s)'
-        print(f'stmt: {stmt} namespace={namespace} name={name}', file=sys.stderr)
-
-        self.cur.execute(stmt, (namespace, name, owner_id))
+        self.execute(stmt, (namespace, name, owner_id))
 
         full_name = f'{namespace}/{name}'
         stmt = 'INSERT INTO Permissions (resourceType, resourceName, granteeType, grantee, permission) VALUES (%s, %s, %s, %s, %s)'
-        print(f'stmt: {stmt} id={full_name}', file=sys.stderr)
-
-        self.cur.execute(stmt, ("repository", full_name, "USER", owner_id, "FULL_CONTROL"))
-
+        self.execute(stmt, ("repository", full_name, "USER", owner_id, "FULL_CONTROL"))
 
         self.db.commit()
         return 1
-
 
     def addMetaFile(self, namespace, name, version, file_name, blob, kind):
         app_id = f'{namespace}/{name}:{version}'
         stmt = 'INSERT INTO MetaFiles (app_id, namespace, name, version, file_name, file, kind) VALUES (%s, %s, %s, %s, %s, %s, %s)'
-
-        print(f'stmt: {stmt} app_id={app_id} ={namespace} name={name} version={version} file_name={file_name} kind={kind}', file=sys.stderr)
-
-        self.cur.execute(stmt, (app_id, namespace, name, version, file_name, [blob], kind))
+        self.execute(stmt, (app_id, namespace, name, version, file_name, [blob], kind))
         self.db.commit()
         return 1
 
-
     def getMetaFile(self, namespace, name, version, file_name):
-
         app_id = f'{namespace}/{name}:{version}'
-
         stmt = 'SELECT file, kind FROM MetaFiles where app_id = %s AND file_name = %s'
-
-        print(f'stmt: {stmt} app_id={app_id} file_name={file_name}', file=sys.stderr)
-
-        self.cur.execute(stmt, (app_id, file_name))
+        self.execute(stmt, (app_id, file_name))
         content, kind = self.cur.fetchone()
-
         if kind == 'science_description':
             content = bleach.clean(content.decode('utf-8'))
-
         return content
-

@@ -9,111 +9,31 @@ import time
 import xmltodict
 import json
 from config import *
-import requests
-import sys
 from string import Template
-
-class JenkinsServer():
-    def __init__ ( self , host, username, password, retries=5) :
+import shlex
 
 
-        if not host:
-            raise Exception("Jenkins host not defined")
-
-        #self.host = host
-        #self.username = username
-        #self.password = password
-        count = 0
-        while True:
-            try:
-                self.server = jenkins.Jenkins(host, username=username, password=password)
-
-                user = self.server.get_whoami()
-                version = self.server.get_version()
-
-            except Exception as e: # pragma: no cover
-                if count > retries:
-                    raise
-                print(f'Could not connnect to Jenkins ({host}), error={e}, retry in 2 seconds', file=sys.stderr)
-                time.sleep(2)
-                count += 1
-                continue
-            break
-
-
-        return
+class JenkinsServer:
+    def __init__ (self , host, username, password, retries=5) :
+        self.server = jenkins.Jenkins(host, username=username, password=password)
 
     def hasJenkinsJob(self, id):
-
-
-        try:
-            job_exists = self.server.job_exists(id)
-        except Exception as e:
-            raise
-            #raise ErrorResponse(f'(server.get_job_config) got exception: {str(e)}', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-        return job_exists
-
+        return self.server.job_exists(id)
 
     def build_job(self, job_id):
-
-
         # https://python-jenkins.readthedocs.io/en/latest/api.html#jenkins.Jenkins.build_job
-        queue_item_number = self.server.build_job(job_id)
-        return queue_item_number
-
+        return self.server.build_job(job_id)
 
     def get_job_info(self, job_id):
-
-
         return self.server.get_job_info(job_id, depth=0, fetch_all_builds=False)
 
-
-
-
-
     def createJob(self, id, app_spec, overwrite=False, skip_image_push=False):
-
-
-
         # format https://github.com/user/repo.git#v1.0
-
-
         version = app_spec["version"]
 
         source=app_spec.get("source", None)
         if not source :
             raise Exception("field source empty")
-
-        ###
-        run_test = "\'echo No test defined\'"
-        run_entrypoint = ""
-        test = app_spec.get("testing")
-        if test:
-
-
-            test_command = test.get("command")
-
-            if "mask_entrypoint" in test.keys() and test.get("mask_entrypoint"):
-                    run_entrypoint = ' --entrypoint=\'\''
-
-
-            #if entrypoint_command:
-            #    all_entrypoint_command = " ".join(entrypoint_command)
-            #    run_entrypoint = "\'" + all_entrypoint_command + "\'"
-            if test_command:
-                all_test_command = " ".join(test_command)
-                run_test = "\'" +  all_test_command + "\'"
-
-
-
-
-        # t = " \' rm -rf \' "
-
-
-
-
-        #sourceArray = source.split("#", 3)
 
         git_url = source.get("url", "")
 
@@ -137,8 +57,6 @@ class JenkinsServer():
             raise Exception("No architectures specified")
         platforms_str = ",".join(platforms)
 
-        platforms_list = " ".join(platforms)
-
         build_args = source.get("build_args", {})
         build_args_command_line = ""
         for key in build_args:
@@ -156,59 +74,100 @@ class JenkinsServer():
         else:
             actual_namespace = app_spec.get("owner", "")
 
-
-
-
-        # The registry user credentials are defined in the casc_jenkins.yaml file.
-        docker_login='''withCredentials([usernamePassword(credentialsId: 'registry-user', passwordVariable: 'REGISTRY_USER_PWD', usernameVariable: 'REGISTRY_USERNAME')]) {
-                sh 'echo $REGISTRY_USER_PWD | docker login -u $REGISTRY_USERNAME --password-stdin ''' +docker_registry_url +''''
-            }
-        '''
-
-
-        do_push="--push"
-        if skip_image_push:
-            docker_login = ""
-            do_push =""
-
         name = app_spec["name"]
 
+        # TODO(sean) Decide if / host to restore test feature and understand its relationship to profiling. We should consider a unified approach to those.
+        # TODO(sean) Add test case for submodule clone.
+        # fix dockerfile support
+        template = Template('''pipeline {
+    agent any
+    stages {
+        stage ("Checkout") {
+            steps {
+                checkout scmGit(
+                    branches: [[name: '${branch}']],
+                    extensions: [cloneOption(shallow: true)],
+                    userRemoteConfigs: [[url: '${url}']],
+                    poll: false)
+                script {
+                    dir("$${env.WORKSPACE}") {
+                        sh "git submodule update --init --recursive"
+                    }
+                }
+            }
+        }
+        stage ("Build") {
+            steps {
+                script {
+                    stage("Build") {
+                        currentBuild.displayName = "${version}"
+                        dir("$${env.WORKSPACE}/${directory}") {
+                            sh "${build_command}"
+                        }
+                    }
+                }
+            }
+        }
+    }
+    post {
+        always {
+            cleanWs(cleanWhenNotBuilt: true)
+        }
+    }
+}
+''')
 
-        jenkinsfileTemplate = ""
+        # add validation here!!!
 
-        if test:
-            jenkinsfileTemplate = jenkinsfileTemplatePrefix + jenkinsfileTemplateTestStage + jenkinsfileTemplateSuffix
-        else:
-            jenkinsfileTemplate = jenkinsfileTemplatePrefix + jenkinsfileTemplateSuffix
+        options = ["--opt", f"platform={','.join(platforms)}"]
 
-        template = Template(jenkinsfileTemplate)
+        # specifies an alternative dockerfile filename
+        if git_dockerfile and git_dockerfile != "":
+            options += ["--opt", f"filename={git_dockerfile}"]
+
+        output_args = [
+            "type=image",
+            f"name={docker_registry_url}/{actual_namespace}/{name}:{version}",
+        ]
+
+        # specifies that we should push the image to the registry
+        if docker_registry_push_allowed:
+            output_args += ["push=true"]
+
+        # specifies that the registry is insecure (served over http instead of https). should only be used for local testing!
+        if docker_registry_insecure:
+            output_args += ["registry.insecure=true"]
+
+        build_command = shlex.join([
+            "buildctl",
+            "--addr",
+            buildkitd_address,
+            "build",
+            "--frontend=dockerfile.v0",
+            "--local",
+            "context=.",
+            "--local",
+            "dockerfile=.",
+            *options,
+            "--output",
+            ','.join(output_args),
+        ])
+
         try:
-            jenkinsfile = template.substitute(  url=git_url,
-                                                branch=git_branch,
-                                                directory=git_directory,
-                                                dockerfile=git_dockerfile,
-                                                namespace=actual_namespace,
-                                                name=name,
-                                                version=version,
-                                                platforms=platforms_str,
-                                                build_args_command_line=build_args_command_line,
-                                                docker_run_args=docker_run_args,
-                                                docker_registry_url=docker_registry_url,
-                                                docker_login=docker_login,
-                                                command = run_test,
-                                                platforms_list = platforms,
-                                                platform = platforms_str,
-                                                entrypoint =run_entrypoint,
-                                                do_push=do_push)
+            jenkinsfile = template.substitute(
+                url=git_url,
+                branch=git_branch,
+                directory=git_directory,
+                # dockerfile=git_dockerfile, # add this back in
+                version=version,
+                build_command=build_command,
+            )
         except Exception as e:
-            raise Exception(f'template failed: url={git_url}, branch={git_branch}, directory={git_directory},   e={str(e)}')
+            raise Exception(f'template failed: url={git_url}, branch={git_branch}, directory={git_directory}, e={str(e)}')
 
         #print(jenkins.EMPTY_CONFIG_XML)
         newJob = createPipelineJobConfig(jenkinsfile, f'{actual_namespace}/{name}')
         print(newJob)
-
-
-
 
         newJob_xml = xmltodict.unparse(newJob) #.decode("utf-8")
         #print("------")
@@ -227,25 +186,16 @@ class JenkinsServer():
 
         while True:
             try:
-
-                my_job = self.server.get_job_config(id)
-                return my_job
+                return self.server.get_job_config(id)
             except jenkins.NotFoundException as e: # pragma: no cover
                 pass
             except Exception as e: # pragma: no cover
                 raise
 
-            if True: # pragma: no cover
-                time.sleep(2)
-                timeout -= 2
-
-                if timeout <= 0:
-                    raise Exception(f'timout afer job creation')
-                continue
-
-
-        return 1
-        #print("jobs: "+server.jobs_count())
+            time.sleep(2)
+            timeout -= 2
+            if timeout <= 0:
+                raise Exception(f'timout afer job creation')
 
 
 def createPipelineJobConfig(jenkinsfile, displayName):
@@ -276,8 +226,6 @@ def createPipelineJobConfig(jenkinsfile, displayName):
     </flow-definition>
     '''
 
-
-
     job = xmltodict.parse(jenkins_job_example_xml)
 
     #jenkinsfile = 'pipeline {}'
@@ -286,7 +234,6 @@ def createPipelineJobConfig(jenkinsfile, displayName):
     job["flow-definition"]["definition"]["script"] = jenkinsfile # cgi.escape(jenkinsfile)
     job["flow-definition"]["displayName"] = displayName
     #job["project"]["scm"]["userRemoteConfigs"]["hudson.plugins.git.UserRemoteConfig"]["url"] = 'https://github.com/sagecontinuum/sage-cli.git'
-
 
     print(json.dumps(job, indent=4))
     return job

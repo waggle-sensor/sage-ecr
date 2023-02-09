@@ -8,3 +8,6 @@ precision=1
 exclude_lines = 
     pragma: no cover
     raise
+    logger\.\S+
+    logging\.\S+
+    if __name__ == .__main__.:
