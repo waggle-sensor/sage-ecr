@@ -127,7 +127,7 @@ class ecr_middleware:
         except KeyError:
             pass
 
-        app.logger.info("auth middleware: requesting token for %s", token_info.user)
+        app.logger.info("auth middleware: requesting token")
         token_info = app_authenticator.get_token_info(token)
         token_cache.set(token, token_info)
         return token_info
