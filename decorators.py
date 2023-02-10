@@ -22,6 +22,14 @@ def login_required(func):
     return wrapper2
 
 
+def approval_required(func):
+    def wrapper(self, **kwargs):
+        if not request.environ.get("is_approved", False):
+            raise ErrorResponse("Your account is not approved to perform this action.", status_code=HTTPStatus.FORBIDDEN)
+        return func(self, **kwargs)
+    return wrapper
+
+
 def has_resource_permission(permission):
     def real_decorator(func):
         def wrapper2(self, namespace=None, repository=None, version=None):
@@ -55,7 +63,7 @@ def has_resource_permission(permission):
 
 
             requestUser = request.environ.get('user', "")
-            isAdmin = request.environ.get('admin', False)
+            isAdmin = request.environ.get('is_admin', False)
 
             if not repository:
                 # check namespace permission only

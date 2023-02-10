@@ -322,6 +322,30 @@ source:
     assert r.status_code == 404
 
 
+def test_app_builder_must_be_approved(client):
+    headers = {"Authorization" : "sage notapproved_token"}
+
+    # submit app
+    result = must_submit_app_and_get_json(client, headers=headers, app_yaml="""
+name: simple
+description: "a simple app"
+version: "1.2.3"
+namespace: sage
+source:
+  url: "https://github.com/waggle-sensor/edge-plugins.git"
+  branch: "master"
+  architectures:
+  - "linux/amd64"
+  - "linux/arm64"
+  directory : "plugin-test-success"
+""")
+
+    # attempt to start build
+    r = client.post("/builds/sage/simple/1.2.3?skip_image_push=false", headers=headers)
+    assert r.status_code == 403
+    assert r.get_json() == {"error": "Your account is not approved to perform this action."}
+
+
 def test_app_submit_fails_on_invalid_url(client):
     headers = {"Authorization" : "sage testuser_token"}
 

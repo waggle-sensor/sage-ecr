@@ -125,10 +125,28 @@ if auth_method == "sage":
 
 # static_tokens: only used for testing
 static_tokens = {
-    "testuser_token": {"id": "testuser"},
-    "testuser2_token": {"id": "testuser2"},
-    "admin_token": {"id":"admin", "is_admin": True},
-    "sage_docker_auth_token": {"id": "sage_docker_auth", "scopes":"ecr_authz_introspection"},
+    "testuser_token": {
+        "id": "testuser",
+        "is_approved": True,
+    },
+    "testuser2_token": {
+        "id": "testuser2",
+        "is_approved": True,
+    },
+    "notapproved_token": {
+        "id": "notapproved",
+        "is_approved": False,
+    },
+    "admin_token": {
+        "id":"admin",
+        "is_admin": True,
+        "is_approved": True,
+    },
+    "sage_docker_auth_token": {
+        "id": "sage_docker_auth",
+        "scopes":"ecr_authz_introspection",
+        "is_approved": False,
+    },
 }
 
 add_user=os.getenv('ADD_USER', default="")
