@@ -176,3 +176,8 @@ docker_registry_insecure = parsebool(os.environ.get("DOCKER_REGISTRY_INSECURE", 
 
 # buildkitd settings
 buildkitd_address = os.environ.get("BUILDKITD_ADDR")
+
+# redis cache settings
+redis_host = os.environ.get("REDIS_HOST", "localhost")
+redis_port = int(os.environ.get("REDIS_PORT", "6379"))
+redis_ttl_seconds = int(os.environ.get("REDIS_TTL_SECONDS", "60"))

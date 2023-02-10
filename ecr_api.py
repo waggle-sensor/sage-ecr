@@ -68,12 +68,13 @@ elif config.auth_method == "sage":
 else:
     raise RuntimeError("invalid authenticator")
 
+token_cache = TokenCache(
+    host=config.redis_host,
+    port=config.redis_port,
+    ttl_seconds=config.redis_ttl_seconds,
+)
 
-token_cache = TokenCache(ttl=60)
-
-# do token introspection
-# from https://medium.com/swlh/creating-middlewares-with-python-flask-166bd03f2fd4
-class ecr_middleware:
+class ECRAuthMiddleware:
     '''
     Simple WSGI middleware
     '''
@@ -1491,7 +1492,7 @@ def createJenkinsName(app_spec):
 app = Flask(__name__)
 CORS(app)
 app.config["PROPAGATE_EXCEPTIONS"] = True
-app.wsgi_app = ecr_middleware(app.wsgi_app)
+app.wsgi_app = ECRAuthMiddleware(app.wsgi_app)
 
 
 @app.errorhandler(ErrorResponse)

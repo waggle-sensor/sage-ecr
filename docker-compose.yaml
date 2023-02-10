@@ -50,6 +50,9 @@ services:
       S3_BUCKET:
       S3_FOLDER:
 
+      # redis cache settings
+      REDIS_HOST: "redis"
+      REDIS_TTL_SECONDS: "60"
 
   db:
     image: mysql
@@ -90,6 +93,13 @@ services:
       - tcp://0.0.0.0:1234
     # double check the actual capabilities needed
     privileged: true
+    networks:
+      - sage-ecr
+
+  redis:
+    image: redis
+    ports:
+      - 127.0.0.1:6379:6379
     networks:
       - sage-ecr
 

@@ -1,30 +1,27 @@
-from threading import Lock
-from typing import NamedTuple
-import time
+from hashlib import sha256
+import json
+import redis
+from authenticators import TokenInfo
 
-
-class TokenCacheItem(NamedTuple):
-    token_info: dict
-    timestamp: int
-
-
-# TODO(sean) evaluate how well this performs and update mysql backed cached is needed.
 class TokenCache:
 
-    def __init__(self, ttl, timefunc=time.monotonic):
-        self.lock = Lock()
-        self.ttl = ttl
-        self.data = {}
-        self.timefunc = timefunc
+    def __init__(self, host, port, ttl_seconds, prefix="tokencache."):
+        self.redis = redis.Redis(host=host, port=port)
+        self.ttl_seconds = ttl_seconds
+        self.prefix = prefix
 
-    def get(self, token):
-        with self.lock:
-            item = self.data[token]
-        if self.timefunc() - item.timestamp > self.ttl:
-            raise KeyError(token)
-        return item.token_info
+    def get(self, token: str) -> TokenInfo:
+        key = self.get_key(token)
+        data = self.redis.get(key)
+        if data is None:
+            raise KeyError("token not found")
+        return TokenInfo(**json.loads(data))
 
-    def set(self, token, token_info):
-        item = TokenCacheItem(token_info=token_info, timestamp=self.timefunc())
-        with self.lock:
-            self.data[token] = item
+    def set(self, token: str, token_info: TokenInfo):
+        key = self.get_key(token)
+        data = json.dumps(token_info.__dict__, separators=(",", ":"))
+        self.redis.set(key, data, ex=self.ttl_seconds)
+
+    def get_key(self, token):
+        hashed_token = sha256(token.encode()).hexdigest()
+        return self.prefix + hashed_token

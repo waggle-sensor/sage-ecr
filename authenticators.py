@@ -1,4 +1,4 @@
-from typing import NamedTuple
+from dataclasses import dataclass
 import requests
 
 
@@ -6,7 +6,8 @@ class TokenNotFound(Exception):
     pass
 
 
-class TokenInfo(NamedTuple):
+@dataclass
+class TokenInfo:
     user: str
     is_admin: bool
     is_approved: bool
