@@ -121,9 +121,13 @@ class ecr_middleware:
 
     def get_token_info_with_caching(self, token):
         try:
-            return token_cache.get(token)
+            token_info = token_cache.get(token)
+            app.logger.info("auth middleware: using cached token for %s", token_info.user)
+            return token_info
         except KeyError:
             pass
+
+        app.logger.info("auth middleware: requesting token for %s", token_info.user)
         token_info = app_authenticator.get_token_info(token)
         token_cache.set(token, token_info)
         return token_info

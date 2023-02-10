@@ -8,6 +8,7 @@ class TokenCacheItem(NamedTuple):
     timestamp: int
 
 
+# TODO(sean) evaluate how well this performs and update mysql backed cached is needed.
 class TokenCache:
 
     def __init__(self, ttl, timefunc=time.monotonic):
