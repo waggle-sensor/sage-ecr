@@ -51,6 +51,7 @@ import tempfile
 import boto3
 from botocore.exceptions import ClientError
 import authenticators
+from token_cache import TokenCache
 
 RAW_GITHUB_URL = 'https://raw.githubusercontent.com'
 DEFAULT_BRANCH = 'main'
@@ -66,6 +67,9 @@ elif config.auth_method == "sage":
     app_authenticator = authenticators.SageAuthenticator(url=config.tokenInfoEndpoint, password=config.tokenInfoPassword)
 else:
     raise RuntimeError("invalid authenticator")
+
+
+token_cache = TokenCache(ttl=60)
 
 # do token introspection
 # from https://medium.com/swlh/creating-middlewares-with-python-flask-166bd03f2fd4
@@ -102,7 +106,7 @@ class ecr_middleware:
         app.logger.info("auth middleware: getting token info")
 
         try:
-            token_info = app_authenticator.get_token_info(token)
+            token_info = self.get_token_info_with_caching(token)
         except authenticators.TokenNotFound:
             return ErrorWResponse('Token not found', status_code=HTTPStatus.UNAUTHORIZED)(environ, start_response)
 
@@ -114,6 +118,15 @@ class ecr_middleware:
         environ['is_approved'] = token_info.is_approved
 
         return self.app(environ, start_response)
+
+    def get_token_info_with_caching(self, token):
+        try:
+            return token_cache.get(token)
+        except KeyError:
+            pass
+        token_info = app_authenticator.get_token_info(token)
+        token_cache.set(token, token_info)
+        return token_info
 
 
 def run_command_communicate(command, input_str=None, cwd=None, timeout=None):
