@@ -59,11 +59,13 @@ DEFAULT_BRANCH = 'main'
 app_submission_counter = Counter("app_submission_counter", "This metric counts the total number of successful app submissions.")
 build_request_counter = Counter("build_request_counter", "This metric counts the total number of requested builds.")
 
-
-# refs/tags/<tagName> or  refs/heads/<branchName>
-#t.substitute({'git_url' : 'https://github.com/sagecontinuum/sage-cli.git'})
-
-
+# TODO(sean) make this part of the app config to allow selecting static for testing and sage for deployment.
+if config.auth_method == "static":
+    app_authenticator = authenticators.StaticAuthenticator(config.static_tokens)
+elif config.auth_method == "sage":
+    app_authenticator = authenticators.SageAuthenticator(url=config.tokenInfoEndpoint, password=config.tokenInfoPassword)
+else:
+    raise RuntimeError("invalid authenticator")
 
 # do token introspection
 # from https://medium.com/swlh/creating-middlewares-with-python-flask-166bd03f2fd4
@@ -74,12 +76,6 @@ class ecr_middleware:
 
     def __init__(self, app):
         self.app = app
-
-        # TODO(sean) make this part of the app config to allow selecting static for testing and sage for deployment.
-        if config.auth_method == "static":
-            self.authenticator = authenticators.StaticAuthenticator(config.static_tokens)
-        elif config.auth_method == "sage":
-            self.authenticator = authenticators.SageAuthenticator()
 
     def __call__(self, environ, start_response): # pragma: no cover
         request = Request(environ)
@@ -95,29 +91,27 @@ class ecr_middleware:
 
         if len(authHeaderArray) != 2:
             app.logger.info("bad auth header size")
-            resp = ErrorWResponse(f'Authorization failed (could not parse Authorization header)', status_code=HTTPStatus.UNAUTHORIZED)
-            return resp(environ, start_response)
+            return ErrorWResponse(f'Authorization failed (could not parse Authorization header)', status_code=HTTPStatus.UNAUTHORIZED)(environ, start_response)
 
         bearer, token = authHeaderArray
 
         if bearer not in ["sage", "static"]:
             app.logger.info("bad realm")
-            res = ErrorWResponse(f'Authorization failed (Authorization bearer not supported)', status_code=HTTPStatus.UNAUTHORIZED)
-            return res(environ, start_response)
+            return ErrorWResponse(f'Authorization failed (Authorization bearer not supported)', status_code=HTTPStatus.UNAUTHORIZED)(environ, start_response)
 
         app.logger.info("auth middleware: getting token info")
 
         try:
-            token_info = self.authenticator.get_token_info(token)
+            token_info = app_authenticator.get_token_info(token)
         except authenticators.TokenNotFound:
             return ErrorWResponse('Token not found', status_code=HTTPStatus.UNAUTHORIZED)(environ, start_response)
 
-        app.logger.info("auth middleware: request authenticated as %s", token_info["user"])
+        app.logger.info("auth middleware: request authenticated as %s", token_info.user)
         environ['authenticated'] = True
-        environ['user'] = token_info["user"]
-        environ['scopes'] = token_info["scopes"]
-        environ['is_admin'] = token_info["is_admin"]
-        environ['is_approved'] = token_info["is_approved"]
+        environ['user'] = token_info.user
+        environ['scopes'] = token_info.scopes
+        environ['is_admin'] = token_info.is_admin
+        environ['is_approved'] = token_info.is_approved
 
         return self.app(environ, start_response)
 
