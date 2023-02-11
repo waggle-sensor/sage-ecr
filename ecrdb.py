@@ -14,9 +14,7 @@ import logging
 import base64
 import bleach
 
-#logger = logging.getLogger('gunicorn.error')
-#logger = logging.getLogger('__name__')
-logger=None
+logger = logging.getLogger(__name__)
 
 class EcrDB:
 
@@ -320,7 +318,6 @@ DELETE FROM `SageECR`.`TokenCache` WHERE `expires` < NOW();
         if row == None:
             raise ErrorResponse(f'App {app_id} not found', status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
         for value in row:
-            print(f'value: {value}', file=sys.stderr)
             returnObj[returnFields[i]] = value
             i+=1
 
@@ -338,10 +335,7 @@ DELETE FROM `SageECR`.`TokenCache` WHERE `expires` < NOW();
 
         # convert bool to int for stupid mysql
         if isinstance(value, bool):
-            if value:
-                value = 1
-            else:
-                value = 0
+            value = int(value)
 
         values = (value, namespace, repository,version )
         stmt  = f"UPDATE Apps SET {field} = %s WHERE namespace = %s AND name = %s AND version = %s"
@@ -513,8 +507,6 @@ DELETE FROM `SageECR`.`TokenCache` WHERE `expires` < NOW();
         app_list = []
 
         for row in rows:
-            print(f'row: {row}', file=sys.stderr)
-
             app_obj = {}
             app_obj["source"] = {}
 
@@ -616,8 +608,6 @@ DELETE FROM `SageECR`.`TokenCache` WHERE `expires` < NOW();
         app_list = []
 
         for row in rows:
-            print(f'row: {row}', file=sys.stderr)
-
             app_list.append({"id": row[0], "owner_id": row[1], "type": "namespace"})
 
         return app_list

@@ -1,5 +1,9 @@
+import logging
 from dataclasses import dataclass
 import requests
+
+
+logger = logging.getLogger(__name__)
 
 
 class TokenNotFound(Exception):
@@ -42,10 +46,13 @@ class SageAuthenticator: # pragma: no cover - this should be covered as part of 
         self.password = password
 
     def get_token_info(self, token: str) -> TokenInfo:
+        logger.info("getting token info")
+
         with requests.Session() as session:
             session.headers = {"Authorization": f"Sage {self.password}"}
 
             # fetch token info from auth site
+            logger.info("requesting token info")
             r = session.post(self.url, timeout=5, json={"token": token})
             if r.status_code == 404:
                 raise TokenNotFound()
@@ -61,6 +68,7 @@ class SageAuthenticator: # pragma: no cover - this should be covered as part of 
 
             # fetch user info from auth site
             # TODO(sean) make this url part of config
+            logger.info("requesting user info")
             r = session.get(f"https://auth.sagecontinuum.org/users/{username}", timeout=5)
             if r.status_code == 404:
                 raise TokenNotFound()

@@ -43,6 +43,17 @@ def test_auth_header_incomplete(client):
     assert r.get_json() == {"error": "Authorization failed (could not parse Authorization header)"}
 
 
+def test_auth_header_case_insensitive(client):
+    r = client.get("/apps/", headers={"Authorization": "Sage testuser_token"})
+    assert r.status_code == 200
+
+    r = client.get("/apps/", headers={"Authorization": "sage testuser_token"})
+    assert r.status_code == 200
+
+    r = client.get("/apps/", headers={"Authorization": "SAGE testuser_token"})
+    assert r.status_code == 200
+
+
 def test_auth_header_invalid_bearer(client):
     r = client.get("/apps/sage/simple/1.2.3", headers={"Authorization": "xyz testuser_token"})
     assert r.status_code == 401

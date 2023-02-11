@@ -75,14 +75,13 @@ token_cache = TokenCache(
 )
 
 class ECRAuthMiddleware:
-    '''
-    Simple WSGI middleware
-    '''
 
     def __init__(self, app):
         self.app = app
 
     def __call__(self, environ, start_response): # pragma: no cover
+        app.logger.info("auth middleware: starting request")
+
         request = Request(environ)
 
         try:
@@ -95,13 +94,14 @@ class ECRAuthMiddleware:
         authHeaderArray = authHeader.split(maxsplit=2)
 
         if len(authHeaderArray) != 2:
-            app.logger.info("bad auth header size")
+            app.logger.info("auth middleware: bad auth header size")
             return ErrorWResponse(f'Authorization failed (could not parse Authorization header)', status_code=HTTPStatus.UNAUTHORIZED)(environ, start_response)
 
         bearer, token = authHeaderArray
+        bearer = bearer.lower()
 
         if bearer not in ["sage", "static"]:
-            app.logger.info("bad realm")
+            app.logger.info("auth middleware: bad realm")
             return ErrorWResponse(f'Authorization failed (Authorization bearer not supported)', status_code=HTTPStatus.UNAUTHORIZED)(environ, start_response)
 
         app.logger.info("auth middleware: getting token info")
@@ -130,7 +130,10 @@ class ECRAuthMiddleware:
 
         app.logger.info("auth middleware: requesting token")
         token_info = app_authenticator.get_token_info(token)
+
+        app.logger.info("auth middleware: updating cached token for %s", token_info.user)
         token_cache.set(token, token_info)
+
         return token_info
 
 
@@ -572,7 +575,6 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
         ecr_db.insertApp(col_names_str, values, variables_str, sources_values, resourcesArray)
     except Exception as e:
         raise Exception(f"insertApp returned: {type(e).__name__},{str(e)}")
-    #print(f'row: {row}', file=sys.stderr)
 
     #dbObject["id"] = newID
 
@@ -1339,12 +1341,6 @@ class MetaFiles(MethodView):
 class Base(MethodView):
 
     def get(self):
-        # example:  curl localhost:5000/
-        app.logger.debug('this is a DEBUG message')
-        app.logger.info('this is an INFO message')
-        app.logger.warning('this is a WARNING message')
-        app.logger.error('this is an ERROR message')
-        app.logger.critical('this is a CRITICAL message')
         return "SAGE Edge Code Repository"
 
 
@@ -1540,13 +1536,15 @@ app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
 })
 
 gunicorn_logger = logging.getLogger('gunicorn.error')
+
 app.logger.handlers = gunicorn_logger.handlers
 app.logger.setLevel(gunicorn_logger.level)
 
-ecrdb.logger = logging.getLogger('gunicorn.error')
+ecrdb.logger.handlers = gunicorn_logger.handlers
+ecrdb.logger.setLevel(gunicorn_logger.level)
+
+authenticators.logger.handlers = gunicorn_logger.handlers
+authenticators.logger.setLevel(gunicorn_logger.level)
 
 if __name__ == '__main__':
-    #gunicorn_logger = logging.getLogger('gunicorn.error')
-    #app.logger.handlers = gunicorn_logger.handlers
-    #app.logger.setLevel(gunicorn_logger.level)
     app.run(debug=True, host='0.0.0.0')

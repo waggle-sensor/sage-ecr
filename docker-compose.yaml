@@ -17,6 +17,9 @@ services:
       # test suite requires this to be set to prevent accidentally wiping production database and registry
       TESTING: "true"
 
+      # gunicorn server settings
+      GUNICORN_CMD_ARGS: "--reload --log-level=debug"
+
       # database settings
       MYSQL_HOST: db
       MYSQL_DATABASE: SageECR

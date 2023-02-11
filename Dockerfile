@@ -5,4 +5,4 @@ WORKDIR /app
 COPY requirements.txt /app
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . /app
-CMD gunicorn ecr_api:app --log-level=info --bind=0.0.0.0:5000 --reload --graceful-timeout 630 --timeout 700
+CMD gunicorn ecr_api:app --access-logfile=- --log-level=info --bind=0.0.0.0:5000 --graceful-timeout 630 --timeout 700
