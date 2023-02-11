@@ -78,7 +78,10 @@ class SageAuthenticator: # pragma: no cover - this should be covered as part of 
 
         return TokenInfo(
             user=username,
-            is_admin=user_info.get("is_superuser", False),
+            is_admin=False,
+            # TODO(sean) at the moment, setting is_admin = true makes the portal nearly unusable due to the
+            # high number of requests. (admin users see *all* apps and repos on the portal by default!)
+            # is_admin=user_info.get("is_superuser", False),
             is_approved=user_info.get("is_approved", False),
             scopes=token_info.get("scopes", ""),
         )
