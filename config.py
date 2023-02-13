@@ -100,8 +100,6 @@ input_valid_types = ["boolean", "int", "long", "float", "double", "string", "Fil
 dbAppsFields_str  = ",".join(mysql_Apps_fields.keys())
 dbSourcesFields_str  = ",".join(mysql_Sources_fields.keys())
 
-
-
 auth_method = os.getenv('AUTH_METHOD', default="static") # or sage
 if auth_method=="":
     auth_method = "static"
@@ -148,18 +146,6 @@ static_tokens = {
         "is_approved": False,
     },
 }
-
-add_user=os.getenv('ADD_USER', default="")
-if add_user:
-    add_user_array = add_user.split(",")
-    if len(add_user_array) != 2:
-        sys.exit(f"Cannot parse ADD_USER")
-
-    x_token = add_user_array[0]
-    x_user_id = add_user_array[1]
-    static_tokens[x_token] = {  "id":x_user_id }
-    print(f'added token {x_token} for user {x_user_id}', file=sys.stderr)
-
 
 # jenkins
 jenkins_user = os.environ.get("JENKINS_USER", "ecrdb")
