@@ -1488,6 +1488,7 @@ def createJenkinsName(app_spec):
 app = Flask(__name__)
 CORS(app)
 app.config["PROPAGATE_EXCEPTIONS"] = True
+app.config["MAX_CONTENT_LENGTH"] = 32*1024 # 32K
 app.wsgi_app = ECRAuthMiddleware(app.wsgi_app)
 
 
