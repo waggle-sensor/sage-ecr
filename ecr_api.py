@@ -844,7 +844,7 @@ class Apps(MethodView):
             # try yaml
             yaml_str = request.get_data().decode("utf-8")
             print(f"yaml_str: {yaml_str} ", file=sys.stderr)
-            postData = yaml.load(yaml_str, Loader=yaml.FullLoader)
+            postData = yaml.safe_load(yaml_str)
 
         if not postData:
             raise ErrorResponse(
