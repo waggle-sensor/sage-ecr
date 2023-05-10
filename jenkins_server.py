@@ -1,5 +1,5 @@
-
 import jenkins
+
 # https://python-jenkins.readthedocs.io/en/latest/
 # https://opendev.org/jjb/python-jenkins
 # pip install python-jenkins
@@ -14,7 +14,7 @@ import shlex
 
 
 class JenkinsServer:
-    def __init__ (self , host, username, password, retries=5) :
+    def __init__(self, host, username, password, retries=5):
         self.server = jenkins.Jenkins(host, username=username, password=password)
 
     def hasJenkinsJob(self, id):
@@ -31,8 +31,8 @@ class JenkinsServer:
         # format https://github.com/user/repo.git#v1.0
         version = app_spec["version"]
 
-        source=app_spec.get("source", None)
-        if not source :
+        source = app_spec.get("source", None)
+        if not source:
             raise Exception("field source empty")
 
         git_url = source.get("url", "")
@@ -66,7 +66,6 @@ class JenkinsServer:
         if docker_build_args != "":
             build_args_command_line += f" {docker_build_args}"
 
-
         actual_namespace = ""
         namespace = app_spec.get("namespace", "")
         if len(namespace) > 0:
@@ -79,7 +78,8 @@ class JenkinsServer:
         # TODO(sean) Decide if / host to restore test feature and understand its relationship to profiling. We should consider a unified approach to those.
         # TODO(sean) Add test case for submodule clone.
         # fix dockerfile support
-        template = Template('''pipeline {
+        template = Template(
+            """pipeline {
     agent any
     stages {
         stage ("Checkout") {
@@ -115,7 +115,8 @@ class JenkinsServer:
         }
     }
 }
-''')
+"""
+        )
 
         # add validation here!!!
 
@@ -138,20 +139,22 @@ class JenkinsServer:
         if docker_registry_insecure:
             output_args += ["registry.insecure=true"]
 
-        build_command = shlex.join([
-            "buildctl",
-            "--addr",
-            buildkitd_address,
-            "build",
-            "--frontend=dockerfile.v0",
-            "--local",
-            "context=.",
-            "--local",
-            "dockerfile=.",
-            *options,
-            "--output",
-            ','.join(output_args),
-        ])
+        build_command = shlex.join(
+            [
+                "buildctl",
+                "--addr",
+                buildkitd_address,
+                "build",
+                "--frontend=dockerfile.v0",
+                "--local",
+                "context=.",
+                "--local",
+                "dockerfile=.",
+                *options,
+                "--output",
+                ",".join(output_args),
+            ]
+        )
 
         try:
             jenkinsfile = template.substitute(
@@ -163,43 +166,44 @@ class JenkinsServer:
                 build_command=build_command,
             )
         except Exception as e:
-            raise Exception(f'template failed: url={git_url}, branch={git_branch}, directory={git_directory}, e={str(e)}')
+            raise Exception(
+                f"template failed: url={git_url}, branch={git_branch}, directory={git_directory}, e={str(e)}"
+            )
 
-        #print(jenkins.EMPTY_CONFIG_XML)
-        newJob = createPipelineJobConfig(jenkinsfile, f'{actual_namespace}/{name}')
+        # print(jenkins.EMPTY_CONFIG_XML)
+        newJob = createPipelineJobConfig(jenkinsfile, f"{actual_namespace}/{name}")
         print(newJob)
 
-        newJob_xml = xmltodict.unparse(newJob) #.decode("utf-8")
-        #print("------")
-        #print(newJob_xml)
-        #print("------")
-        #print(jenkins.EMPTY_CONFIG_XML)
-        #print("------")
+        newJob_xml = xmltodict.unparse(newJob)  # .decode("utf-8")
+        # print("------")
+        # print(newJob_xml)
+        # print("------")
+        # print(jenkins.EMPTY_CONFIG_XML)
+        # print("------")
 
         if overwrite:
-            self.server.reconfig_job(id , newJob_xml)
+            self.server.reconfig_job(id, newJob_xml)
         else:
             self.server.create_job(id, newJob_xml)
-
 
         timeout = 10
 
         while True:
             try:
                 return self.server.get_job_config(id)
-            except jenkins.NotFoundException as e: # pragma: no cover
+            except jenkins.NotFoundException as e:  # pragma: no cover
                 pass
-            except Exception as e: # pragma: no cover
+            except Exception as e:  # pragma: no cover
                 raise
 
             time.sleep(2)
             timeout -= 2
             if timeout <= 0:
-                raise Exception(f'timout afer job creation')
+                raise Exception(f"timout afer job creation")
 
 
 def createPipelineJobConfig(jenkinsfile, displayName):
-    jenkins_job_example_xml = '''<?xml version='1.1' encoding='UTF-8'?>
+    jenkins_job_example_xml = """<?xml version='1.1' encoding='UTF-8'?>
     <flow-definition plugin="workflow-job@2.39">
     <displayName>overwrite_me</displayName>
     <description></description>
@@ -224,16 +228,18 @@ def createPipelineJobConfig(jenkinsfile, displayName):
     <quietPeriod>0</quietPeriod>
     <disabled>false</disabled>
     </flow-definition>
-    '''
+    """
 
     job = xmltodict.parse(jenkins_job_example_xml)
 
-    #jenkinsfile = 'pipeline {}'
+    # jenkinsfile = 'pipeline {}'
     print(json.dumps(job, indent=4))
 
-    job["flow-definition"]["definition"]["script"] = jenkinsfile # cgi.escape(jenkinsfile)
+    job["flow-definition"]["definition"][
+        "script"
+    ] = jenkinsfile  # cgi.escape(jenkinsfile)
     job["flow-definition"]["displayName"] = displayName
-    #job["project"]["scm"]["userRemoteConfigs"]["hudson.plugins.git.UserRemoteConfig"]["url"] = 'https://github.com/sagecontinuum/sage-cli.git'
+    # job["project"]["scm"]["userRemoteConfigs"]["hudson.plugins.git.UserRemoteConfig"]["url"] = 'https://github.com/sagecontinuum/sage-cli.git'
 
     print(json.dumps(job, indent=4))
     return job

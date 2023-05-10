@@ -3,6 +3,7 @@ import werkzeug
 from werkzeug.wrappers import Response
 import json
 
+
 # from https://flask.palletsprojects.com/en/1.1.x/patterns/apierrors/
 class ErrorResponse(werkzeug.exceptions.HTTPException):
     status_code = HTTPStatus.BAD_REQUEST
@@ -17,10 +18,14 @@ class ErrorResponse(werkzeug.exceptions.HTTPException):
 
     def to_dict(self):
         rv = dict(self.payload or ())
-        rv['error'] = self.message
+        rv["error"] = self.message
         return rv
 
 
 def ErrorWResponse(message, status_code=None, payload=None):
-    return Response(json.dumps({"error":message}), mimetype="application/json", headers={"Access-Control-Allow-Origin": "*"},  status=status_code)
-
+    return Response(
+        json.dumps({"error": message}),
+        mimetype="application/json",
+        headers={"Access-Control-Allow-Origin": "*"},
+        status=status_code,
+    )

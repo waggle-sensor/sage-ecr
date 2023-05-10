@@ -3,8 +3,8 @@ import json
 import redis
 from authenticators import TokenInfo
 
-class TokenCache:
 
+class TokenCache:
     def __init__(self, host, port, ttl_seconds, prefix="tokencache."):
         self.redis = redis.Redis(host=host, port=port)
         self.ttl_seconds = ttl_seconds

@@ -19,7 +19,6 @@ class TokenInfo:
 
 
 class StaticAuthenticator:
-
     def __init__(self, items):
         self.items = items
 
@@ -30,7 +29,7 @@ class StaticAuthenticator:
             raise TokenNotFound()
 
         user_id = info["id"]
-        
+
         return TokenInfo(
             user=user_id,
             is_admin=info.get("is_admin", False),
@@ -39,8 +38,7 @@ class StaticAuthenticator:
         )
 
 
-class SageAuthenticator: # pragma: no cover - this should be covered as part of an integration test instead.
-
+class SageAuthenticator:  # pragma: no cover - this should be covered as part of an integration test instead.
     def __init__(self, url, password):
         self.url = url
         self.password = password
@@ -69,7 +67,9 @@ class SageAuthenticator: # pragma: no cover - this should be covered as part of 
             # fetch user info from auth site
             # TODO(sean) make this url part of config
             logger.info("requesting user info")
-            r = session.get(f"https://auth.sagecontinuum.org/users/{username}", timeout=5)
+            r = session.get(
+                f"https://auth.sagecontinuum.org/users/{username}", timeout=5
+            )
             if r.status_code == 404:
                 raise TokenNotFound()
             r.raise_for_status()

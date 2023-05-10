@@ -10,21 +10,21 @@ def parsebool(s):
 
 
 # https://mysqlclient.readthedocs.io/user_guide.html#mysqldb-mysql
-mysql_host = os.getenv('MYSQL_HOST')
-mysql_db = os.getenv('MYSQL_DATABASE')
-mysql_user =  os.getenv('MYSQL_USER')
-mysql_password =  os.getenv('MYSQL_PASSWORD')
-#app.config['MYSQL_DATABASE_HOST'] = os.getenv('MYSQL_HOST')
-#app.config['MYSQL_DATABASE_DB'] = os.getenv('MYSQL_DATABASE')
-#app.config['MYSQL_DATABASE_USER'] = os.getenv('MYSQL_USER')
-#app.config['MYSQL_DATABASE_PASSWORD'] = os.getenv('MYSQL_PASSWORD')
+mysql_host = os.getenv("MYSQL_HOST")
+mysql_db = os.getenv("MYSQL_DATABASE")
+mysql_user = os.getenv("MYSQL_USER")
+mysql_password = os.getenv("MYSQL_PASSWORD")
+# app.config['MYSQL_DATABASE_HOST'] = os.getenv('MYSQL_HOST')
+# app.config['MYSQL_DATABASE_DB'] = os.getenv('MYSQL_DATABASE')
+# app.config['MYSQL_DATABASE_USER'] = os.getenv('MYSQL_USER')
+# app.config['MYSQL_DATABASE_PASSWORD'] = os.getenv('MYSQL_PASSWORD')
 
 
-S3_ENDPOINT = os.getenv('S3_ENDPOINT')
-S3_ACCESS_KEY = os.getenv('S3_ACCESS_KEY')
-S3_SECRET_KEY = os.getenv('S3_SECRET_KEY')
-S3_BUCKET=os.getenv('S3_BUCKET')
-S3_FOLDER=os.getenv('S3_FOLDER')
+S3_ENDPOINT = os.getenv("S3_ENDPOINT")
+S3_ACCESS_KEY = os.getenv("S3_ACCESS_KEY")
+S3_SECRET_KEY = os.getenv("S3_SECRET_KEY")
+S3_BUCKET = os.getenv("S3_BUCKET")
+S3_FOLDER = os.getenv("S3_FOLDER")
 
 
 # directory to clone and zip git repositories (not used by jenkins)
@@ -32,59 +32,93 @@ ecr_temp_dir = "/temp/ecr/"
 
 
 # app definition , these are the app fields (as seen by user) that are stored in the tables Apps
-valid_fields =[
-    "namespace", "name", "version", "description",
-    "keywords", "authors", "collaborators", "homepage", "funding", "license",
-    "source", "depends_on", "baseCommand", "arguments", "inputs", "resources", "metadata", "frozen", "testing"
+valid_fields = [
+    "namespace",
+    "name",
+    "version",
+    "description",
+    "keywords",
+    "authors",
+    "collaborators",
+    "homepage",
+    "funding",
+    "license",
+    "source",
+    "depends_on",
+    "baseCommand",
+    "arguments",
+    "inputs",
+    "resources",
+    "metadata",
+    "frozen",
+    "testing",
 ]
 
 valid_fields_set = set(valid_fields)
 
-app_view_fields = ["namespace", "name", "version", "description" , "source", "depends_on", "baseCommand", "arguments", "inputs", "resources", "metadata","testing"]
+app_view_fields = [
+    "namespace",
+    "name",
+    "version",
+    "description",
+    "source",
+    "depends_on",
+    "baseCommand",
+    "arguments",
+    "inputs",
+    "resources",
+    "metadata",
+    "testing",
+]
 
-required_fields = { "description" : "str",
-                    "source" : "dict"}
+required_fields = {"description": "str", "source": "dict"}
 
 
 mysql_Apps_fields = {
-                "id"            : "str",
-                "namespace"     : "str",
-                "name"          : "str",
-                "version"       : "str",
-                "description"   : "str",
-                "keywords"   : "str",
-                "authors"   : "str",
-                "collaborators"   : "str",
-                "homepage"   : "str",
-                "funding"   : "str",
-                "license"   : "str",
-                "depends_on"    : "str",
-                "baseCommand"   : "str",
-                "arguments"     : "str",
-                "inputs"        : "json",
-                "metadata"      : "json",
-                "frozen"        : "bool",
-                "testing"       : "json",
-                "owner"         : "str",
-                "time_created"  : "datetime",
-                "time_last_updated"        : "datetime",
-                }
+    "id": "str",
+    "namespace": "str",
+    "name": "str",
+    "version": "str",
+    "description": "str",
+    "keywords": "str",
+    "authors": "str",
+    "collaborators": "str",
+    "homepage": "str",
+    "funding": "str",
+    "license": "str",
+    "depends_on": "str",
+    "baseCommand": "str",
+    "arguments": "str",
+    "inputs": "json",
+    "metadata": "json",
+    "frozen": "bool",
+    "testing": "json",
+    "owner": "str",
+    "time_created": "datetime",
+    "time_last_updated": "datetime",
+}
 
 
 mysql_Sources_fields = {
-                "architectures": "json",
-                "url":"str",
-                "branch":"str",
-                "tag":"str",
-                "git_commit":"str",
-                "directory":"str",
-                "dockerfile":"str",
-                "build_args":"json"
-            }
-#mysql_Apps_fields_set = set(valid_fields)
+    "architectures": "json",
+    "url": "str",
+    "branch": "str",
+    "tag": "str",
+    "git_commit": "str",
+    "directory": "str",
+    "dockerfile": "str",
+    "build_args": "json",
+}
+# mysql_Apps_fields_set = set(valid_fields)
 
 # architecture https://github.com/docker-library/official-images#architectures-other-than-amd64
-architecture_valid = ["linux/amd64", "linux/arm64", "linux/arm/v6", "linux/arm/v7", "linux/arm/v8"]
+architecture_valid = [
+    "linux/amd64",
+    "linux/arm64",
+    "linux/arm/v6",
+    "linux/arm/v7",
+    "linux/arm/v8",
+]
 
 
 # app input
@@ -96,20 +130,20 @@ input_valid_types = ["boolean", "int", "long", "float", "double", "string", "Fil
 
 
 # Apps table fields
-#dbAppsFields = mysql_Apps_fields.keys()
-dbAppsFields_str  = ",".join(mysql_Apps_fields.keys())
-dbSourcesFields_str  = ",".join(mysql_Sources_fields.keys())
+# dbAppsFields = mysql_Apps_fields.keys()
+dbAppsFields_str = ",".join(mysql_Apps_fields.keys())
+dbSourcesFields_str = ",".join(mysql_Sources_fields.keys())
 
-auth_method = os.getenv('AUTH_METHOD', default="static") # or sage
-if auth_method=="":
+auth_method = os.getenv("AUTH_METHOD", default="static")  # or sage
+if auth_method == "":
     auth_method = "static"
 if auth_method != "static" and auth_method != "sage":
     sys.exit(f"AUTH_METHOD {auth_method} invalid")
 
 # for auth_method==sage
-tokenInfoEndpoint = os.getenv('tokenInfoEndpoint')
-tokenInfoUser = os.getenv('tokenInfoUser')
-tokenInfoPassword = os.getenv('tokenInfoPassword')
+tokenInfoEndpoint = os.getenv("tokenInfoEndpoint")
+tokenInfoUser = os.getenv("tokenInfoUser")
+tokenInfoPassword = os.getenv("tokenInfoPassword")
 
 if auth_method == "sage":
     if tokenInfoEndpoint == "":
@@ -118,7 +152,6 @@ if auth_method == "sage":
         sys.exit("tokenInfoUser not defined")
     if tokenInfoPassword == "":
         sys.exit("tokenInfoPassword not defined")
-
 
 
 # static_tokens: only used for testing
@@ -136,13 +169,13 @@ static_tokens = {
         "is_approved": False,
     },
     "admin_token": {
-        "id":"admin",
+        "id": "admin",
         "is_admin": True,
         "is_approved": True,
     },
     "sage_docker_auth_token": {
         "id": "sage_docker_auth",
-        "scopes":"ecr_authz_introspection",
+        "scopes": "ecr_authz_introspection",
         "is_approved": False,
     },
 }
@@ -150,14 +183,16 @@ static_tokens = {
 # jenkins
 jenkins_user = os.environ.get("JENKINS_USER", "ecrdb")
 jenkins_token = os.environ.get("JENKINS_TOKEN", "")
-jenkins_server = os.getenv('JENKINS_SERVER', default="http://localhost:8082")
+jenkins_server = os.getenv("JENKINS_SERVER", default="http://localhost:8082")
 
 docker_build_args = os.environ.get("DOCKER_BUILD_ARGS", "")
-docker_run_args =os.environ.get("DOCKER_RUN_ARGS", "")
+docker_run_args = os.environ.get("DOCKER_RUN_ARGS", "")
 
 # docker registry
 docker_registry_url = os.environ.get("DOCKER_REGISTRY_URL")
-docker_registry_push_allowed = parsebool(os.environ.get("DOCKER_REGISTRY_PUSH_ALLOWED", "0"))
+docker_registry_push_allowed = parsebool(
+    os.environ.get("DOCKER_REGISTRY_PUSH_ALLOWED", "0")
+)
 docker_registry_insecure = parsebool(os.environ.get("DOCKER_REGISTRY_INSECURE", "0"))
 
 # buildkitd settings
