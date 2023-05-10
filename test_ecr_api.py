@@ -43,6 +43,17 @@ def test_auth_header_incomplete(client):
     assert r.get_json() == {"error": "Authorization failed (could not parse Authorization header)"}
 
 
+def test_auth_header_case_insensitive(client):
+    r = client.get("/apps/", headers={"Authorization": "Sage testuser_token"})
+    assert r.status_code == 200
+
+    r = client.get("/apps/", headers={"Authorization": "sage testuser_token"})
+    assert r.status_code == 200
+
+    r = client.get("/apps/", headers={"Authorization": "SAGE testuser_token"})
+    assert r.status_code == 200
+
+
 def test_auth_header_invalid_bearer(client):
     r = client.get("/apps/sage/simple/1.2.3", headers={"Authorization": "xyz testuser_token"})
     assert r.status_code == 401
@@ -320,6 +331,30 @@ source:
     # confirm that image is not in registry on failure
     r = requests.head("http://registry:5000/v2/sagebuildtest/failure/manifests/1.0.0")
     assert r.status_code == 404
+
+
+def test_app_builder_must_be_approved(client):
+    headers = {"Authorization" : "sage notapproved_token"}
+
+    # submit app
+    result = must_submit_app_and_get_json(client, headers=headers, app_yaml="""
+name: simple
+description: "a simple app"
+version: "1.2.3"
+namespace: sage
+source:
+  url: "https://github.com/waggle-sensor/edge-plugins.git"
+  branch: "master"
+  architectures:
+  - "linux/amd64"
+  - "linux/arm64"
+  directory : "plugin-test-success"
+""")
+
+    # attempt to start build
+    r = client.post("/builds/sage/simple/1.2.3?skip_image_push=false", headers=headers)
+    assert r.status_code == 403
+    assert r.get_json() == {"error": "Your account is not approved to perform this action."}
 
 
 def test_app_submit_fails_on_invalid_url(client):

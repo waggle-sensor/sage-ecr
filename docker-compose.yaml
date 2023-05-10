@@ -9,13 +9,16 @@ services:
     ports:
       - "127.0.0.1:5000:5000"
     volumes:
-      - ./:/usr/src/app  # for development only
+      - ./:/app  # for development only
     restart: always
     networks:
       - sage-ecr
     environment:
       # test suite requires this to be set to prevent accidentally wiping production database and registry
       TESTING: "true"
+
+      # gunicorn server settings
+      GUNICORN_CMD_ARGS: "--reload --log-level=debug"
 
       # database settings
       MYSQL_HOST: db
@@ -29,8 +32,8 @@ services:
       JENKINS_TOKEN: test
 
       # registry settings
-      DOCKER_REGISTRY_PASSWORD: ${DOCKER_REGISTRY_PASSWORD}
       DOCKER_REGISTRY_URL: "registry:5000"
+      DOCKER_REGISTRY_PASSWORD:
       DOCKER_REGISTRY_PUSH_ALLOWED: "1"
       DOCKER_REGISTRY_INSECURE: "1"
 
@@ -38,18 +41,21 @@ services:
       BUILDKITD_ADDR: "tcp://buildkitd:1234"
 
       # auth settings (not used for local testing)
-      AUTH_METHOD: ${AUTH_METHOD}
-      tokenInfoEndpoint: ${SageTokenInfoEndpoint}
-      tokenInfoUser: ${SageTokenInfoUser}
-      tokenInfoPassword: ${SageTokenInfoPassword}
+      AUTH_METHOD:
+      tokenInfoEndpoint:
+      tokenInfoUser:
+      tokenInfoPassword:
 
       # s3 settings (not used in local testing)
-      ADD_USER: ${ADD_USER}
-      S3_ENDPOINT: ${S3_ENDPOINT}
-      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
-      S3_SECRET_KEY: ${S3_SECRET_KEY}
-      S3_BUCKET: ${S3_BUCKET}
-      S3_FOLDER: ${S3_FOLDER}
+      S3_ENDPOINT:
+      S3_ACCESS_KEY:
+      S3_SECRET_KEY:
+      S3_BUCKET:
+      S3_FOLDER:
+
+      # redis cache settings
+      REDIS_HOST: "redis"
+      REDIS_TTL_SECONDS: "60"
 
   db:
     image: mysql
@@ -90,6 +96,13 @@ services:
       - tcp://0.0.0.0:1234
     # double check the actual capabilities needed
     privileged: true
+    networks:
+      - sage-ecr
+
+  redis:
+    image: redis
+    ports:
+      - 127.0.0.1:6379:6379
     networks:
       - sage-ecr
 

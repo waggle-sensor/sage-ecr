@@ -50,6 +50,8 @@ import subprocess
 import tempfile
 import boto3
 from botocore.exceptions import ClientError
+import authenticators
+from token_cache import TokenCache
 
 RAW_GITHUB_URL = 'https://raw.githubusercontent.com'
 DEFAULT_BRANCH = 'main'
@@ -58,137 +60,81 @@ DEFAULT_BRANCH = 'main'
 app_submission_counter = Counter("app_submission_counter", "This metric counts the total number of successful app submissions.")
 build_request_counter = Counter("build_request_counter", "This metric counts the total number of requested builds.")
 
+# TODO(sean) make this part of the app config to allow selecting static for testing and sage for deployment.
+if config.auth_method == "static":
+    app_authenticator = authenticators.StaticAuthenticator(config.static_tokens)
+elif config.auth_method == "sage":
+    app_authenticator = authenticators.SageAuthenticator(url=config.tokenInfoEndpoint, password=config.tokenInfoPassword)
+else:
+    raise RuntimeError("invalid authenticator")
 
-# refs/tags/<tagName> or  refs/heads/<branchName>
-#t.substitute({'git_url' : 'https://github.com/sagecontinuum/sage-cli.git'})
+token_cache = TokenCache(
+    host=config.redis_host,
+    port=config.redis_port,
+    ttl_seconds=config.redis_ttl_seconds,
+)
 
-
-
-# do token introspection
-# from https://medium.com/swlh/creating-middlewares-with-python-flask-166bd03f2fd4
-class ecr_middleware:
-    '''
-    Simple WSGI middleware
-    '''
+class ECRAuthMiddleware:
 
     def __init__(self, app):
         self.app = app
-        self.userName = ''
-        self.password = ''
-        #self.authenticated = False
 
     def __call__(self, environ, start_response): # pragma: no cover
-        app.logger.info("calling ecr middleware")
+        app.logger.info("auth middleware: starting request")
 
-        # reminder: -H "Authorization: sage ${SAGE_USER_TOKEN}"
         request = Request(environ)
-        authHeader = request.headers.get("Authorization", default = "")
 
-        environ['authenticated'] = False
-        #print(f"Authorization: {authHeader}", file=sys.stderr)
-
-        if authHeader == "":
-            app.logger.info("auth middleware: no auth header")
+        try:
+            authHeader = request.headers["Authorization"]
+        except KeyError:
+            app.logger.info("auth middleware: no auth provided")
+            environ['authenticated'] = False
             return self.app(environ, start_response)
 
         authHeaderArray = authHeader.split(maxsplit=2)
 
         if len(authHeaderArray) != 2:
-            app.logger.info("bad auth header size")
-            #res = Response(f'Authorization failed (could not parse Authorization header)', mimetype= 'text/plain', status=401)
-            res= ErrorWResponse(f'Authorization failed (could not parse Authorization header)', status_code=HTTPStatus.UNAUTHORIZED)
-            return res(environ, start_response)
+            app.logger.info("auth middleware: bad auth header size")
+            return ErrorWResponse(f'Authorization failed (could not parse Authorization header)', status_code=HTTPStatus.UNAUTHORIZED)(environ, start_response)
 
         bearer, token = authHeaderArray
+        bearer = bearer.lower()
 
         if bearer not in ["sage", "static"]:
-            app.logger.info("bad realm")
-            #res = Response(f'Authorization failed (Authorization bearer not supported)', mimetype= 'text/plain', status=401)
-            res= ErrorWResponse(f'Authorization failed (Authorization bearer not supported)', status_code=HTTPStatus.UNAUTHORIZED)
-            return res(environ, start_response)
+            app.logger.info("auth middleware: bad realm")
+            return ErrorWResponse(f'Authorization failed (Authorization bearer not supported)', status_code=HTTPStatus.UNAUTHORIZED)(environ, start_response)
 
-        # example: curl -X POST -H 'Accept: application/json; indent=4' -H "Authorization: Basic c2FnZS1hcGktc2VydmVyOnRlc3Q=" -d 'token=<SAGE-USER-TOKEN>'  <sage-ui-hostname>:80/token_info/
-        # https://github.com/sagecontinuum/sage-ui/#token-introspection-api
+        app.logger.info("auth middleware: getting token info")
 
-        app.logger.info("auth middleware: request has token")
+        try:
+            token_info = self.get_token_info_with_caching(token)
+        except authenticators.TokenNotFound:
+            return ErrorWResponse('Token not found', status_code=HTTPStatus.UNAUTHORIZED)(environ, start_response)
 
-        ecr_db = None
-        user_id = ""
-        scopes = ""
-        is_admin = False
-
-        # check token cache
-        ecr_db = ecrdb.EcrDB()
-        user_id, scopes , is_admin = ecr_db.getTokenInfo(token)
-        if user_id != "":
-            app.logger.info("auth middleware: using cached token")
-            environ['authenticated'] = True
-            environ['user'] = user_id
-            environ['scopes'] = scopes
-            environ['admin'] = is_admin
-            # TODO(sean) refactor this so there's a common return regardless of if using cached info or not
-            # this can also potentially allow simply passing a static auth component for testing
-            app.logger.info("auth middleware: request authenticated as %s", user_id)
-            return self.app(environ, start_response)
-
-        if config.auth_method == "static":
-            app.logger.info("auth middleware: checking static auth")
-            userObj = config.static_tokens.get(token)
-            if not userObj:
-                #res = Response(f'Token not found', mimetype= 'text/plain', status=401)
-                res= ErrorWResponse(f'Token not found', status_code=HTTPStatus.UNAUTHORIZED)
-                return res(environ, start_response)
-
-           # self.authenticated
-            user_id = userObj.get("id", "")
-            if not user_id:
-                res= ErrorWResponse(f'id missing in user object', status_code=HTTPStatus.UNAUTHORIZED)
-                return res(environ, start_response)
-
-
-
-            is_admin = userObj.get("is_admin", False)
-            scopes = userObj.get("scopes", "")
-
-
-        if config.auth_method == "sage":
-
-            # ask sage token introspection
-            headers = {"Accept":"application/json; indent=4", "Authorization": f"Basic {config.tokenInfoPassword}" , "Content-Type":"application/x-www-form-urlencoded"}
-            data=f"token={token}"
-            r = requests.post(config.tokenInfoEndpoint, data = data, headers=headers, timeout=5)
-
-
-
-            result_obj = r.json()
-            if not "active" in result_obj:
-                #res = Response(f'Authorization failed (broken response) {result_obj}', mimetype= 'text/plain', status=500)
-                res= ErrorWResponse(f'Authorization failed (broken response) {result_obj}', status_code=HTTPStatus.UNAUTHORIZED)
-                return res(environ, start_response)
-
-            is_active = result_obj.get("active", False)
-            if not is_active:
-                #res = Response(f'Authorization failed (token not active)', mimetype= 'text/plain', status=401)
-                res= ErrorWResponse(f'Authorization failed (token not active)', status_code=HTTPStatus.UNAUTHORIZED)
-                return res(environ, start_response)
-
-
-
-            user_id = result_obj.get("username")
-
-        ecr_db.setTokenInfo(token, user_id, scopes, is_admin)
-
-        if not user_id:
-            #res= Response("something went wrong, user_id is missing", status=HTTPStatus.INTERNAL_SERVER_ERROR)
-            res= ErrorWResponse(f'something went wrong, user_id is missing', status_code=HTTPStatus.UNAUTHORIZED)
-            return res(environ, start_response)
-
+        app.logger.info("auth middleware: request authenticated as %s", token_info.user)
         environ['authenticated'] = True
-        environ['user'] = user_id
-        environ['scopes'] = scopes
-        environ['admin'] = is_admin
-        app.logger.info("auth middleware: request authenticated as %s", user_id)
+        environ['user'] = token_info.user
+        environ['scopes'] = token_info.scopes
+        environ['is_admin'] = token_info.is_admin
+        environ['is_approved'] = token_info.is_approved
+
         return self.app(environ, start_response)
+
+    def get_token_info_with_caching(self, token):
+        try:
+            token_info = token_cache.get(token)
+            app.logger.info("auth middleware: using cached token for %s", token_info.user)
+            return token_info
+        except KeyError:
+            pass
+
+        app.logger.info("auth middleware: requesting token")
+        token_info = app_authenticator.get_token_info(token)
+
+        app.logger.info("auth middleware: updating cached token for %s", token_info.user)
+        token_cache.set(token, token_info)
+
+        return token_info
 
 
 def run_command_communicate(command, input_str=None, cwd=None, timeout=None):
@@ -629,7 +575,6 @@ def submit_app(requestUser, isAdmin, force_overwrite, postData, namespace=None, 
         ecr_db.insertApp(col_names_str, values, variables_str, sources_values, resourcesArray)
     except Exception as e:
         raise Exception(f"insertApp returned: {type(e).__name__},{str(e)}")
-    #print(f'row: {row}', file=sys.stderr)
 
     #dbObject["id"] = newID
 
@@ -662,12 +607,12 @@ class Submit(MethodView):
     def post(self):
         app.logger.info("submit: processing request")
         requestUser = request.environ.get('user', "")
-        isAdmin = request.environ.get('admin', False)
+        isAdmin = request.environ.get('is_admin', False)
         force_overwrite = request.args.get("force", "").lower() in ["true", "1"]
 
         app.logger.info("submit: trying to load app spec as json")
         postData = request.get_json(force=True, silent=True)
-        
+
         if not postData:
             app.logger.info("submit: trying to load app spec as yaml")
             # try yaml
@@ -742,11 +687,11 @@ def import_meta_files(app_obj, namespace=None, repository=None, version=None):
 
 # /apps/<string:namespace>/<string:repository>/<string:version>
 class Apps(MethodView):
-    
+
     @login_required
     @has_resource_permission("FULL_CONTROL")
     def delete(self, namespace, repository, version):
-        isAdmin = request.environ.get('admin', False)
+        isAdmin = request.environ.get('is_admin', False)
         requestUser = request.environ.get('user', "")
 
         ecr_db = ecrdb.EcrDB()
@@ -762,7 +707,7 @@ class Apps(MethodView):
     @has_resource_permission("READ")
     def get(self, namespace, repository, version):
         requestUser = request.environ.get('user', "")
-        isAdmin = request.environ.get('admin', False)
+        isAdmin = request.environ.get('is_admin', False)
 
         view = request.args.get('view', "")
 
@@ -801,7 +746,7 @@ class Apps(MethodView):
     def post(self, namespace, repository, version):
         app.logger.info("POST apps")
         requestUser = request.environ.get('user', "")
-        isAdmin = request.environ.get('admin', False)
+        isAdmin = request.environ.get('is_admin', False)
 
         force_overwrite = request.args.get("force", "").lower() in ["true", "1"]
 
@@ -838,7 +783,7 @@ class AppsGlobal(MethodView):
 
     def get(self, namespace=None, repository=None, version=None):
         requestUser = request.environ.get('user', "")
-        isAdmin = request.environ.get('admin', False)
+        isAdmin = request.environ.get('is_admin', False)
 
 
         limit = request.args.get('limit', 1000)
@@ -1037,6 +982,7 @@ def build_app(requestUser, isAdmin, namespace, repository, version, skip_image_p
 # maybe /build/<string:app_id>
 # /builds/<string:namespace>/<string:repository>/<version>
 class Builds(MethodView):
+
     @login_required
     @has_resource_permission( "READ" )
     #def get(self, app_id):
@@ -1044,7 +990,7 @@ class Builds(MethodView):
 
         #namespace, repository, version
         requestUser = request.environ.get('user', "")
-        isAdmin = request.environ.get('admin', False)
+        isAdmin = request.environ.get('is_admin', False)
 
         try:
             result = get_build(requestUser,isAdmin, namespace, repository, version)
@@ -1056,15 +1002,12 @@ class Builds(MethodView):
 
         return jsonify(result)
 
-
-
-
     @login_required
+    @approval_required
     @has_resource_permission( "FULL_CONTROL" )
     def post(self, namespace, repository, version):
-
         requestUser = request.environ.get('user', "")
-        isAdmin = request.environ.get('admin', False)
+        isAdmin = request.environ.get('is_admin', False)
 
         skip_image_push = request.args.get('skip_image_push', "") in ["true", "1"]
 
@@ -1155,7 +1098,7 @@ class Namespace(MethodView):
     def delete(self, namespace, repository = None):
 
         requestUser = request.environ.get('user', "")
-        isAdmin = request.environ.get('admin', "")
+        isAdmin = request.environ.get('is_admin', "")
 
         # check permission
         ecr_db = ecrdb.EcrDB()
@@ -1183,7 +1126,7 @@ class RepositoriesList(MethodView):
         if not namespace:
             namespace = request.args.get('namespace', None)
 
-        isAdmin = request.environ.get('admin', "")
+        isAdmin = request.environ.get('is_admin', "")
 
         filter = {}
         filter["public"] = request.args.get('public', "") in ["true", "1"]
@@ -1244,7 +1187,7 @@ class RepositoriesList(MethodView):
 class Repository(MethodView):
     def get(self, namespace, repository):
         requestUser = request.environ.get('user', "")
-        isAdmin = request.environ.get('admin', "")
+        isAdmin = request.environ.get('is_admin', "")
 
         ecr_db = ecrdb.EcrDB()
 
@@ -1265,7 +1208,7 @@ class Repository(MethodView):
     def delete(self, namespace, repository, version=None):
 
         #requestUser = request.environ.get('user', "")
-        #isAdmin = request.environ.get('admin', "")
+        #isAdmin = request.environ.get('is_admin', "")
 
         ecr_db = ecrdb.EcrDB()
 
@@ -1396,14 +1339,8 @@ class MetaFiles(MethodView):
 
 # /
 class Base(MethodView):
-    
+
     def get(self):
-        # example:  curl localhost:5000/
-        app.logger.debug('this is a DEBUG message')
-        app.logger.info('this is an INFO message')
-        app.logger.warning('this is a WARNING message')
-        app.logger.error('this is an ERROR message')
-        app.logger.critical('this is a CRITICAL message')
         return "SAGE Edge Code Repository"
 
 
@@ -1551,7 +1488,8 @@ def createJenkinsName(app_spec):
 app = Flask(__name__)
 CORS(app)
 app.config["PROPAGATE_EXCEPTIONS"] = True
-app.wsgi_app = ecr_middleware(app.wsgi_app)
+app.config["MAX_CONTENT_LENGTH"] = 32*1024 # 32K
+app.wsgi_app = ECRAuthMiddleware(app.wsgi_app)
 
 
 @app.errorhandler(ErrorResponse)
@@ -1599,13 +1537,15 @@ app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
 })
 
 gunicorn_logger = logging.getLogger('gunicorn.error')
+
 app.logger.handlers = gunicorn_logger.handlers
 app.logger.setLevel(gunicorn_logger.level)
 
-ecrdb.logger = logging.getLogger('gunicorn.error')
+ecrdb.logger.handlers = gunicorn_logger.handlers
+ecrdb.logger.setLevel(gunicorn_logger.level)
+
+authenticators.logger.handlers = gunicorn_logger.handlers
+authenticators.logger.setLevel(gunicorn_logger.level)
 
 if __name__ == '__main__':
-    #gunicorn_logger = logging.getLogger('gunicorn.error')
-    #app.logger.handlers = gunicorn_logger.handlers
-    #app.logger.setLevel(gunicorn_logger.level)
     app.run(debug=True, host='0.0.0.0')

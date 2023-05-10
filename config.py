@@ -100,8 +100,6 @@ input_valid_types = ["boolean", "int", "long", "float", "double", "string", "Fil
 dbAppsFields_str  = ",".join(mysql_Apps_fields.keys())
 dbSourcesFields_str  = ",".join(mysql_Sources_fields.keys())
 
-
-
 auth_method = os.getenv('AUTH_METHOD', default="static") # or sage
 if auth_method=="":
     auth_method = "static"
@@ -125,23 +123,29 @@ if auth_method == "sage":
 
 # static_tokens: only used for testing
 static_tokens = {
-    "testuser_token": {"id": "testuser"},
-    "testuser2_token": {"id": "testuser2"},
-    "admin_token": {"id":"admin", "is_admin": True},
-    "sage_docker_auth_token": {"id": "sage_docker_auth", "scopes":"ecr_authz_introspection"},
+    "testuser_token": {
+        "id": "testuser",
+        "is_approved": True,
+    },
+    "testuser2_token": {
+        "id": "testuser2",
+        "is_approved": True,
+    },
+    "notapproved_token": {
+        "id": "notapproved",
+        "is_approved": False,
+    },
+    "admin_token": {
+        "id":"admin",
+        "is_admin": True,
+        "is_approved": True,
+    },
+    "sage_docker_auth_token": {
+        "id": "sage_docker_auth",
+        "scopes":"ecr_authz_introspection",
+        "is_approved": False,
+    },
 }
-
-add_user=os.getenv('ADD_USER', default="")
-if add_user:
-    add_user_array = add_user.split(",")
-    if len(add_user_array) != 2:
-        sys.exit(f"Cannot parse ADD_USER")
-
-    x_token = add_user_array[0]
-    x_user_id = add_user_array[1]
-    static_tokens[x_token] = {  "id":x_user_id }
-    print(f'added token {x_token} for user {x_user_id}', file=sys.stderr)
-
 
 # jenkins
 jenkins_user = os.environ.get("JENKINS_USER", "ecrdb")
@@ -152,9 +156,14 @@ docker_build_args = os.environ.get("DOCKER_BUILD_ARGS", "")
 docker_run_args =os.environ.get("DOCKER_RUN_ARGS", "")
 
 # docker registry
-docker_registry_url = os.environ["DOCKER_REGISTRY_URL"]
+docker_registry_url = os.environ.get("DOCKER_REGISTRY_URL")
 docker_registry_push_allowed = parsebool(os.environ.get("DOCKER_REGISTRY_PUSH_ALLOWED", "0"))
 docker_registry_insecure = parsebool(os.environ.get("DOCKER_REGISTRY_INSECURE", "0"))
 
 # buildkitd settings
-buildkitd_address = os.environ["BUILDKITD_ADDR"]
+buildkitd_address = os.environ.get("BUILDKITD_ADDR")
+
+# redis cache settings
+redis_host = os.environ.get("REDIS_HOST", "localhost")
+redis_port = int(os.environ.get("REDIS_PORT", "6379"))
+redis_ttl_seconds = int(os.environ.get("REDIS_TTL_SECONDS", "60"))

@@ -37,18 +37,18 @@ class JenkinsServer:
 
         git_url = source.get("url", "")
 
-        git_branch = source.get("tag", "")
+        tag = source.get("tag") or ""
+        branch = source.get("branch") or ""
 
-        if git_branch == None or git_branch == "":
-            git_branch = source.get("branch", "")
-            if git_branch == None or git_branch == "":
-                raise Exception("neither tag nor branch specified")
+        if tag != "":
+            git_branch = f"refs/tags/{tag}"
+        elif branch != "":
+            git_branch = branch
         else:
-            git_branch = f"refs/tags/{git_branch}"
+            raise Exception("neither tag nor branch specified")
 
         git_directory = source.get("directory", ".")
-        if git_directory.startswith("/"):
-            git_directory=git_directory[1:]
+        git_directory = git_directory.removeprefix("/")
 
         git_dockerfile = source.get("dockerfile", "./Dockerfile")
 

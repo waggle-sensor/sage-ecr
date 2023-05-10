@@ -1,8 +1,5 @@
-
 from http import HTTPStatus
 import werkzeug
-from werkzeug.exceptions import HTTPException
-
 from werkzeug.wrappers import Response
 import json
 
@@ -25,6 +22,5 @@ class ErrorResponse(werkzeug.exceptions.HTTPException):
 
 
 def ErrorWResponse(message, status_code=None, payload=None):
-
     return Response(json.dumps({"error":message}), mimetype="application/json", headers={"Access-Control-Allow-Origin": "*"},  status=status_code)
 
