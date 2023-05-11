@@ -54,6 +54,8 @@ from botocore.exceptions import ClientError
 import authenticators
 from token_cache import TokenCache
 
+from pathlib import Path
+
 RAW_GITHUB_URL = "https://raw.githubusercontent.com"
 DEFAULT_BRANCH = "main"
 
@@ -188,12 +190,8 @@ def preprocess_repository(url, branchOrTag, custom_version, namespace, repositor
     version = ""
     git_hash_long = ""
 
-    temp_dir = config.ecr_temp_dir
-
-    if not os.path.exists(temp_dir):
-        os.makedirs(temp_dir)
-
-    wait_count = 0
+    temp_dir = Path(config.ecr_temp_dir)
+    temp_dir.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory(dir=temp_dir) as tmpdirname:
         app.logger.debug(f"tmpdirname: {tmpdirname}")
@@ -260,9 +258,20 @@ def preprocess_repository(url, branchOrTag, custom_version, namespace, repositor
         else:
             final_version = version
 
+        target_gzip = Path(temp_dir, f"{namespace}_{repository}_{final_version}.tgz")
+
+        # check that user submission artifact lives directly in temp_dir
+        if target_gzip.parent != temp_dir:
+            app.logger.error(
+                "preprocess_repository: invalid repo gzip artifact path: %s",
+                target_gzip,
+            )
+            raise Exception(
+                f"Invalid submission! Check that namespace, repository and version are all valid."
+            )
+
         # tar -czvf file.tar.gz directory
-        target_gzip = f"{temp_dir}/{namespace}_{repository}_{final_version}.tgz"
-        command = ["tar", "-czvf", target_gzip, "."]
+        command = ["tar", "-czvf", str(target_gzip), "."]
         stdout, stderr, exit_code = run_command_communicate(command, cwd=tmpdirname)
         stdout_str = ""
         if stdout:
