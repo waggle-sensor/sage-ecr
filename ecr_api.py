@@ -189,11 +189,7 @@ def preprocess_repository(url, branchOrTag, custom_version, namespace, repositor
     git_hash_long = ""
 
     temp_dir = config.ecr_temp_dir
-
-    if not os.path.exists(temp_dir):
-        os.makedirs(temp_dir)
-
-    wait_count = 0
+    os.makedirs(temp_dir, exist_ok=True)
 
     with tempfile.TemporaryDirectory(dir=temp_dir) as tmpdirname:
         app.logger.debug(f"tmpdirname: {tmpdirname}")
@@ -260,8 +256,15 @@ def preprocess_repository(url, branchOrTag, custom_version, namespace, repositor
         else:
             final_version = version
 
-        # tar -czvf file.tar.gz directory
         target_gzip = f"{temp_dir}/{namespace}_{repository}_{final_version}.tgz"
+
+        # check that user submission artifact lives directly in temp_dir
+        if os.path.dirname(target_gzip) != temp_dir:
+            raise Exception(
+                "User submission has invalid namespace, repository or version."
+            )
+
+        # tar -czvf file.tar.gz directory
         command = ["tar", "-czvf", target_gzip, "."]
         stdout, stderr, exit_code = run_command_communicate(command, cwd=tmpdirname)
         stdout_str = ""
