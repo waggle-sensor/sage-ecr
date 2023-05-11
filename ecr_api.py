@@ -260,7 +260,13 @@ def preprocess_repository(url, branchOrTag, custom_version, namespace, repositor
 
         # check that user submission artifact lives directly in temp_dir
         if os.path.dirname(target_gzip) != temp_dir:
-            raise Exception(f"Invalid repo gzip artifact path: {target_gzip}")
+            app.logger.error(
+                "preprocess_repository: invalid repo gzip artifact path: %s",
+                target_gzip,
+            )
+            raise Exception(
+                f"Invalid submission! Check that namespace, repository and version are all valid."
+            )
 
         # tar -czvf file.tar.gz directory
         command = ["tar", "-czvf", target_gzip, "."]
